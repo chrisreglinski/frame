@@ -49,7 +49,7 @@ def _season_3phase(phase4: pd.Series) -> pd.Series:
 
 _RAW_ODDS = {
     "b365": {"home": "B365H", "draw": "B365D", "away": "B365A"},
-    "avg":  {"home": "AvgH",  "draw": "AvgD",  "away": "AvgA"},
+    "mrkt": {"home": "AvgH",  "draw": "AvgD",  "away": "AvgA"},
 }
 
 

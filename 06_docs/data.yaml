@@ -120,7 +120,7 @@ columns:
     table: match_info
     description: "odds from {bookmaker} for outcome {outcome}"
     dims:
-      bookmaker: [b365, avg]
+      bookmaker: [b365, mrkt]
       outcome: [home, draw, away]
     dtype: float
     range: [1.01, 100]
@@ -129,7 +129,7 @@ columns:
     table: match_info
     description: "implied probability of {outcome} from {bookmaker} odds (1/odds)"
     dims:
-      bookmaker: [b365, avg]
+      bookmaker: [b365, mrkt]
       outcome: [home, draw, away]
     dtype: float
     range: [0, 1]
@@ -138,7 +138,7 @@ columns:
     table: match_info
     description: "{bookmaker} overround on HDA market (sum of implied - 1)"
     dims:
-      bookmaker: [b365, avg]
+      bookmaker: [b365, mrkt]
     dtype: float
     range: [0, 0.2]
 
@@ -146,7 +146,7 @@ columns:
     table: match_info
     description: "shannon entropy of normalized {bookmaker} implied probabilities (H/D/A); max = log2(3) ~ 1.585"
     dims:
-      bookmaker: [b365, avg]
+      bookmaker: [b365, mrkt]
     dtype: float
     range: [0, 1.585]
 
@@ -265,7 +265,7 @@ columns:
 
   "{side}_{window}_implied_{outcome}_avg":
     table: team_stats
-    description: "avg bookmaker (avg) implied probability of {outcome} for {side} team over {window}"
+    description: "mrkt bookmaker implied probability of {outcome} for {side} team over {window}"
     dims:
       side: [homet, awayt]
       window: [season, rolling6, rolling8]
