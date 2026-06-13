@@ -51,13 +51,13 @@ def build_match_matchup_stats() -> pd.DataFrame:
     computed = {}
     for w in _windows():
         computed[f"teams_{w}_goals_foragst_avg_max"] = src[[
-            f"home_{w}_goals_for_avg",
-            f"home_{w}_goals_agst_avg",
-            f"away_{w}_goals_for_avg",
-            f"away_{w}_goals_agst_avg",
+            f"homet_{w}_goals_for_avg",
+            f"homet_{w}_goals_agst_avg",
+            f"awayt_{w}_goals_for_avg",
+            f"awayt_{w}_goals_agst_avg",
         ]].max(axis=1)
         computed[f"teams_{w}_goals_diff_diff"] = (
-            src[f"home_{w}_goals_diff_avg"] - src[f"away_{w}_goals_diff_avg"]
+            src[f"homet_{w}_goals_diff_avg"] - src[f"awayt_{w}_goals_diff_avg"]
         )
 
     result = pd.concat(

@@ -73,6 +73,30 @@ columns:
     inputs: [Date]
     dtype: string
 
+  season_game_number:
+    table: match_info
+    description: "sequential match number in the league-season (1 = first match of the season)"
+    dtype: int
+    range: [1, 380]
+
+  gameweek:
+    table: match_info
+    description: "gameweek number; derived as ceil(season_game_number / (n_teams/2)) where n_teams is counted per league-season"
+    dtype: int
+    range: [1, 38]
+
+  season_4phase:
+    table: match_info
+    description: "season phase (4 levels) based on international breaks; boundaries from 01_data/01_raw/03_dates/season_limit_dates.csv"
+    dtype: string
+    categories: [summer, fall, winter, spring]
+
+  season_3phase:
+    table: match_info
+    description: "season phase (3 levels): start=summer, mid=fall+winter, end=spring"
+    dtype: string
+    categories: [start, mid, end]
+
   home_is_promoted:
     table: match_info
     description: "home team promoted to the league this season"
@@ -118,11 +142,19 @@ columns:
     dtype: float
     range: [0, 0.2]
 
+  "{bookmaker}_entropy":
+    table: match_info
+    description: "shannon entropy of normalized {bookmaker} implied probabilities (H/D/A); max = log2(3) ~ 1.585"
+    dims:
+      bookmaker: [b365, avg]
+    dtype: float
+    range: [0, 1.585]
+
   "{side}_game_number":
     table: team_stats
     description: "sequential match number for the {side} team in the season (1 = first match)"
     dims:
-      side: [home, away]
+      side: [homet, awayt]
     dtype: int
     range: [1, 38]
 
@@ -130,8 +162,8 @@ columns:
     table: team_stats
     description: "arithmetic mean of {metric} {kind} per match over {window}, {side} team"
     dims:
-      side: [home, away]
-      window: [season]
+      side: [homet, awayt]
+      window: [season, rolling6, rolling8]
       metric: [goals, shots, shots_on_target, corners, yellow]
       kind: [for, agst]
     dtype: float
@@ -140,8 +172,8 @@ columns:
     table: team_stats
     description: "arithmetic mean of {metric} per match over {window}, {side} team"
     dims:
-      side: [home, away]
-      window: [season]
+      side: [homet, awayt]
+      window: [season, rolling6, rolling8]
       metric: [points, goals_diff, goals_total]
     dtype: float
 
@@ -149,8 +181,8 @@ columns:
     table: team_stats
     description: "standard deviation of {metric} per match over {window}, {side} team"
     dims:
-      side: [home, away]
-      window: [season]
+      side: [homet, awayt]
+      window: [season, rolling6, rolling8]
       metric: [points, goals_diff, goals_total]
     dtype: float
 
@@ -158,8 +190,8 @@ columns:
     table: team_stats
     description: "share of matches with {result} over {window}, {side} team"
     dims:
-      side: [home, away]
-      window: [season]
+      side: [homet, awayt]
+      window: [season, rolling6, rolling8]
       result: [wins, draws, losses]
     dtype: float
     range: [0, 1]
@@ -168,8 +200,8 @@ columns:
     table: team_stats
     description: "share of matches with total goals <= {x} over {window}, {side} team"
     dims:
-      side: [home, away]
-      window: [season]
+      side: [homet, awayt]
+      window: [season, rolling6, rolling8]
       x: [0, 1, 2, 3]
     dtype: float
     range: [0, 1]
@@ -178,8 +210,8 @@ columns:
     table: team_stats
     description: "share of matches with total goals >= {x} over {window}, {side} team"
     dims:
-      side: [home, away]
-      window: [season]
+      side: [homet, awayt]
+      window: [season, rolling6, rolling8]
       x: [2, 3, 4]
     dtype: float
     range: [0, 1]
@@ -188,8 +220,8 @@ columns:
     table: team_stats
     description: "share of matches with goals {kind} <= {x} over {window}, {side} team"
     dims:
-      side: [home, away]
-      window: [season]
+      side: [homet, awayt]
+      window: [season, rolling6, rolling8]
       kind: [for, agst]
       x: [0, 1]
     dtype: float
@@ -199,8 +231,8 @@ columns:
     table: team_stats
     description: "share of matches with goals {kind} >= {x} over {window}, {side} team"
     dims:
-      side: [home, away]
-      window: [season]
+      side: [homet, awayt]
+      window: [season, rolling6, rolling8]
       kind: [for, agst]
       x: [2, 3]
     dtype: float
@@ -210,8 +242,8 @@ columns:
     table: team_stats
     description: "cumulative shots on target / cumulative shots ({kind}) over {window}, {side} team"
     dims:
-      side: [home, away]
-      window: [season]
+      side: [homet, awayt]
+      window: [season, rolling6, rolling8]
       kind: [for, agst]
     dtype: float
     range: [0, 1]
@@ -220,30 +252,50 @@ columns:
     table: team_stats
     description: "average red cards received per match over {window}, {side} team"
     dims:
-      side: [home, away]
-      window: [season]
+      side: [homet, awayt]
+      window: [season, rolling6, rolling8]
     dtype: float
 
   "{side}_red_last_match":
     table: team_stats
     description: "{side} team received a red card in its previous match (NaN if no previous match)"
     dims:
-      side: [home, away]
+      side: [homet, awayt]
     dtype: bool
+
+  "{side}_{window}_implied_{outcome}_avg":
+    table: team_stats
+    description: "avg bookmaker (avg) implied probability of {outcome} for {side} team over {window}"
+    dims:
+      side: [homet, awayt]
+      window: [season, rolling6, rolling8]
+      outcome: [win, draw, loss]
+    dtype: float
+    range: [0, 1]
+
+  "{side}_{window}_profit_{outcome}":
+    table: team_stats
+    description: "edge on {outcome} market over {window}: {outcome}_ratio minus implied_{outcome}_avg"
+    dims:
+      side: [homet, awayt]
+      window: [season, rolling6, rolling8]
+      outcome: [win, draw, loss]
+    dtype: float
+    range: [-1, 1]
 
 
   "teams_{window}_goals_foragst_avg_max":
     table: match_matchup_stats
     description: "max over the four values: home/away {window} goals for/agst avg; low value = both teams score little and concede little"
     dims:
-      window: [season]
+      window: [season, rolling6, rolling8]
     dtype: float
 
   "teams_{window}_goals_diff_diff":
     table: match_matchup_stats
     description: "home {window} goals_diff avg minus away {window} goals_diff avg; positive = home team stronger on goal balance"
     dims:
-      window: [season]
+      window: [season, rolling6, rolling8]
     dtype: float
 
 

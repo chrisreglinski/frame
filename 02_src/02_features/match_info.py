@@ -3,6 +3,7 @@ import itertools
 import math
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import yaml
 
@@ -12,9 +13,39 @@ _RAW_DIR = _ROOT / "01_data" / "01_raw" / "01_matches"
 _STADIUMS_DIR = _ROOT / "01_data" / "01_raw" / "02_stadiums"
 _FEATURES_DIR = _ROOT / "01_data" / "02_features"
 _YAML_PATH = _ROOT / "06_docs" / "data.yaml"
+_DATES_PATH = _ROOT / "01_data" / "01_raw" / "03_dates" / "season_limit_dates.csv"
 
 _LEAGUES = ["england", "spain", "italy", "germany", "france"]
 _SEASONS = ["2223", "2324", "2425", "2526"]
+
+def _load_phase_limits() -> dict[str, dict[str, pd.Timestamp]]:
+    df = pd.read_csv(_DATES_PATH, dtype={"season": str}, parse_dates=["summer_fall", "fall_winter", "winter_spring"])
+    return {
+        row["season"]: {
+            "summer_fall":  row["summer_fall"],
+            "fall_winter":  row["fall_winter"],
+            "winter_spring": row["winter_spring"],
+        }
+        for _, row in df.iterrows()
+    }
+
+
+def _season_4phase(date: pd.Series, season: str, limits: dict) -> pd.Series:
+    lim = limits[season]
+    return pd.cut(
+        date,
+        bins=[pd.Timestamp.min, lim["summer_fall"], lim["fall_winter"], lim["winter_spring"], pd.Timestamp.max],
+        labels=["summer", "fall", "winter", "spring"],
+        right=False,
+    ).astype(str)
+
+
+_3PHASE_MAP = {"summer": "start", "fall": "mid", "winter": "mid", "spring": "end"}
+
+
+def _season_3phase(phase4: pd.Series) -> pd.Series:
+    return phase4.map(_3PHASE_MAP)
+
 
 _RAW_ODDS = {
     "b365": {"home": "B365H", "draw": "B365D", "away": "B365A"},
@@ -84,12 +115,16 @@ def _check_missing(teams: set[str], stadiums: dict, league: str, season: str) ->
         raise ValueError("missing stadium entries:\n" + "\n".join(lines))
 
 
-def _load_file(path: Path, stadiums: dict[str, dict]) -> pd.DataFrame:
+def _load_file(path: Path, stadiums: dict[str, dict], limits: dict) -> pd.DataFrame:
     league, season = path.stem.split("_", 1)
     raw = pd.read_csv(path)
 
     all_teams = set(raw["HomeTeam"]) | set(raw["AwayTeam"])
     _check_missing(all_teams, stadiums, league, season)
+
+    matches_per_gw = len(all_teams) // 2
+    season_game_number = pd.Series(range(1, len(raw) + 1))
+    gameweek = ((season_game_number - 1) // matches_per_gw + 1).rename("gameweek")
 
     date = _parse_dates(raw["Date"])
     odds, impl, margins = {}, {}, {}
@@ -99,6 +134,12 @@ def _load_file(path: Path, stadiums: dict[str, dict]) -> pd.DataFrame:
             odds[f"{bk}_{outcome}_odds"] = raw[raw_col]
             impl[f"{bk}_{outcome}_impl"] = 1.0 / raw[raw_col]
         margins[f"{bk}_margin"] = sum(1.0 / raw[c] for c in mapping.values()) - 1
+
+    entropies = {}
+    for bk, mapping in _RAW_ODDS.items():
+        p = pd.DataFrame({o: impl[f"{bk}_{o}_impl"] for o in mapping})
+        p_norm = p.div(p.sum(axis=1), axis=0)
+        entropies[f"{bk}_entropy"] = -(p_norm * np.log2(p_norm)).sum(axis=1)
 
     home_is_promoted = raw["HomeTeam"].map(lambda t: stadiums[t]["promoted"])
     away_is_promoted = raw["AwayTeam"].map(lambda t: stadiums[t]["promoted"])
@@ -120,6 +161,10 @@ def _load_file(path: Path, stadiums: dict[str, dict]) -> pd.DataFrame:
         date.rename("date"),
         raw["Time"].rename("time"),
         date.dt.day_name().rename("day_of_week"),
+        season_game_number.rename("season_game_number"),
+        gameweek,
+        _season_4phase(date, season, limits).rename("season_4phase"),
+        _season_3phase(_season_4phase(date, season, limits)).rename("season_3phase"),
         raw["HomeTeam"].rename("home_team"),
         raw["AwayTeam"].rename("away_team"),
         home_is_promoted.rename("home_is_promoted"),
@@ -128,11 +173,13 @@ def _load_file(path: Path, stadiums: dict[str, dict]) -> pd.DataFrame:
         pd.DataFrame(odds),
         pd.DataFrame(impl),
         pd.DataFrame(margins),
+        pd.DataFrame(entropies),
     ], axis=1)
 
 
 def build_match_info() -> pd.DataFrame:
     cols = ["match_id"] + _columns()
+    limits = _load_phase_limits()
     frames = []
     for league in _LEAGUES:
         for season in _SEASONS:
@@ -140,7 +187,7 @@ def build_match_info() -> pd.DataFrame:
             if not path.exists():
                 continue
             stadiums = _load_stadiums(league, season)
-            frames.append(_load_file(path, stadiums))
+            frames.append(_load_file(path, stadiums, limits))
 
     df = pd.concat(frames, ignore_index=True)[cols]
 

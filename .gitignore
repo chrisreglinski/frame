@@ -16,7 +16,9 @@ __pycache__/
 venv/
 .env
 
-# Notebooks checkpoints
+# Notebooks — only template is tracked; push others explicitly when needed
+03_notebooks/*.ipynb
+!03_notebooks/template.ipynb
 .ipynb_checkpoints/
 
 # Reports
