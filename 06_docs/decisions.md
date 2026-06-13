@@ -1,3 +1,9 @@
+## 2026-06-13 — Rolling windows: min_periods=1 + explicit early-season mask
+Rolling aggregations use `min_periods=1` so a single missing raw value mid-season doesn't
+produce NaN for the whole window. Early-season NaN is enforced separately: after all
+computations, every rolling column is set to NaN where `game_number <= window_size`.
+This keeps the two concerns independent and explicit.
+
 ## 2026-06-13 — ABT parametrization
 `build_abt()` always produces the full wide table (all columns, all rows). No parametrization.
 Filtering by rows (league, season, game_number threshold) and columns (features vs targets) is done downstream in notebooks. The full ABT is small enough to hold in memory, and slicing pandas is trivial.

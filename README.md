@@ -31,6 +31,7 @@ Source: [football-data.co.uk](https://www.football-data.co.uk)
   02_features/         # generated feature tables (gitignored, rebuild locally)
   03_abt/              # final wide ABT (gitignored, rebuild locally)
 02_src/
+  01_raw/              # match_raw_stats builder (aggregates raw CSVs)
   02_features/         # feature builders (one file per table)
 03_notebooks/          # exploratory notebooks (gitignored except template.ipynb)
 04_models/             # trained models (gitignored)
@@ -120,22 +121,14 @@ Full table always generated; filter by league/season/phase/game_number downstrea
 
 ## Rebuild pipeline
 
-```python
-import sys
-sys.path.insert(0, '02_src/02_features')
-
-from match_info import build_match_info
-from match_team_stats import build_match_team_stats
-from match_matchup_stats import build_match_matchup_stats
-from match_target import build_match_target
-from abt import build_abt
-
-build_match_info()
-build_match_team_stats()
-build_match_matchup_stats()
-build_match_target()
-build_abt()
+```bash
+python build_abt.py             # rebuild everything
+python build_abt.py --skip-raw  # skip match_raw_stats (when raw CSVs are unchanged)
 ```
+
+`build_abt.py` in the project root runs all builders in dependency order and prints
+timing for each step. Use `--skip-raw` for the common case where the source CSVs
+in `01_data/01_raw/01_matches/` have not changed.
 
 Or use `03_notebooks/template.ipynb` to load all tables directly.
 

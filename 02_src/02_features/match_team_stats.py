@@ -122,19 +122,19 @@ def _build_long(raw: pd.DataFrame, league: str, season: str) -> pd.DataFrame:
 def _agg_mean(g, col, w):
     if w is None:
         return g[col].transform(lambda x: x.shift(1).expanding(min_periods=1).mean())
-    return g[col].transform(lambda x: x.shift(1).rolling(w, min_periods=w).mean())
+    return g[col].transform(lambda x: x.shift(1).rolling(w, min_periods=1).mean())
 
 
 def _agg_std(g, col, w):
     if w is None:
         return g[col].transform(lambda x: x.shift(1).expanding(min_periods=1).std(ddof=0))
-    return g[col].transform(lambda x: x.shift(1).rolling(w, min_periods=w).std(ddof=0))
+    return g[col].transform(lambda x: x.shift(1).rolling(w, min_periods=1).std(ddof=0))
 
 
 def _agg_sum(g, col, w):
     if w is None:
         return g[col].transform(lambda x: x.shift(1).expanding(min_periods=1).sum())
-    return g[col].transform(lambda x: x.shift(1).rolling(w, min_periods=w).sum())
+    return g[col].transform(lambda x: x.shift(1).rolling(w, min_periods=1).sum())
 
 
 def _add_stats(long: pd.DataFrame) -> pd.DataFrame:
@@ -195,6 +195,13 @@ def _add_stats(long: pd.DataFrame) -> pd.DataFrame:
         .where(red_shifted.notna(), other=pd.NA)
         .astype(pd.BooleanDtype())
     )
+
+    # mask rolling windows for matches with insufficient history
+    for wname, wsize in _WINDOWS.items():
+        if wsize is None:
+            continue
+        window_cols = [c for c in long.columns if c.startswith(f"{wname}_")]
+        long.loc[long["game_number"] <= wsize, window_cols] = pd.NA
 
     return long.copy()
 

@@ -1,4 +1,6 @@
 # Generated data — rebuild with builders
+01_data/01_raw/match_raw_stats.csv
+01_data/01_raw/match_raw_stats.parquet
 01_data/02_features/*
 !01_data/02_features/.gitkeep
 01_data/03_abt/*

@@ -1,8 +1,10 @@
 ## raw/matches
 - germany_2425: row 121 (Union Berlin vs Bochum, 14/12/2024) — HS, AS, HST, AST, HC, AC,
-  HY, AY, HR, AR all NaN. Goals (FTHG, FTAG, FTR) are present. Consequence: rolling6/rolling8
-  averages for shots, corners, yellow, red for both clubs carry NaN for several subsequent
-  matches. Left as-is — NaN is honest signal for downstream models.
+  HY, AY, HR, AR all NaN. Goals (FTHG, FTAG, FTR) are present. Rolling windows use
+  min_periods=1 so the average is computed over available non-NaN values within the window;
+  early-season NaN is enforced separately via explicit mask (game_number <= window_size).
+  Residual effect: red_last_match is NaN for the next match of both clubs (red_for was NaN,
+  shift(1) propagates it). Left as-is.
 - france_2526: 305 matches (not 306) - Nantes vs Toulouse (17 May 2026,
   final matchday) abandoned in the 22nd minute at 0-0 after Nantes fans
   stormed the pitch in protest against relegation. Football-data does not
