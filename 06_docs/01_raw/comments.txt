@@ -1,0 +1,6 @@
+## raw/matches
+- france_2526: 305 matches (not 306) - Nantes vs Toulouse (17 May 2026,
+  final matchday) abandoned in the 22nd minute at 0-0 after Nantes fans
+  stormed the pitch in protest against relegation. Football-data does not
+  include rows for unresolved matches. If LFP later awards a forfeit,
+  the source file may be updated and the count may change to 306.

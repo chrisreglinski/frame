@@ -1,0 +1,298 @@
+schema_version: 1
+
+ids:
+
+  match_id:
+    description: "match identifier"
+    built_from: [league, season, home_team, away_team]
+    rule: "md5(league|season|home_team|away_team)"
+    dtype: string
+
+tables:
+
+  match_info:
+    id: match_id
+    source: [raw/matches, raw/stadiums]
+
+  match_target:
+    id: match_id
+    source: raw/matches
+
+  team_stats:
+    id: match_id
+    source: raw/matches
+    note: "one row per match; team statistics as home_/away_ dimensioned
+           features. all stats computed from matches strictly BEFORE the
+           match date (current match excluded). first matches carry NaN stats"
+
+  match_matchup_stats:
+    id: match_id
+    source: features/team_stats
+    note: "one row per match; comparative features derived from team_stats
+           home_/away_ columns. windowing follows team_stats."
+
+columns:
+
+  league:
+    table: match_info
+    description: "league (england, spain, italy, germany, france)"
+    dtype: string
+
+  season:
+    table: match_info
+    description: "season, e.g. '2223'"
+    dtype: string
+
+  home_team:
+    table: match_info
+    description: "home team"
+    inputs: [HomeTeam]
+    dtype: string
+
+  away_team:
+    table: match_info
+    description: "away team"
+    inputs: [AwayTeam]
+    dtype: string
+
+  date:
+    table: match_info
+    description: "match date"
+    inputs: [Date]
+    dtype: date
+
+  time:
+    table: match_info
+    description: "kick-off time"
+    inputs: [Time]
+    dtype: string
+
+  day_of_week:
+    table: match_info
+    description: "day of week of the match"
+    inputs: [Date]
+    dtype: string
+
+  home_is_promoted:
+    table: match_info
+    description: "home team promoted to the league this season"
+    inputs: [Promotee]
+    dtype: bool
+
+  away_is_promoted:
+    table: match_info
+    description: "away team promoted to the league this season"
+    inputs: [Promotee]
+    dtype: bool
+
+  travel_distance_km:
+    table: match_info
+    description: "haversine distance between home and away team stadiums"
+    inputs: [Latitude, Longitude]
+    dtype: float
+    range: [0, 4000]
+
+  "{bookmaker}_{outcome}_odds":
+    table: match_info
+    description: "odds from {bookmaker} for outcome {outcome}"
+    dims:
+      bookmaker: [b365, avg]
+      outcome: [home, draw, away]
+    dtype: float
+    range: [1.01, 100]
+
+  "{bookmaker}_{outcome}_impl":
+    table: match_info
+    description: "implied probability of {outcome} from {bookmaker} odds (1/odds)"
+    dims:
+      bookmaker: [b365, avg]
+      outcome: [home, draw, away]
+    dtype: float
+    range: [0, 1]
+
+  "{bookmaker}_margin":
+    table: match_info
+    description: "{bookmaker} overround on HDA market (sum of implied - 1)"
+    dims:
+      bookmaker: [b365, avg]
+    dtype: float
+    range: [0, 0.2]
+
+  "{side}_game_number":
+    table: team_stats
+    description: "sequential match number for the {side} team in the season (1 = first match)"
+    dims:
+      side: [home, away]
+    dtype: int
+    range: [1, 38]
+
+  "{side}_{window}_{metric}_{kind}_avg":
+    table: team_stats
+    description: "arithmetic mean of {metric} {kind} per match over {window}, {side} team"
+    dims:
+      side: [home, away]
+      window: [season]
+      metric: [goals, shots, shots_on_target, corners, yellow]
+      kind: [for, agst]
+    dtype: float
+
+  "{side}_{window}_{metric}_avg":
+    table: team_stats
+    description: "arithmetic mean of {metric} per match over {window}, {side} team"
+    dims:
+      side: [home, away]
+      window: [season]
+      metric: [points, goals_diff, goals_total]
+    dtype: float
+
+  "{side}_{window}_{metric}_std":
+    table: team_stats
+    description: "standard deviation of {metric} per match over {window}, {side} team"
+    dims:
+      side: [home, away]
+      window: [season]
+      metric: [points, goals_diff, goals_total]
+    dtype: float
+
+  "{side}_{window}_{result}_ratio":
+    table: team_stats
+    description: "share of matches with {result} over {window}, {side} team"
+    dims:
+      side: [home, away]
+      window: [season]
+      result: [wins, draws, losses]
+    dtype: float
+    range: [0, 1]
+
+  "{side}_{window}_goals_total_le{x}_ratio":
+    table: team_stats
+    description: "share of matches with total goals <= {x} over {window}, {side} team"
+    dims:
+      side: [home, away]
+      window: [season]
+      x: [0, 1, 2, 3]
+    dtype: float
+    range: [0, 1]
+
+  "{side}_{window}_goals_total_ge{x}_ratio":
+    table: team_stats
+    description: "share of matches with total goals >= {x} over {window}, {side} team"
+    dims:
+      side: [home, away]
+      window: [season]
+      x: [2, 3, 4]
+    dtype: float
+    range: [0, 1]
+
+  "{side}_{window}_goals_{kind}_le{x}_ratio":
+    table: team_stats
+    description: "share of matches with goals {kind} <= {x} over {window}, {side} team"
+    dims:
+      side: [home, away]
+      window: [season]
+      kind: [for, agst]
+      x: [0, 1]
+    dtype: float
+    range: [0, 1]
+
+  "{side}_{window}_goals_{kind}_ge{x}_ratio":
+    table: team_stats
+    description: "share of matches with goals {kind} >= {x} over {window}, {side} team"
+    dims:
+      side: [home, away]
+      window: [season]
+      kind: [for, agst]
+      x: [2, 3]
+    dtype: float
+    range: [0, 1]
+
+  "{side}_{window}_shots_on_target_{kind}_ratio":
+    table: team_stats
+    description: "cumulative shots on target / cumulative shots ({kind}) over {window}, {side} team"
+    dims:
+      side: [home, away]
+      window: [season]
+      kind: [for, agst]
+    dtype: float
+    range: [0, 1]
+
+  "{side}_{window}_red_for_avg":
+    table: team_stats
+    description: "average red cards received per match over {window}, {side} team"
+    dims:
+      side: [home, away]
+      window: [season]
+    dtype: float
+
+  "{side}_red_last_match":
+    table: team_stats
+    description: "{side} team received a red card in its previous match (NaN if no previous match)"
+    dims:
+      side: [home, away]
+    dtype: bool
+
+
+  "teams_{window}_goals_foragst_avg_max":
+    table: match_matchup_stats
+    description: "max over the four values: home/away {window} goals for/agst avg; low value = both teams score little and concede little"
+    dims:
+      window: [season]
+    dtype: float
+
+  "teams_{window}_goals_diff_diff":
+    table: match_matchup_stats
+    description: "home {window} goals_diff avg minus away {window} goals_diff avg; positive = home team stronger on goal balance"
+    dims:
+      window: [season]
+    dtype: float
+
+
+target_columns:
+
+  t_home_goals:
+    table: match_target
+    description: "goals scored by home team"
+    inputs: [FTHG]
+    dtype: int
+
+  t_away_goals:
+    table: match_target
+    description: "goals scored by away team"
+    inputs: [FTAG]
+    dtype: int
+
+  t_result:
+    table: match_target
+    description: "full-time result H/D/A"
+    inputs: [FTR]
+    dtype: string
+
+  t_home_flg:
+    table: match_target
+    description: "home win flag"
+    inputs: [FTR]
+    dtype: bool
+
+  t_draw_flg:
+    table: match_target
+    description: "draw flag"
+    inputs: [FTR]
+    dtype: bool
+
+  t_away_flg:
+    table: match_target
+    description: "away win flag"
+    inputs: [FTR]
+    dtype: bool
+
+  t_goals_diff:
+    table: match_target
+    description: "home_goals - away_goals"
+    inputs: [FTHG, FTAG]
+    dtype: int
+
+  t_goals_total:
+    table: match_target
+    description: "home_goals + away_goals"
+    inputs: [FTHG, FTAG]
+    dtype: int

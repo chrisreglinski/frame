@@ -1,0 +1,28 @@
+# Generated data — rebuild with builders
+01_data/02_features/*
+!01_data/02_features/.gitkeep
+01_data/03_abt/*
+!01_data/03_abt/.gitkeep
+
+# Models
+04_models/*
+!04_models/.gitkeep
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env
+
+# Notebooks checkpoints
+.ipynb_checkpoints/
+
+# Reports
+05_reports/*
+!05_reports/.gitkeep
+
+# OS
+.DS_Store
+Thumbs.db
