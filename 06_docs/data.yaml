@@ -168,6 +168,40 @@ columns:
       kind: [for, agst]
     dtype: float
 
+  "homet_home_{window}_{metric}_{kind}_avg":
+    table: team_stats
+    description: "arithmetic mean of {metric} {kind} per home match over {window}, home team only"
+    dims:
+      window: [season]
+      metric: [goals, shots, shots_on_target]
+      kind: [for, agst]
+    dtype: float
+
+  "awayt_away_{window}_{metric}_{kind}_avg":
+    table: team_stats
+    description: "arithmetic mean of {metric} {kind} per away match over {window}, away team only"
+    dims:
+      window: [season]
+      metric: [goals, shots, shots_on_target]
+      kind: [for, agst]
+    dtype: float
+
+  "homet_home_{window}_{metric}_avg":
+    table: team_stats
+    description: "arithmetic mean of {metric} per home match over {window}, home team only"
+    dims:
+      window: [season]
+      metric: [points, goals_diff, goals_total]
+    dtype: float
+
+  "awayt_away_{window}_{metric}_avg":
+    table: team_stats
+    description: "arithmetic mean of {metric} per away match over {window}, away team only"
+    dims:
+      window: [season]
+      metric: [points, goals_diff, goals_total]
+    dtype: float
+
   "{side}_{window}_{metric}_avg":
     table: team_stats
     description: "arithmetic mean of {metric} per match over {window}, {side} team"
@@ -183,7 +217,7 @@ columns:
     dims:
       side: [homet, awayt]
       window: [season, rolling6, rolling8]
-      metric: [points, goals_diff, goals_total]
+      metric: [goals_diff, goals_total]
     dtype: float
 
   "{side}_{window}_{result}_ratio":

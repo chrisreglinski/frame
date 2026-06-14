@@ -16,6 +16,19 @@ _SEASONS = ["2223", "2324", "2425", "2526"]
 
 _WINDOWS = {"season": None, "rolling6": 6, "rolling8": 8}
 
+_LOCALITY_METRICS = ["goals", "shots", "shots_on_target"]
+_LOCALITY_SCALAR_METRICS = ["points", "goals_diff", "goals_total"]
+_LOCALITY_STAT_COLS = [
+    f"{loc}_season_{m}_{k}_avg"
+    for loc in ["home", "away"]
+    for m in _LOCALITY_METRICS
+    for k in ["for", "agst"]
+] + [
+    f"{loc}_season_{m}_avg"
+    for loc in ["home", "away"]
+    for m in _LOCALITY_SCALAR_METRICS
+]
+
 _TEAM_SEASON_COLS = [
     "match_id", "league", "season", "date", "team", "opponent", "is_home",
     "goals_for", "goals_agst", "points", "goals_diff", "goals_total",
@@ -196,6 +209,19 @@ def _add_stats(long: pd.DataFrame) -> pd.DataFrame:
         .astype(pd.BooleanDtype())
     )
 
+    # home-only and away-only season averages
+    for m in _LOCALITY_METRICS:
+        for k in ["for", "agst"]:
+            long[f"_home_{m}_{k}"] = long[f"{m}_{k}"].where(long["is_home"])
+            long[f"_away_{m}_{k}"] = long[f"{m}_{k}"].where(~long["is_home"])
+            long[f"home_season_{m}_{k}_avg"] = _agg_mean(g, f"_home_{m}_{k}", None)
+            long[f"away_season_{m}_{k}_avg"] = _agg_mean(g, f"_away_{m}_{k}", None)
+    for m in _LOCALITY_SCALAR_METRICS:
+        long[f"_home_{m}"] = long[m].where(long["is_home"])
+        long[f"_away_{m}"] = long[m].where(~long["is_home"])
+        long[f"home_season_{m}_avg"] = _agg_mean(g, f"_home_{m}", None)
+        long[f"away_season_{m}_avg"] = _agg_mean(g, f"_away_{m}", None)
+
     # mask rolling windows for matches with insufficient history
     for wname, wsize in _WINDOWS.items():
         if wsize is None:
@@ -217,7 +243,7 @@ def build_match_team_stats() -> pd.DataFrame:
     long = _add_stats(pd.concat(frames, ignore_index=True))
 
     # team_season — long grain: (team, match)
-    team_season = long[_TEAM_SEASON_COLS + _STAT_COLS].sort_values(
+    team_season = long[_TEAM_SEASON_COLS + _STAT_COLS + _LOCALITY_STAT_COLS].sort_values(
         ["league", "season", "team", "date"]
     ).reset_index(drop=True)
 
@@ -243,7 +269,23 @@ def build_match_team_stats() -> pd.DataFrame:
         )
     )
 
-    result = base.merge(home_stats, on="match_id").merge(away_stats, on="match_id")
+    _home_loc_cols = [c for c in _LOCALITY_STAT_COLS if c.startswith("home_")]
+    _away_loc_cols = [c for c in _LOCALITY_STAT_COLS if c.startswith("away_")]
+    home_locality = (
+        long[long["is_home"]][["match_id"] + _home_loc_cols]
+        .rename(columns={c: f"homet_{c}" for c in _home_loc_cols})
+    )
+    away_locality = (
+        long[~long["is_home"]][["match_id"] + _away_loc_cols]
+        .rename(columns={c: f"awayt_{c}" for c in _away_loc_cols})
+    )
+
+    result = (base
+        .merge(home_stats, on="match_id")
+        .merge(away_stats, on="match_id")
+        .merge(home_locality, on="match_id")
+        .merge(away_locality, on="match_id")
+    )
     result = result[["match_id"] + _columns()]
 
     result.to_csv(_FEATURES_DIR / "match_team_stats.csv", index=False)
