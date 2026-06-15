@@ -12,14 +12,17 @@ def portfolio_roi(
     implied_probs: pd.Series,
     outcomes: pd.Series,
     buffer: float = 0.0,
+    bet_all: bool = False,
 ) -> dict:
     """
     Implied-probability staking: stake_i = implied_prob_i, win return = 1.0.
 
     Selects bets where model_prob > implied_prob + buffer.
+    If bet_all=True, all rows are selected regardless of model_probs.
     ROI is scale-independent — measures whether the edge exists.
     """
-    mask = model_probs.values > implied_probs.values + buffer
+    mask = pd.Series(True, index=model_probs.index).values if bet_all \
+        else model_probs.values > implied_probs.values + buffer
     imp = implied_probs[mask]
     won = outcomes[mask]
 
@@ -43,14 +46,17 @@ def portfolio_kelly(
     bankroll: float = 100.0,
     buffer: float = 0.0,
     max_fraction: float = 0.25,
+    bet_all: bool = False,
 ) -> dict:
     """
     Flat Kelly staking: stake_i = f*_i * bankroll (bankroll never updated).
 
     f* = (model_prob * odds - 1) / (odds - 1), clipped to [0, max_fraction].
     Selects bets where model_prob > implied_prob + buffer.
+    If bet_all=True, all rows are selected regardless of model_probs.
     """
-    mask = model_probs.values > implied_probs.values + buffer
+    mask = pd.Series(True, index=model_probs.index).values if bet_all \
+        else model_probs.values > implied_probs.values + buffer
     imp = implied_probs[mask]
     mp = model_probs[mask]
     won = outcomes[mask]
