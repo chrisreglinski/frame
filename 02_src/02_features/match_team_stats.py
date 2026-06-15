@@ -47,7 +47,8 @@ def _make_stat_cols() -> list[str]:
         cols += [f"{w}_goals_{kind}_ge{x}_ratio" for kind in ["for", "agst"] for x in [2, 3]]
         cols += [f"{w}_shots_on_target_{k}_ratio" for k in ["for", "agst"]]
         cols += [f"{w}_red_for_avg"]
-        cols += [f"{w}_implied_{o}_avg" for o in ["win", "draw", "loss"]]
+        cols += [f"{w}_impl_{o}_avg" for o in ["win", "draw", "loss"]]
+        cols += [f"{w}_impl_points_avg"]
         cols += [f"{w}_profit_{o}" for o in ["win", "draw", "loss"]]
     cols += ["red_last_match"]
     return cols
@@ -108,7 +109,7 @@ def _build_long(raw: pd.DataFrame, league: str, season: str) -> pd.DataFrame:
         "is_win":  (raw["FTR"] == "H").astype(float).values,
         "is_draw": (raw["FTR"] == "D").astype(float).values,
         "is_loss": (raw["FTR"] == "A").astype(float).values,
-        "implied_win": 1.0 / avg_h, "implied_draw": 1.0 / avg_d, "implied_loss": 1.0 / avg_a,
+        "impl_win": 1.0 / avg_h, "impl_draw": 1.0 / avg_d, "impl_loss": 1.0 / avg_a,
     })
 
     away = pd.DataFrame({
@@ -198,9 +199,10 @@ def _add_stats(long: pd.DataFrame) -> pd.DataFrame:
         long[f"{wname}_red_for_avg"] = _agg_mean(g, "red_for", wsize)
 
         for o in ["win", "draw", "loss"]:
-            long[f"{wname}_implied_{o}_avg"] = _agg_mean(g, f"implied_{o}", wsize)
+            long[f"{wname}_impl_{o}_avg"] = _agg_mean(g, f"impl_{o}", wsize)
+        long[f"{wname}_impl_points_avg"] = long[f"{wname}_impl_win_avg"] * 3 + long[f"{wname}_impl_draw_avg"]
         for o, r in [("win", "wins"), ("draw", "draws"), ("loss", "losses")]:
-            long[f"{wname}_profit_{o}"] = long[f"{wname}_{r}_ratio"] - long[f"{wname}_implied_{o}_avg"]
+            long[f"{wname}_profit_{o}"] = long[f"{wname}_{r}_ratio"] - long[f"{wname}_impl_{o}_avg"]
 
     red_shifted = g["red_for"].transform(lambda x: x.shift(1))
     long["red_last_match"] = (
