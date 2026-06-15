@@ -16,6 +16,8 @@ that can be sliced and fed into betting/prediction models downstream.
 | Germany (Bundesliga) | 2223, 2324, 2425, 2526 |
 | France (Ligue 1) | 2223, 2324, 2425, 2526 |
 
+Seasons before 2223 excluded — COVID-era matches (2020–2022) had no fans, reducing home advantage and skewing result distributions.
+
 Source: [football-data.co.uk](https://www.football-data.co.uk)
 
 ---
