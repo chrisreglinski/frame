@@ -370,3 +370,21 @@ target_columns:
     description: "home_goals + away_goals"
     inputs: [FTHG, FTAG]
     dtype: int
+
+  t_home_profit:
+    table: match_target
+    description: "profit from betting on home win: 1 - mrkt_home_impl if home wins, else -mrkt_home_impl"
+    inputs: [FTR, AvgH]
+    dtype: float
+
+  t_draw_profit:
+    table: match_target
+    description: "profit from betting on draw: 1 - mrkt_draw_impl if draw, else -mrkt_draw_impl"
+    inputs: [FTR, AvgD]
+    dtype: float
+
+  t_away_profit:
+    table: match_target
+    description: "profit from betting on away win: 1 - mrkt_away_impl if away wins, else -mrkt_away_impl"
+    inputs: [FTR, AvgA]
+    dtype: float

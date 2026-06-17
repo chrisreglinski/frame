@@ -1,6 +1,7 @@
 import hashlib
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import yaml
 
@@ -44,6 +45,18 @@ def _load_file(path: Path) -> pd.DataFrame:
         (raw["FTR"] == "A").rename("t_away_flg"),
         (raw["FTHG"] - raw["FTAG"]).rename("t_goals_diff"),
         (raw["FTHG"] + raw["FTAG"]).rename("t_goals_total"),
+        pd.Series(
+            np.where(raw["FTR"] == "H", 1 - 1/raw["AvgH"], -1/raw["AvgH"]),
+            name="t_home_profit",
+        ),
+        pd.Series(
+            np.where(raw["FTR"] == "D", 1 - 1/raw["AvgD"], -1/raw["AvgD"]),
+            name="t_draw_profit",
+        ),
+        pd.Series(
+            np.where(raw["FTR"] == "A", 1 - 1/raw["AvgA"], -1/raw["AvgA"]),
+            name="t_away_profit",
+        ),
     ], axis=1)
 
 
