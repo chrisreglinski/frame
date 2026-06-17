@@ -21,6 +21,7 @@ venv/
 # Notebooks — only template is tracked; push others explicitly when needed
 03_notebooks/*.ipynb
 !03_notebooks/template.ipynb
+!03_notebooks/t_goals_diff_corrs_and_LR.ipynb
 .ipynb_checkpoints/
 
 # Reports
