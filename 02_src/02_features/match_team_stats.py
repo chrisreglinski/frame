@@ -41,10 +41,8 @@ def _make_stat_cols() -> list[str]:
         cols += [f"{w}_{m}_{k}_avg" for m in ["goals", "shots", "shots_on_target", "corners", "yellow"] for k in ["for", "agst"]]
         cols += [f"{w}_{m}_{v}" for m in ["points", "goals_diff", "goals_total"] for v in ["avg", "std"]]
         cols += [f"{w}_{r}_ratio" for r in ["wins", "draws", "losses"]]
-        cols += [f"{w}_goals_total_le{x}_ratio" for x in [0, 1, 2, 3]]
-        cols += [f"{w}_goals_total_ge{x}_ratio" for x in [2, 3, 4]]
-        cols += [f"{w}_goals_{kind}_le{x}_ratio" for kind in ["for", "agst"] for x in [0, 1]]
-        cols += [f"{w}_goals_{kind}_ge{x}_ratio" for kind in ["for", "agst"] for x in [2, 3]]
+        cols += [f"{w}_goals_total_le{x}_ratio" for x in [0, 1, 2, 3, 4]]
+        cols += [f"{w}_goals_{kind}_le{x}_ratio" for kind in ["for", "agst"] for x in [0, 1, 2]]
         cols += [f"{w}_shots_on_target_{k}_ratio" for k in ["for", "agst"]]
         cols += [f"{w}_red_for_avg"]
         cols += [f"{w}_impl_{o}_avg" for o in ["win", "draw", "loss"]]
@@ -159,15 +157,11 @@ def _add_stats(long: pd.DataFrame) -> pd.DataFrame:
     long["game_number"] = g.cumcount() + 1
 
     # indicators computed once, reused across all windows
-    for x in [0, 1, 2, 3]:
+    for x in [0, 1, 2, 3, 4]:
         long[f"_ind_gt_le{x}"] = (long["goals_total"] <= x).astype(float)
-    for x in [2, 3, 4]:
-        long[f"_ind_gt_ge{x}"] = (long["goals_total"] >= x).astype(float)
     for kind in ["for", "agst"]:
-        for x in [0, 1]:
+        for x in [0, 1, 2]:
             long[f"_ind_g{kind[0]}le{x}"] = (long[f"goals_{kind}"] <= x).astype(float)
-        for x in [2, 3]:
-            long[f"_ind_g{kind[0]}ge{x}"] = (long[f"goals_{kind}"] >= x).astype(float)
 
     for wname, wsize in _WINDOWS.items():
         for m in ["goals", "shots", "shots_on_target", "corners", "yellow"]:
@@ -181,15 +175,11 @@ def _add_stats(long: pd.DataFrame) -> pd.DataFrame:
         for r, c in [("wins", "is_win"), ("draws", "is_draw"), ("losses", "is_loss")]:
             long[f"{wname}_{r}_ratio"] = _agg_mean(g, c, wsize)
 
-        for x in [0, 1, 2, 3]:
+        for x in [0, 1, 2, 3, 4]:
             long[f"{wname}_goals_total_le{x}_ratio"] = _agg_mean(g, f"_ind_gt_le{x}", wsize)
-        for x in [2, 3, 4]:
-            long[f"{wname}_goals_total_ge{x}_ratio"] = _agg_mean(g, f"_ind_gt_ge{x}", wsize)
         for kind in ["for", "agst"]:
-            for x in [0, 1]:
+            for x in [0, 1, 2]:
                 long[f"{wname}_goals_{kind}_le{x}_ratio"] = _agg_mean(g, f"_ind_g{kind[0]}le{x}", wsize)
-            for x in [2, 3]:
-                long[f"{wname}_goals_{kind}_ge{x}_ratio"] = _agg_mean(g, f"_ind_g{kind[0]}ge{x}", wsize)
 
         for k in ["for", "agst"]:
             long[f"{wname}_shots_on_target_{k}_ratio"] = (

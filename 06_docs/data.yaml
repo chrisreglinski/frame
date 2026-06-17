@@ -236,17 +236,7 @@ columns:
     dims:
       side: [homet, awayt]
       window: [season, rolling6, rolling8]
-      x: [0, 1, 2, 3]
-    dtype: float
-    range: [0, 1]
-
-  "{side}_{window}_goals_total_ge{x}_ratio":
-    table: team_stats
-    description: "share of matches with total goals >= {x} over {window}, {side} team"
-    dims:
-      side: [homet, awayt]
-      window: [season, rolling6, rolling8]
-      x: [2, 3, 4]
+      x: [0, 1, 2, 3, 4]
     dtype: float
     range: [0, 1]
 
@@ -257,18 +247,7 @@ columns:
       side: [homet, awayt]
       window: [season, rolling6, rolling8]
       kind: [for, agst]
-      x: [0, 1]
-    dtype: float
-    range: [0, 1]
-
-  "{side}_{window}_goals_{kind}_ge{x}_ratio":
-    table: team_stats
-    description: "share of matches with goals {kind} >= {x} over {window}, {side} team"
-    dims:
-      side: [homet, awayt]
-      window: [season, rolling6, rolling8]
-      kind: [for, agst]
-      x: [2, 3]
+      x: [0, 1, 2]
     dtype: float
     range: [0, 1]
 
