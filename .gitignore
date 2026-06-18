@@ -23,6 +23,7 @@ venv/
 !03_notebooks/template.ipynb
 !03_notebooks/t_goals_diff_corrs_and_LR.ipynb
 !03_notebooks/t_draw_flg_corrs_and_LR.ipynb
+!03_notebooks/market_calibration.ipynb
 .ipynb_checkpoints/
 
 # Reports
