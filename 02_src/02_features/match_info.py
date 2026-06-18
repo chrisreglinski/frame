@@ -141,6 +141,21 @@ def _load_file(path: Path, stadiums: dict[str, dict], limits: dict) -> pd.DataFr
         p_norm = p.div(p.sum(axis=1), axis=0)
         entropies[f"{bk}_entropy"] = -(p_norm * np.log2(p_norm)).sum(axis=1)
 
+    mrkt_p = pd.DataFrame({o: impl[f"mrkt_{o}_impl"] for o in ["home", "draw", "away"]})
+    mrkt_p_norm = mrkt_p.div(mrkt_p.sum(axis=1), axis=0)
+    mrkt_favourite = pd.Series(np.where(
+        mrkt_p_norm["home"] > 0.5, "home",
+        np.where(mrkt_p_norm["away"] > 0.5, "away", "none")
+    ), name="mrkt_favourite")
+    mrkt_impl_order = pd.Series([
+        "".join(k[0] for k in sorted(
+            [("h", h), ("d", d), ("a", a)], key=lambda x: -x[1]
+        ))
+        for h, d, a in zip(
+            impl["mrkt_home_impl"], impl["mrkt_draw_impl"], impl["mrkt_away_impl"]
+        )
+    ], name="mrkt_impl_order")
+
     home_is_promoted = raw["HomeTeam"].map(lambda t: stadiums[t]["promoted"])
     away_is_promoted = raw["AwayTeam"].map(lambda t: stadiums[t]["promoted"])
     travel = pd.Series([
@@ -174,6 +189,8 @@ def _load_file(path: Path, stadiums: dict[str, dict], limits: dict) -> pd.DataFr
         pd.DataFrame(impl),
         pd.DataFrame(margins),
         pd.DataFrame(entropies),
+        mrkt_favourite,
+        mrkt_impl_order,
     ], axis=1)
 
 

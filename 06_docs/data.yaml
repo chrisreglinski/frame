@@ -150,6 +150,18 @@ columns:
     dtype: float
     range: [0, 1.585]
 
+  mrkt_favourite:
+    table: match_info
+    description: "team with mrkt normalized implied probability > 50% (home/away/none)"
+    dtype: string
+    categories: [home, away, none]
+
+  mrkt_impl_order:
+    table: match_info
+    description: "ordering of H/D/A outcomes by mrkt implied probability descending (e.g. hda = home > draw > away)"
+    dtype: string
+    categories: [hda, had, dha, dah, ahd, adh]
+
   "{side}_game_number":
     table: team_stats
     description: "sequential match number for the {side} team in the season (1 = first match)"
