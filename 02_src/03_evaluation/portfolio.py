@@ -8,22 +8,23 @@ import pandas as pd
 
 
 def portfolio_roi(
-    model_probs: pd.Series,
     implied_probs: pd.Series,
     outcomes: pd.Series,
+    model_probs: pd.Series = None,
     buffer: float = 0.0,
-    bet_all: bool = False,
 ) -> dict:
     """
     Implied-probability staking: stake_i = implied_prob_i, win return = 1.0.
 
-    Selects bets where model_prob > implied_prob + buffer.
-    If bet_all=True, all rows are selected regardless of model_probs.
+    If model_probs not provided, bets all rows (bet_all mode).
+    If model_probs provided, selects bets where model_prob > implied_prob + buffer.
     ROI is scale-independent — measures whether the edge exists.
     """
-    # select bets with positive edge (model sees higher prob than market)
-    mask = pd.Series(True, index=model_probs.index).values if bet_all \
-        else model_probs.values > implied_probs.values + buffer
+    if model_probs is None:
+        # select bets with positive edge (model sees higher prob than market)
+        mask = pd.Series(True, index=implied_probs.index).values
+    else:
+        mask = model_probs.values > implied_probs.values + buffer
     imp = implied_probs[mask]
     won = outcomes[mask]
 
@@ -41,26 +42,29 @@ def portfolio_roi(
 
 
 def portfolio_kelly(
-    model_probs: pd.Series,
     implied_probs: pd.Series,
     outcomes: pd.Series,
+    model_probs: pd.Series = None,
     bankroll: float = 100.0,
     buffer: float = 0.0,
     max_fraction: float = 0.25,
-    bet_all: bool = False,
 ) -> dict:
     """
     Flat Kelly staking: stake_i = f*_i * bankroll (bankroll never updated).
 
     f* = (model_prob * odds - 1) / (odds - 1), clipped to [0, max_fraction].
-    Selects bets where model_prob > implied_prob + buffer.
-    If bet_all=True, all rows are selected regardless of model_probs.
+    If model_probs not provided, bets all rows (bet_all mode).
+    If model_probs provided, selects bets where model_prob > implied_prob + buffer.
     """
-    # select bets with positive edge (model sees higher prob than market)
-    mask = pd.Series(True, index=model_probs.index).values if bet_all \
-        else model_probs.values > implied_probs.values + buffer
+    if model_probs is None:
+        # select bets with positive edge (model sees higher prob than market)
+        mask = pd.Series(True, index=implied_probs.index).values
+        mp_all = implied_probs
+    else:
+        mask = model_probs.values > implied_probs.values + buffer
+        mp_all = model_probs
     imp = implied_probs[mask]
-    mp = model_probs[mask]
+    mp = mp_all[mask]
     won = outcomes[mask]
 
     odds = 1.0 / imp
