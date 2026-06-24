@@ -14,10 +14,13 @@ def build_thresholds() -> dict:
     raw = pd.read_parquet(_RAW_STATS_PATH)
     raw["goals_total"] = raw["FTHG"] + raw["FTAG"]
 
+    goals_total_mean = float(raw["goals_total"].mean())
     thresholds = {
-        "goals_total_mean": round(float(raw["goals_total"].mean()), 6),
-        "goals_for_mean":   round(float(raw["FTHG"].mean()), 6),
-        "goals_agst_mean":  round(float(raw["FTAG"].mean()), 6),
+        "goals_total_mean": round(goals_total_mean, 6),
+        # from team perspective each match appears as home and away,
+        # so goals_for_mean == goals_agst_mean == goals_total_mean / 2
+        "goals_for_mean":  round(goals_total_mean / 2, 6),
+        "goals_agst_mean": round(goals_total_mean / 2, 6),
     }
 
     _FEATURES_DIR.mkdir(parents=True, exist_ok=True)
