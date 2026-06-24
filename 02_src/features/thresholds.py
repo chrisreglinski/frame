@@ -16,6 +16,8 @@ def build_thresholds() -> dict:
 
     thresholds = {
         "goals_total_mean": round(float(raw["goals_total"].mean()), 6),
+        "goals_for_mean":   round(float(raw["FTHG"].mean()), 6),
+        "goals_agst_mean":  round(float(raw["FTAG"].mean()), 6),
     }
 
     _FEATURES_DIR.mkdir(parents=True, exist_ok=True)

@@ -239,15 +239,16 @@ def build_match_team_stats() -> pd.DataFrame:
 
     # categorical columns based on global population thresholds
     thresholds = json.loads(_THRESHOLDS_PATH.read_text())
-    long["season_goals_total_cat"] = np.where(
-        long["season_goals_total_avg"].isna(), None,
-        np.where(long["season_goals_total_avg"] >= thresholds["goals_total_mean"], "high", "low"),
-    )
-    long["season_goals_diff_cat"] = np.where(
-        long["season_goals_diff_avg"].isna(), None,
-        np.where(long["season_goals_diff_avg"] >= 0, "positive", "negative"),
-    )
-    _cat_cols = ["season_goals_total_cat", "season_goals_diff_cat"]
+
+    def _cat(col, threshold, hi, lo):
+        return np.where(long[col].isna(), None, np.where(long[col] > threshold, hi, lo))
+
+    long["season_goals_total_cat"] = _cat("season_goals_total_avg", thresholds["goals_total_mean"], "high", "low")
+    long["season_goals_diff_cat"]  = _cat("season_goals_diff_avg",  0,                              "positive", "negative")
+    long["season_goals_for_cat"]   = _cat("season_goals_for_avg",   thresholds["goals_for_mean"],   "high", "low")
+    long["season_goals_agst_cat"]  = _cat("season_goals_agst_avg",  thresholds["goals_agst_mean"],  "high", "low")
+    _cat_cols = ["season_goals_total_cat", "season_goals_diff_cat",
+                 "season_goals_for_cat",   "season_goals_agst_cat"]
 
     # team_season — long grain: (team, match)
     team_season = long[_TEAM_SEASON_COLS + _STAT_COLS + _cat_cols + _LOCALITY_STAT_COLS].sort_values(
