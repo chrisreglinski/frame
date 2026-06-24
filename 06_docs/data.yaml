@@ -152,15 +152,27 @@ columns:
 
   mrkt_favourite:
     table: match_info
-    description: "team with mrkt normalized implied probability > 50% (home/away/none)"
+    description: "team with mrkt normalized implied probability > 50% (home/away/balanced)"
     dtype: string
-    categories: [home, away, none]
+    categories: [home, away, balanced]
 
   mrkt_impl_order:
     table: match_info
     description: "ordering of H/D/A outcomes by mrkt implied probability descending (e.g. hda = home > draw > away)"
     dtype: string
     categories: [hda, had, dha, dah, ahd, adh]
+
+  mrkt_favrt_impl:
+    table: match_info
+    description: "mrkt implied probability of the stronger side: max(home_impl, away_impl)"
+    dtype: float
+    range: [0, 1]
+
+  mrkt_undrd_impl:
+    table: match_info
+    description: "mrkt implied probability of the weaker side: min(home_impl, away_impl)"
+    dtype: float
+    range: [0, 1]
 
   "{side}_game_number":
     table: team_stats

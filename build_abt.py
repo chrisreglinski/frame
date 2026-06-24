@@ -7,18 +7,13 @@ Usage:
 import argparse
 import time
 from pathlib import Path
-import sys
 
-ROOT = Path(__file__).parent
-sys.path.insert(0, str(ROOT / "02_src" / "01_raw"))
-sys.path.insert(0, str(ROOT / "02_src" / "02_features"))
-
-from match_raw_stats import build_match_raw_stats
-from match_info import build_match_info
-from match_team_stats import build_match_team_stats
-from match_matchup_stats import build_match_matchup_stats
-from match_target import build_match_target
-from abt import build_abt
+from raw.match_raw_stats import build_match_raw_stats
+from features.match_info import build_match_info
+from features.match_team_stats import build_match_team_stats
+from features.match_matchup_stats import build_match_matchup_stats
+from features.match_target import build_match_target
+from features.abt import build_abt
 
 
 def _step(n: int, total: int, name: str, fn):
