@@ -121,6 +121,18 @@ Full table always generated; filter by league/season/phase/game_number downstrea
 
 ---
 
+## Setup
+
+```bash
+pip install -e .
+```
+
+Required once after cloning. Installs the `02_src/` package in editable mode so
+notebooks can import directly: `from features.match_info import build_match_info`,
+`from evaluation.portfolio import portfolio_roi`, etc.
+
+---
+
 ## Rebuild pipeline
 
 ```bash
