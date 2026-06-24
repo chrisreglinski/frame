@@ -9,6 +9,7 @@ import time
 from pathlib import Path
 
 from raw.match_raw_stats import build_match_raw_stats
+from features.thresholds import build_thresholds
 from features.match_info import build_match_info
 from features.match_team_stats import build_match_team_stats
 from features.match_matchup_stats import build_match_matchup_stats
@@ -19,9 +20,12 @@ from features.abt import build_abt
 def _step(n: int, total: int, name: str, fn):
     print(f"[{n}/{total}] {name}...", end=" ", flush=True)
     t0 = time.time()
-    df = fn()
+    result = fn()
     elapsed = time.time() - t0
-    print(f"{df.shape[0]} rows × {df.shape[1]} cols  ({elapsed:.1f}s)")
+    if isinstance(result, dict):
+        print(f"{result}  ({elapsed:.1f}s)")
+    else:
+        print(f"{result.shape[0]} rows × {result.shape[1]} cols  ({elapsed:.1f}s)")
     return elapsed
 
 
@@ -29,11 +33,15 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--skip-raw", action="store_true",
                         help="skip match_raw_stats (use when raw CSVs are unchanged)")
+    parser.add_argument("--skip-thresholds", action="store_true",
+                        help="skip build_thresholds (use when thresholds.json already exists)")
     args = parser.parse_args()
 
     steps = []
     if not args.skip_raw:
         steps.append(("match_raw_stats", build_match_raw_stats))
+    if not args.skip_thresholds:
+        steps.append(("thresholds", build_thresholds))
     steps += [
         ("match_info",         build_match_info),
         ("match_team_stats",   build_match_team_stats),

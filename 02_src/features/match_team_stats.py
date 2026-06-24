@@ -1,7 +1,9 @@
 import hashlib
 import itertools
+import json
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import yaml
 
@@ -10,6 +12,7 @@ _ROOT = Path(__file__).parents[2]
 _RAW_DIR = _ROOT / "01_data" / "01_raw" / "01_matches"
 _FEATURES_DIR = _ROOT / "01_data" / "02_features"
 _YAML_PATH = _ROOT / "06_docs" / "data.yaml"
+_THRESHOLDS_PATH = _FEATURES_DIR / "thresholds.json"
 
 _LEAGUES = ["england", "spain", "italy", "germany", "france"]
 _SEASONS = ["2223", "2324", "2425", "2526"]
@@ -234,8 +237,20 @@ def build_match_team_stats() -> pd.DataFrame:
 
     long = _add_stats(pd.concat(frames, ignore_index=True))
 
+    # categorical columns based on global population thresholds
+    thresholds = json.loads(_THRESHOLDS_PATH.read_text())
+    long["season_goals_total_cat"] = np.where(
+        long["season_goals_total_avg"].isna(), None,
+        np.where(long["season_goals_total_avg"] >= thresholds["goals_total_mean"], "high", "low"),
+    )
+    long["season_goals_diff_cat"] = np.where(
+        long["season_goals_diff_avg"].isna(), None,
+        np.where(long["season_goals_diff_avg"] >= 0, "positive", "negative"),
+    )
+    _cat_cols = ["season_goals_total_cat", "season_goals_diff_cat"]
+
     # team_season — long grain: (team, match)
-    team_season = long[_TEAM_SEASON_COLS + _STAT_COLS + _LOCALITY_STAT_COLS].sort_values(
+    team_season = long[_TEAM_SEASON_COLS + _STAT_COLS + _cat_cols + _LOCALITY_STAT_COLS].sort_values(
         ["league", "season", "team", "date"]
     ).reset_index(drop=True)
 
@@ -244,13 +259,14 @@ def build_match_team_stats() -> pd.DataFrame:
     team_season.to_parquet(_FEATURES_DIR / "team_season.parquet", index=False)
 
     # match_team_stats — match grain: (match_id)
+    stat_cols = _STAT_COLS + _cat_cols
     home_stats = (
-        long[long["is_home"]][["match_id"] + _STAT_COLS]
-        .rename(columns={c: f"homet_{c}" for c in _STAT_COLS})
+        long[long["is_home"]][["match_id"] + stat_cols]
+        .rename(columns={c: f"homet_{c}" for c in stat_cols})
     )
     away_stats = (
-        long[~long["is_home"]][["match_id"] + _STAT_COLS]
-        .rename(columns={c: f"awayt_{c}" for c in _STAT_COLS})
+        long[~long["is_home"]][["match_id"] + stat_cols]
+        .rename(columns={c: f"awayt_{c}" for c in stat_cols})
     )
     base = (
         long[long["is_home"]][["match_id", "league", "season", "date", "team"]]

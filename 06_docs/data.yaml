@@ -329,6 +329,22 @@ columns:
     dtype: float
     range: [-1, 1]
 
+  "{side}_season_goals_total_cat":
+    table: team_stats
+    description: "high if season_goals_total_avg >= global mean of raw goals_total (from thresholds.json), else low"
+    dims:
+      side: [homet, awayt]
+    dtype: string
+    categories: [high, low]
+
+  "{side}_season_goals_diff_cat":
+    table: team_stats
+    description: "positive if season_goals_diff_avg >= 0, else negative"
+    dims:
+      side: [homet, awayt]
+    dtype: string
+    categories: [positive, negative]
+
 
   "teams_{window}_goals_foragst_avg_max":
     table: match_matchup_stats
