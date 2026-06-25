@@ -287,6 +287,7 @@ def build_match_team_stats() -> pd.DataFrame:
     team_season.to_csv(_FEATURES_DIR / "team_season.csv", index=False)
     team_season.to_parquet(_FEATURES_DIR / "team_season.parquet", index=False)
     team_season_final.to_parquet(_FEATURES_DIR / "team_season_final.parquet", index=False)
+    team_season_final.to_csv(_FEATURES_DIR / "team_season_final.csv", index=False)
 
     # match_team_stats — match grain: (match_id)
     stat_cols = _STAT_COLS + _cat_cols
