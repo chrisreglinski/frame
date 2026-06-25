@@ -58,6 +58,11 @@ def build_match_matchup_stats() -> pd.DataFrame:
             f"awayt_{w}_goals_for_avg",
             f"awayt_{w}_goals_agst_avg",
         ]].max(axis=1)
+        for side in ["homet", "awayt"]:
+            computed[f"{side}_{w}_goals_foragst_avg_max"] = src[[
+                f"{side}_{w}_goals_for_avg",
+                f"{side}_{w}_goals_agst_avg",
+            ]].max(axis=1)
         computed[f"teams_{w}_goals_diff_diff"] = (
             src[f"homet_{w}_goals_diff_avg"] - src[f"awayt_{w}_goals_diff_avg"]
         )

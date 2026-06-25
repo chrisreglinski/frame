@@ -370,6 +370,14 @@ columns:
       window: [season, rolling6, rolling8]
     dtype: float
 
+  "{side}_{window}_goals_foragst_avg_max":
+    table: match_matchup_stats
+    description: "max(goals_for_avg, goals_agst_avg) for {side} team over {window}; measures intensity of play regardless of direction"
+    dims:
+      side: [homet, awayt]
+      window: [season, rolling6, rolling8]
+    dtype: float
+
   "teams_{window}_goals_diff_diff":
     table: match_matchup_stats
     description: "home {window} goals_diff avg minus away {window} goals_diff avg; positive = home team stronger on goal balance"
