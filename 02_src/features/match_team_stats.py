@@ -278,7 +278,8 @@ def build_match_team_stats() -> pd.DataFrame:
                    .reset_index(drop=True))
 
     # team_season_final — one row per (team, season): stats include the last match
-    _final_cols = ["match_id", "league", "season", "date", "team"] + _STAT_COLS + _cat_cols + _LOCALITY_STAT_COLS
+    _final_stat_cols = [c for c in _STAT_COLS if c != "game_number"]
+    _final_cols = ["league", "season", "team"] + _final_stat_cols + _cat_cols + _LOCALITY_STAT_COLS
     team_season_final = (long[is_summary][[c for c in _final_cols if c in long.columns]]
                          .sort_values(["league", "season", "team"])
                          .reset_index(drop=True))
