@@ -127,7 +127,7 @@ def _build_long(raw: pd.DataFrame, league: str, season: str) -> pd.DataFrame:
         "is_win":  (raw["FTR"] == "A").astype(float).values,
         "is_draw": (raw["FTR"] == "D").astype(float).values,
         "is_loss": (raw["FTR"] == "H").astype(float).values,
-        "implied_win": 1.0 / avg_a, "implied_draw": 1.0 / avg_d, "implied_loss": 1.0 / avg_h,
+        "impl_win": 1.0 / avg_a, "impl_draw": 1.0 / avg_d, "impl_loss": 1.0 / avg_h,
     })
 
     long = pd.concat([home, away], ignore_index=True)
