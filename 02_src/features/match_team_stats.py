@@ -227,6 +227,25 @@ def _add_stats(long: pd.DataFrame) -> pd.DataFrame:
     return long.copy()
 
 
+def _add_summary_stubs(long: pd.DataFrame) -> pd.DataFrame:
+    """Append one NaN stub row per (league, season, team) dated one day after the last match.
+    When _add_stats processes these with shift(1), the stub's season/rolling stats
+    naturally include all N real matches — no duplicate aggregation logic needed."""
+    long = long.copy()
+    long["_is_summary"] = False
+    keys = long.groupby(["league", "season", "team"])["date"].max().reset_index()
+    stubs = pd.DataFrame({
+        "league":      keys["league"].values,
+        "season":      keys["season"].values,
+        "team":        keys["team"].values,
+        "date":        keys["date"].values + pd.Timedelta(days=1),
+        "match_id":    keys["league"] + "_" + keys["season"] + "_" + keys["team"],
+        "is_home":     False,
+        "_is_summary": True,
+    })
+    return pd.concat([long, stubs], ignore_index=True)
+
+
 def build_match_team_stats() -> pd.DataFrame:
     frames = []
     for league in _LEAGUES:
@@ -235,7 +254,7 @@ def build_match_team_stats() -> pd.DataFrame:
             if path.exists():
                 frames.append(_build_long(pd.read_csv(path), league, season))
 
-    long = _add_stats(pd.concat(frames, ignore_index=True))
+    long = _add_stats(_add_summary_stubs(pd.concat(frames, ignore_index=True)))
 
     # categorical columns based on global population thresholds
     thresholds = json.loads(_THRESHOLDS_PATH.read_text())
@@ -250,14 +269,24 @@ def build_match_team_stats() -> pd.DataFrame:
     _cat_cols = ["season_goals_total_cat", "season_goals_diff_cat",
                  "season_goals_for_cat",   "season_goals_agst_cat"]
 
-    # team_season — long grain: (team, match)
-    team_season = long[_TEAM_SEASON_COLS + _STAT_COLS + _cat_cols + _LOCALITY_STAT_COLS].sort_values(
-        ["league", "season", "team", "date"]
-    ).reset_index(drop=True)
+    is_summary = long["_is_summary"].fillna(False).astype(bool)
+    _out_cols = _TEAM_SEASON_COLS + _STAT_COLS + _cat_cols + _LOCALITY_STAT_COLS
+
+    # team_season — long grain: (team, match), real rows only
+    team_season = (long[~is_summary][_out_cols]
+                   .sort_values(["league", "season", "team", "date"])
+                   .reset_index(drop=True))
+
+    # team_season_final — one row per (team, season): stats include the last match
+    _final_cols = ["match_id", "league", "season", "date", "team"] + _STAT_COLS + _cat_cols + _LOCALITY_STAT_COLS
+    team_season_final = (long[is_summary][[c for c in _final_cols if c in long.columns]]
+                         .sort_values(["league", "season", "team"])
+                         .reset_index(drop=True))
 
     _FEATURES_DIR.mkdir(parents=True, exist_ok=True)
     team_season.to_csv(_FEATURES_DIR / "team_season.csv", index=False)
     team_season.to_parquet(_FEATURES_DIR / "team_season.parquet", index=False)
+    team_season_final.to_parquet(_FEATURES_DIR / "team_season_final.parquet", index=False)
 
     # match_team_stats — match grain: (match_id)
     stat_cols = _STAT_COLS + _cat_cols
