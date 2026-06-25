@@ -49,6 +49,7 @@ def portfolio_kelly(
     bankroll: float = 100.0,
     buffer: float = 0.0,
     max_fraction: float = 0.25,
+    kelly_fraction: float = 0.5,
     plot: bool = False,
     dates: pd.Series = None,
     title: str = "",
@@ -73,7 +74,7 @@ def portfolio_kelly(
         df = df[df["mp"] > df["imp"] + buffer].copy()
 
     odds = 1.0 / df["imp"]
-    f_star = ((df["mp"].values * odds.values - 1) / (odds.values - 1)).clip(0, max_fraction)
+    f_star = ((df["mp"].values * odds.values - 1) / (odds.values - 1)).clip(0, max_fraction) * kelly_fraction
     stakes = f_star * bankroll
 
     capital = float(stakes.sum())
@@ -94,7 +95,7 @@ def portfolio_kelly(
             raise ValueError("dates required for plot=True")
         df_plot = df.sort_values("date").reset_index(drop=True)
         odds_plot = 1.0 / df_plot["imp"]
-        f_plot = ((df_plot["mp"].values * odds_plot.values - 1) / (odds_plot.values - 1)).clip(0, max_fraction)
+        f_plot = ((df_plot["mp"].values * odds_plot.values - 1) / (odds_plot.values - 1)).clip(0, max_fraction) * kelly_fraction
         stakes_plot = f_plot * bankroll
         profit_plot = df_plot["won"].values * stakes_plot * odds_plot.values - stakes_plot
         cumulative = bankroll + profit_plot.cumsum()
