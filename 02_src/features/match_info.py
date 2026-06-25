@@ -7,6 +7,8 @@ import numpy as np
 import pandas as pd
 import yaml
 
+from features.utils import round_floats
+
 
 _ROOT = Path(__file__).parents[2]
 _RAW_DIR = _ROOT / "01_data" / "01_raw" / "01_matches"
@@ -145,7 +147,7 @@ def _load_file(path: Path, stadiums: dict[str, dict], limits: dict) -> pd.DataFr
     mrkt_p_norm = mrkt_p.div(mrkt_p.sum(axis=1), axis=0)
     mrkt_favourite = pd.Series(np.where(
         mrkt_p_norm["home"] > 0.5, "home",
-        np.where(mrkt_p_norm["away"] > 0.5, "away", "none")
+        np.where(mrkt_p_norm["away"] > 0.5, "away", "balanced")
     ), name="mrkt_favourite")
     mrkt_impl_order = pd.Series([
         "".join(k[0] for k in sorted(
@@ -155,6 +157,14 @@ def _load_file(path: Path, stadiums: dict[str, dict], limits: dict) -> pd.DataFr
             impl["mrkt_home_impl"], impl["mrkt_draw_impl"], impl["mrkt_away_impl"]
         )
     ], name="mrkt_impl_order")
+    mrkt_favrt_impl = pd.Series(
+        np.maximum(impl["mrkt_home_impl"], impl["mrkt_away_impl"]),
+        name="mrkt_favrt_impl",
+    )
+    mrkt_undrd_impl = pd.Series(
+        np.minimum(impl["mrkt_home_impl"], impl["mrkt_away_impl"]),
+        name="mrkt_undrd_impl",
+    )
 
     home_is_promoted = raw["HomeTeam"].map(lambda t: stadiums[t]["promoted"])
     away_is_promoted = raw["AwayTeam"].map(lambda t: stadiums[t]["promoted"])
@@ -191,6 +201,8 @@ def _load_file(path: Path, stadiums: dict[str, dict], limits: dict) -> pd.DataFr
         pd.DataFrame(entropies),
         mrkt_favourite,
         mrkt_impl_order,
+        mrkt_favrt_impl,
+        mrkt_undrd_impl,
     ], axis=1)
 
 
@@ -206,7 +218,7 @@ def build_match_info() -> pd.DataFrame:
             stadiums = _load_stadiums(league, season)
             frames.append(_load_file(path, stadiums, limits))
 
-    df = pd.concat(frames, ignore_index=True)[cols]
+    df = round_floats(pd.concat(frames, ignore_index=True)[cols])
 
     _FEATURES_DIR.mkdir(parents=True, exist_ok=True)
     df.to_csv(_FEATURES_DIR / "match_info.csv", index=False)

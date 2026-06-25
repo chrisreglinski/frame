@@ -2,6 +2,8 @@ from pathlib import Path
 
 import pandas as pd
 
+from features.utils import round_floats
+
 
 _ROOT = Path(__file__).parents[2]
 _FEATURES_DIR = _ROOT / "01_data" / "02_features"
@@ -14,7 +16,7 @@ def build_abt() -> pd.DataFrame:
     match_matchup_stats = pd.read_parquet(_FEATURES_DIR / "match_matchup_stats.parquet")
     match_target = pd.read_parquet(_FEATURES_DIR / "match_target.parquet")
 
-    abt = (
+    abt = round_floats(
         match_info
         .merge(match_team_stats, on="match_id")
         .merge(match_matchup_stats, on="match_id")

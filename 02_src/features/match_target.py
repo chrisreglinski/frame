@@ -3,6 +3,8 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+
+from features.utils import round_floats
 import yaml
 
 
@@ -68,7 +70,7 @@ def build_match_target() -> pd.DataFrame:
         for season in _SEASONS
         if (path := _RAW_DIR / f"{league}_{season}.csv").exists()
     ]
-    df = pd.concat(frames, ignore_index=True)[cols]
+    df = round_floats(pd.concat(frames, ignore_index=True)[cols])
 
     _FEATURES_DIR.mkdir(parents=True, exist_ok=True)
     df.to_csv(_FEATURES_DIR / "match_target.csv", index=False)

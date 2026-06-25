@@ -1,4 +1,5 @@
 schema_version: 1
+float_precision: 3
 
 ids:
 

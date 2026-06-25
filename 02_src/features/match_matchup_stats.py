@@ -4,6 +4,8 @@ from pathlib import Path
 import pandas as pd
 import yaml
 
+from features.utils import round_floats
+
 
 _ROOT = Path(__file__).parents[2]
 _FEATURES_DIR = _ROOT / "01_data" / "02_features"
@@ -60,10 +62,10 @@ def build_match_matchup_stats() -> pd.DataFrame:
             src[f"homet_{w}_goals_diff_avg"] - src[f"awayt_{w}_goals_diff_avg"]
         )
 
-    result = pd.concat(
+    result = round_floats(pd.concat(
         [src[["match_id"]], pd.DataFrame(computed, index=src.index)],
         axis=1,
-    )[["match_id"] + _columns()]
+    )[["match_id"] + _columns()])
 
     _FEATURES_DIR.mkdir(parents=True, exist_ok=True)
     result.to_csv(_FEATURES_DIR / "match_matchup_stats.csv", index=False)

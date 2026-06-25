@@ -7,6 +7,8 @@ import numpy as np
 import pandas as pd
 import yaml
 
+from features.utils import round_floats
+
 
 _ROOT = Path(__file__).parents[2]
 _RAW_DIR = _ROOT / "01_data" / "01_raw" / "01_matches"
@@ -273,14 +275,14 @@ def build_match_team_stats() -> pd.DataFrame:
     _out_cols = _TEAM_SEASON_COLS + _STAT_COLS + _cat_cols + _LOCALITY_STAT_COLS
 
     # team_season — long grain: (team, match), real rows only
-    team_season = (long[~is_summary][_out_cols]
+    team_season = round_floats(long[~is_summary][_out_cols]
                    .sort_values(["league", "season", "team", "date"])
                    .reset_index(drop=True))
 
     # team_season_final — one row per (team, season): stats include the last match
     _final_stat_cols = [c for c in _STAT_COLS if c != "game_number"]
     _final_cols = ["league", "season", "team"] + _final_stat_cols + _cat_cols + _LOCALITY_STAT_COLS
-    team_season_final = (long[is_summary][[c for c in _final_cols if c in long.columns]]
+    team_season_final = round_floats(long[is_summary][[c for c in _final_cols if c in long.columns]]
                          .sort_values(["league", "season", "team"])
                          .reset_index(drop=True))
 
@@ -326,7 +328,7 @@ def build_match_team_stats() -> pd.DataFrame:
         .merge(home_locality, on="match_id")
         .merge(away_locality, on="match_id")
     )
-    result = result[["match_id"] + _columns()]
+    result = round_floats(result[["match_id"] + _columns()])
 
     result.to_csv(_FEATURES_DIR / "match_team_stats.csv", index=False)
     result.to_parquet(_FEATURES_DIR / "match_team_stats.parquet", index=False)
