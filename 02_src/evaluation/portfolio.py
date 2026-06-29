@@ -134,16 +134,19 @@ def portfolio_breakdown(
     if model_probs is not None:
         df = df[model_probs.values > implied_probs.values + buffer]
 
-    def _roi(g):
-        capital = g["imp"].sum()
-        profit = g["won"].sum() - capital
-        return round(profit / capital, 4) if capital > 0 else None
+    def _roi_scalar(sub):
+        cap = float(sub["imp"].sum())
+        return round((float(sub["won"].sum()) - cap) / cap, 4) if cap > 0 else None
 
-    pivot = df.groupby(["league", "season"]).apply(_roi).unstack("season")
+    def _roi_series(by):
+        agg = df.groupby(by)[["imp", "won"]].sum()
+        cap = agg["imp"].replace(0, float("nan"))
+        return ((agg["won"] - agg["imp"]) / cap).round(4)
 
-    pivot["ALL"] = df.groupby("league").apply(_roi)
-    totals = df.groupby("season").apply(_roi).rename("ALL")
-    totals["ALL"] = _roi(df)
-    pivot = pd.concat([pivot, totals.to_frame().T.rename(index={0: "ALL"})])
+    pivot = _roi_series(["league", "season"]).unstack("season")
+    pivot["ALL"] = _roi_series("league")
+    totals = _roi_series("season").rename("ALL")
+    totals["ALL"] = _roi_scalar(df)
+    pivot = pd.concat([pivot, totals.to_frame().T])
 
     return pivot
