@@ -394,6 +394,38 @@ columns:
     dtype: string
     categories: [low, medium, high]
 
+  "{side}_season_shots_on_target_for_cat2m":
+    table: team_stats
+    description: "high if season_shots_on_target_for_avg > global mean (thresholds.json shots_on_target_foragst_mean), else low"
+    dims:
+      side: [homet, awayt]
+    dtype: string
+    categories: [high, low]
+
+  "{side}_season_shots_on_target_agst_cat2m":
+    table: team_stats
+    description: "high if season_shots_on_target_agst_avg > global mean (thresholds.json shots_on_target_foragst_mean), else low"
+    dims:
+      side: [homet, awayt]
+    dtype: string
+    categories: [high, low]
+
+  "{side}_season_shots_on_target_for_cat3q":
+    table: team_stats
+    description: "tertile of season_shots_on_target_for_avg from team_season_final (thresholds.json shots_on_target_foragst_p33/p67)"
+    dims:
+      side: [homet, awayt]
+    dtype: string
+    categories: [low, medium, high]
+
+  "{side}_season_shots_on_target_agst_cat3q":
+    table: team_stats
+    description: "tertile of season_shots_on_target_agst_avg from team_season_final (thresholds.json shots_on_target_foragst_p33/p67)"
+    dims:
+      side: [homet, awayt]
+    dtype: string
+    categories: [low, medium, high]
+
 
   "teams_{window}_goals_foragst_avg_max":
     table: match_matchup_stats

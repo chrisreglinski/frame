@@ -297,11 +297,19 @@ def build_match_team_stats() -> pd.DataFrame:
     long["season_goals_for_cat3q"]   = _cat3("season_goals_for_avg",   thresholds["goals_foragst_p33"], thresholds["goals_foragst_p67"])
     long["season_goals_agst_cat3q"]  = _cat3("season_goals_agst_avg",  thresholds["goals_foragst_p33"], thresholds["goals_foragst_p67"])
 
+    sot_mean = thresholds["shots_on_target_foragst_mean"]
+    long["season_shots_on_target_for_cat2m"]  = _cat("season_shots_on_target_for_avg",  sot_mean, "high", "low")
+    long["season_shots_on_target_agst_cat2m"] = _cat("season_shots_on_target_agst_avg", sot_mean, "high", "low")
+    long["season_shots_on_target_for_cat3q"]  = _cat3("season_shots_on_target_for_avg",  thresholds["shots_on_target_foragst_p33"], thresholds["shots_on_target_foragst_p67"])
+    long["season_shots_on_target_agst_cat3q"] = _cat3("season_shots_on_target_agst_avg", thresholds["shots_on_target_foragst_p33"], thresholds["shots_on_target_foragst_p67"])
+
     _cat_cols = [
         "season_goals_total_cat2m", "season_goals_diff_cat2m",
         "season_goals_for_cat2m",   "season_goals_agst_cat2m",
         "season_goals_total_cat3q", "season_goals_diff_cat3q",
         "season_goals_for_cat3q",   "season_goals_agst_cat3q",
+        "season_shots_on_target_for_cat2m",  "season_shots_on_target_agst_cat2m",
+        "season_shots_on_target_for_cat3q",  "season_shots_on_target_agst_cat3q",
     ]
     _out_cols = _TEAM_SEASON_COLS + _STAT_COLS + _cat_cols + _LOCALITY_STAT_COLS
 
