@@ -13,11 +13,15 @@ _OUT_PATH = _FEATURES_DIR / "thresholds.json"
 def build_thresholds() -> dict:
     raw = pd.read_parquet(_RAW_STATS_PATH)
     raw["goals_total"] = raw["FTHG"] + raw["FTAG"]
+    raw["sot_total"]   = raw["HST"]  + raw["AST"]
 
     goals_total_mean = float(raw["goals_total"].mean())
+    sot_total_mean   = float(raw["sot_total"].mean())
     thresholds = {
-        "goals_total_mean":   round(goals_total_mean, 3),
-        "goals_foragst_mean": round(goals_total_mean / 2, 3),
+        "goals_total_mean":             round(goals_total_mean, 3),
+        "goals_foragst_mean":           round(goals_total_mean / 2, 3),
+        "shots_on_target_total_mean":   round(sot_total_mean, 3),
+        "shots_on_target_foragst_mean": round(sot_total_mean / 2, 3),
     }
 
     _FEATURES_DIR.mkdir(parents=True, exist_ok=True)

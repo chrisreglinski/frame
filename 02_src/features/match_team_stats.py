@@ -281,6 +281,10 @@ def build_match_team_stats() -> pd.DataFrame:
     foragst_pool = pd.concat([summary_rows["season_goals_for_avg"], summary_rows["season_goals_agst_avg"]])
     thresholds["goals_foragst_p33"] = round(float(foragst_pool.quantile(1 / 3)), 3)
     thresholds["goals_foragst_p67"] = round(float(foragst_pool.quantile(2 / 3)), 3)
+    # shots_on_target — same pooled approach
+    sot_pool = pd.concat([summary_rows["season_shots_on_target_for_avg"], summary_rows["season_shots_on_target_agst_avg"]])
+    thresholds["shots_on_target_foragst_p33"] = round(float(sot_pool.quantile(1 / 3)), 3)
+    thresholds["shots_on_target_foragst_p67"] = round(float(sot_pool.quantile(2 / 3)), 3)
     _THRESHOLDS_PATH.write_text(json.dumps(thresholds, indent=2))
 
     def _cat3(col, p33, p67):
