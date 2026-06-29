@@ -16,11 +16,8 @@ def build_thresholds() -> dict:
 
     goals_total_mean = float(raw["goals_total"].mean())
     thresholds = {
-        "goals_total_mean": round(goals_total_mean, 3),
-        # from team perspective each match appears as home and away,
-        # so goals_for_mean == goals_agst_mean == goals_total_mean / 2
-        "goals_for_mean":  round(goals_total_mean / 2, 3),
-        "goals_agst_mean": round(goals_total_mean / 2, 3),
+        "goals_total_mean":   round(goals_total_mean, 3),
+        "goals_foragst_mean": round(goals_total_mean / 2, 3),
     }
 
     _FEATURES_DIR.mkdir(parents=True, exist_ok=True)
