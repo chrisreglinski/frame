@@ -264,14 +264,37 @@ def build_match_team_stats() -> pd.DataFrame:
     def _cat(col, threshold, hi, lo):
         return np.where(long[col].isna(), None, np.where(long[col] > threshold, hi, lo))
 
-    long["season_goals_total_cat"] = _cat("season_goals_total_avg", thresholds["goals_total_mean"], "high", "low")
-    long["season_goals_diff_cat"]  = _cat("season_goals_diff_avg",  0,                              "positive", "negative")
-    long["season_goals_for_cat"]   = _cat("season_goals_for_avg",   thresholds["goals_for_mean"],   "high", "low")
-    long["season_goals_agst_cat"]  = _cat("season_goals_agst_avg",  thresholds["goals_agst_mean"],  "high", "low")
-    _cat_cols = ["season_goals_total_cat", "season_goals_diff_cat",
-                 "season_goals_for_cat",   "season_goals_agst_cat"]
+    long["season_goals_total_cat2m"] = _cat("season_goals_total_avg", thresholds["goals_total_mean"], "high", "low")
+    long["season_goals_diff_cat2m"]  = _cat("season_goals_diff_avg",  0,                              "positive", "negative")
+    long["season_goals_for_cat2m"]   = _cat("season_goals_for_avg",   thresholds["goals_for_mean"],   "high", "low")
+    long["season_goals_agst_cat2m"]  = _cat("season_goals_agst_avg",  thresholds["goals_agst_mean"],  "high", "low")
 
     is_summary = long["_is_summary"].fillna(False).astype(bool)
+
+    # tertile thresholds from summary rows (one per team-season, unbiased distribution)
+    summary_rows = long[is_summary]
+    for metric in ["goals_total", "goals_diff", "goals_for", "goals_agst"]:
+        col = f"season_{metric}_avg"
+        thresholds[f"{metric}_p33"] = round(float(summary_rows[col].quantile(1 / 3)), 3)
+        thresholds[f"{metric}_p67"] = round(float(summary_rows[col].quantile(2 / 3)), 3)
+    _THRESHOLDS_PATH.write_text(json.dumps(thresholds, indent=2))
+
+    def _cat3(col, p33, p67):
+        return np.where(long[col].isna(), None,
+               np.where(long[col] <= p33, "low",
+               np.where(long[col] <= p67, "medium", "high")))
+
+    long["season_goals_total_cat3q"] = _cat3("season_goals_total_avg", thresholds["goals_total_p33"], thresholds["goals_total_p67"])
+    long["season_goals_diff_cat3q"]  = _cat3("season_goals_diff_avg",  thresholds["goals_diff_p33"],  thresholds["goals_diff_p67"])
+    long["season_goals_for_cat3q"]   = _cat3("season_goals_for_avg",   thresholds["goals_for_p33"],   thresholds["goals_for_p67"])
+    long["season_goals_agst_cat3q"]  = _cat3("season_goals_agst_avg",  thresholds["goals_agst_p33"],  thresholds["goals_agst_p67"])
+
+    _cat_cols = [
+        "season_goals_total_cat2m", "season_goals_diff_cat2m",
+        "season_goals_for_cat2m",   "season_goals_agst_cat2m",
+        "season_goals_total_cat3q", "season_goals_diff_cat3q",
+        "season_goals_for_cat3q",   "season_goals_agst_cat3q",
+    ]
     _out_cols = _TEAM_SEASON_COLS + _STAT_COLS + _cat_cols + _LOCALITY_STAT_COLS
 
     # team_season — long grain: (team, match), real rows only
