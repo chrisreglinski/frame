@@ -27,6 +27,7 @@ venv/
 !03_notebooks/market_impl_scatter_groups.ipynb
 !03_notebooks/goals_foragst_scatter_groups.ipynb
 !03_notebooks/shots_on_target_foragst_scatter_groups.ipynb
+!03_notebooks/goals_totaldiff_scatter_groups.ipynb
 .ipynb_checkpoints/
 
 # Reports
