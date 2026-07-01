@@ -70,13 +70,14 @@ The current match is never included in its own features.
 
 One row per match. Context and market features:
 
-- `league`, `season`, `date`, `home_team`, `away_team`
+- `league`, `season`, `date`, `time`, `day_of_week`, `home_team`, `away_team`
 - `season_game_number` — sequential match number in the league-season
 - `gameweek` — derived as `ceil(season_game_number / (n_teams / 2))`; `n_teams` computed dynamically per league-season (handles France's drop from 20 to 18 teams after 2223)
 - `season_4phase` — `summer / fall / winter / spring` based on hand-coded boundary dates in `01_raw/03_dates/season_limit_dates.csv`
 - `season_3phase` — `start / mid / end` (fall+winter merged into mid)
 - `home_is_promoted`, `away_is_promoted`, `travel_distance_km`
 - `b365_*` / `mrkt_*` — odds, implied probabilities (1/odds), bookmaker margin, Shannon entropy of normalized implied probs
+- `mrkt_favourite`, `mrkt_impl_order`, `mrkt_favrt_impl`, `mrkt_undrd_impl`, `mrkt_home_away_impl_diff` — derived market signals: favoured side (home/away/balanced), H/D/A ordering by implied prob, stronger/weaker side implied prob, home − away implied gap
 
 ### `match_team_stats`
 
@@ -93,18 +94,23 @@ Three window variants for every statistic:
 
 Statistics per team per window:
 - Goals, shots, shots on target, corners, yellow cards — for & against averages
-- Points, goals_diff, goals_total — average & std
+- Points — average
+- goals_diff, goals_total, shots_on_target_diff, shots_on_target_total — average & std
 - Win / draw / loss ratio
 - Goals total / for / against threshold ratios (e.g. over 2.5, clean sheets)
 - Shots on target conversion ratio
 - Red cards average; red card in last match flag
+- Home-only (`homet_home_*`) and away-only (`awayt_away_*`) season splits: goals / shots / shots-on-target for & against, plus points / goals_diff / goals_total, over that team's home (resp. away) matches only
 - `implied_win/draw/loss_avg` — bookmaker's (mrkt) average implied probability for this team's outcome
+- `impl_points_avg` — bookmaker expected points per match (`impl_win_avg * 3 + impl_draw_avg`)
 - `profit_win/draw/loss` — edge: actual ratio minus implied avg (positive = team undervalued by market)
+- Season-level categoricals (`season` window only): `*_cat2m` (binary — vs global mean, or sign) and `*_cat3q` (tertiles from `team_season_final`) for goals and shots-on-target total / diff / for / against
 
 ### `match_matchup_stats`
 
 Derived from `match_team_stats`. Comparative features per window:
 - `teams_{window}_goals_foragst_avg_max` — max of the four goals averages (home for, home agst, away for, away agst)
+- `homet/awayt_{window}_goals_foragst_avg_max` — per-team max(goals_for_avg, goals_agst_avg) for the home (`homet_`) and away (`awayt_`) side
 - `teams_{window}_goals_diff_diff` — home goals_diff_avg minus away goals_diff_avg
 
 ### `match_target`
@@ -113,10 +119,11 @@ Targets prefixed `t_`:
 - `t_home_goals`, `t_away_goals`, `t_result`
 - `t_home_flg`, `t_draw_flg`, `t_away_flg`
 - `t_goals_diff`, `t_goals_total`
+- `t_home_profit`, `t_draw_profit`, `t_away_profit` — profit from a unit stake on that outcome at mrkt odds (win: `1 - impl`; lose: `-impl`)
 
 ### ABT (`01_data/03_abt/abt.parquet`)
 
-Wide join of all four tables on `match_id`. ~7 000 rows, ~307 columns.
+Wide join of all four tables on `match_id`. ~7 000 rows, ~371 columns.
 Full table always generated; filter by league/season/phase/game_number downstream.
 
 ---
