@@ -1,5 +1,20 @@
 # Journal
 
+## 2026-07-01 — draw signal does NOT generalize to second divisions (minor group)
+- validation on the new minor group (second divisions england2/spain2/italy2/france2/germany2, 2223-2526,
+  built via the group-parameterized pipeline). The exact same draw pipeline that passes on major FAILS every
+  gate on minor, under both region structures:
+  - match (4-var matchup): major +13.6% (G1 3/4, G2 pass, no veto)  ->  minor -5.3% (G1 1/3, G2 fail, VETO)
+  - team (archetype grid): major +8.8% (G1 4/4, G2 pass)            ->  minor +0.7% (G1 2/4, G2 fail, VETO)
+  match-draw even flips sign; home fails on both groups.
+- this is the step-5 out-of-sample test on a NEW axis (leagues the template never saw). A genuinely
+  behavioural, universal bias (draws under-bet, favourites over-backed) should appear in the softer minor
+  markets, plausibly stronger — it does not appear at all. So the top-5 draw edge is most likely
+  top-5-specific, or overfit to the 4 top-5 seasons, despite passing the major gates.
+- VERDICT DOWNGRADE: the draw finding is NOT a confirmed universal edge. It survives time (LOSO) and league
+  (drop-best) robustness *within* major, but fails cross-league generalization to second divisions. Treat as
+  a low-confidence top-5-only pattern unless it reappears on genuinely fresh data.
+
 ## 2026-07-01 — draw value in "weak away vs strong home" matchups
 - signal: draws underpriced when a clearly weak team (season goals_for low & goals_against high)
   meets a stronger side. strongly ASYMMETRIC — weak-AWAY carries it, weak-home ~null. mechanism:
