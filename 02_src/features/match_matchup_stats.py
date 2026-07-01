@@ -8,8 +8,12 @@ from features.utils import round_floats
 
 
 _ROOT = Path(__file__).parents[2]
-_FEATURES_DIR = _ROOT / "01_data" / "02_features"
+_DATA = _ROOT / "01_data"
 _YAML_PATH = _ROOT / "06_docs" / "data.yaml"
+
+
+def _features_dir(group: str) -> Path:
+    return _DATA / "02_features" / group
 
 
 def _columns() -> list[str]:
@@ -47,8 +51,9 @@ def _windows() -> list[str]:
     return []
 
 
-def build_match_matchup_stats() -> pd.DataFrame:
-    src = pd.read_parquet(_FEATURES_DIR / "match_team_stats.parquet")
+def build_match_matchup_stats(group: str = "major") -> pd.DataFrame:
+    features_dir = _features_dir(group)
+    src = pd.read_parquet(features_dir / "match_team_stats.parquet")
 
     computed = {}
     for w in _windows():
@@ -72,8 +77,8 @@ def build_match_matchup_stats() -> pd.DataFrame:
         axis=1,
     )[["match_id"] + _columns()])
 
-    _FEATURES_DIR.mkdir(parents=True, exist_ok=True)
-    result.to_csv(_FEATURES_DIR / "match_matchup_stats.csv", index=False)
-    result.to_parquet(_FEATURES_DIR / "match_matchup_stats.parquet", index=False)
+    features_dir.mkdir(parents=True, exist_ok=True)
+    result.to_csv(features_dir / "match_matchup_stats.csv", index=False)
+    result.to_parquet(features_dir / "match_matchup_stats.parquet", index=False)
 
     return result

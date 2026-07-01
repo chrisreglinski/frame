@@ -78,13 +78,13 @@ columns:
     table: match_info
     description: "sequential match number in the league-season (1 = first match of the season)"
     dtype: int
-    range: [1, 380]
+    range: [1, 552]
 
   gameweek:
     table: match_info
     description: "gameweek number; derived as ceil(season_game_number / (n_teams/2)) where n_teams is counted per league-season"
     dtype: int
-    range: [1, 38]
+    range: [1, 46]
 
   season_4phase:
     table: match_info
@@ -187,7 +187,7 @@ columns:
     dims:
       side: [homet, awayt]
     dtype: int
-    range: [1, 38]
+    range: [1, 46]
 
   "{side}_{window}_{metric}_{kind}_avg":
     table: team_stats

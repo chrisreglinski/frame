@@ -11,13 +11,16 @@ from features.utils import round_floats
 
 
 _ROOT = Path(__file__).parents[2]
-_RAW_DIR = _ROOT / "01_data" / "01_raw" / "01_matches"
-_FEATURES_DIR = _ROOT / "01_data" / "02_features"
+_DATA = _ROOT / "01_data"
 _YAML_PATH = _ROOT / "06_docs" / "data.yaml"
-_THRESHOLDS_PATH = _FEATURES_DIR / "thresholds.json"
 
-_LEAGUES = ["england", "spain", "italy", "germany", "france"]
-_SEASONS = ["2223", "2324", "2425", "2526"]
+
+def _matches_dir(group: str) -> Path:
+    return _DATA / "01_raw" / "01_matches" / group
+
+
+def _features_dir(group: str) -> Path:
+    return _DATA / "02_features" / group
 
 _WINDOWS = {"season": None, "rolling6": 6, "rolling8": 8}
 
@@ -250,18 +253,18 @@ def _add_summary_stubs(long: pd.DataFrame) -> pd.DataFrame:
     return pd.concat([long, stubs], ignore_index=True)
 
 
-def build_match_team_stats() -> pd.DataFrame:
+def build_match_team_stats(group: str = "major") -> pd.DataFrame:
+    features_dir = _features_dir(group)
+    thresholds_path = features_dir / "thresholds.json"
     frames = []
-    for league in _LEAGUES:
-        for season in _SEASONS:
-            path = _RAW_DIR / f"{league}_{season}.csv"
-            if path.exists():
-                frames.append(_build_long(pd.read_csv(path), league, season))
+    for path in sorted(_matches_dir(group).glob("*.csv")):
+        league, season = path.stem.rsplit("_", 1)
+        frames.append(_build_long(pd.read_csv(path), league, season))
 
     long = _add_stats(_add_summary_stubs(pd.concat(frames, ignore_index=True)))
 
     # categorical columns based on global population thresholds
-    thresholds = json.loads(_THRESHOLDS_PATH.read_text())
+    thresholds = json.loads(thresholds_path.read_text())
 
     def _cat(col, threshold, hi, lo):
         return np.where(long[col].isna(), None, np.where(long[col] > threshold, hi, lo))
@@ -287,7 +290,7 @@ def build_match_team_stats() -> pd.DataFrame:
     sot_pool = pd.concat([summary_rows["season_shots_on_target_for_avg"], summary_rows["season_shots_on_target_agst_avg"]])
     thresholds["shots_on_target_foragst_p33"] = round(float(sot_pool.quantile(1 / 3)), 3)
     thresholds["shots_on_target_foragst_p67"] = round(float(sot_pool.quantile(2 / 3)), 3)
-    _THRESHOLDS_PATH.write_text(json.dumps(thresholds, indent=2))
+    thresholds_path.write_text(json.dumps(thresholds, indent=2))
 
     def _cat3(col, p33, p67):
         return np.where(long[col].isna(), None,
@@ -333,11 +336,11 @@ def build_match_team_stats() -> pd.DataFrame:
                          .sort_values(["league", "season", "team"])
                          .reset_index(drop=True))
 
-    _FEATURES_DIR.mkdir(parents=True, exist_ok=True)
-    team_season.to_csv(_FEATURES_DIR / "team_season.csv", index=False)
-    team_season.to_parquet(_FEATURES_DIR / "team_season.parquet", index=False)
-    team_season_final.to_parquet(_FEATURES_DIR / "team_season_final.parquet", index=False)
-    team_season_final.to_csv(_FEATURES_DIR / "team_season_final.csv", index=False)
+    features_dir.mkdir(parents=True, exist_ok=True)
+    team_season.to_csv(features_dir / "team_season.csv", index=False)
+    team_season.to_parquet(features_dir / "team_season.parquet", index=False)
+    team_season_final.to_parquet(features_dir / "team_season_final.parquet", index=False)
+    team_season_final.to_csv(features_dir / "team_season_final.csv", index=False)
 
     # match_team_stats — match grain: (match_id)
     stat_cols = _STAT_COLS + _cat_cols
@@ -377,7 +380,7 @@ def build_match_team_stats() -> pd.DataFrame:
     )
     result = round_floats(result[["match_id"] + _columns()])
 
-    result.to_csv(_FEATURES_DIR / "match_team_stats.csv", index=False)
-    result.to_parquet(_FEATURES_DIR / "match_team_stats.parquet", index=False)
+    result.to_csv(features_dir / "match_team_stats.csv", index=False)
+    result.to_parquet(features_dir / "match_team_stats.parquet", index=False)
 
     return result

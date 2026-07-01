@@ -11,14 +11,18 @@ from features.utils import round_floats
 
 
 _ROOT = Path(__file__).parents[2]
-_RAW_DIR = _ROOT / "01_data" / "01_raw" / "01_matches"
-_STADIUMS_DIR = _ROOT / "01_data" / "01_raw" / "02_stadiums"
-_FEATURES_DIR = _ROOT / "01_data" / "02_features"
+_DATA = _ROOT / "01_data"
+_STADIUMS_DIR = _DATA / "01_raw" / "02_stadiums"
 _YAML_PATH = _ROOT / "06_docs" / "data.yaml"
-_DATES_PATH = _ROOT / "01_data" / "01_raw" / "03_dates" / "season_limit_dates.csv"
+_DATES_PATH = _DATA / "01_raw" / "03_dates" / "season_limit_dates.csv"
 
-_LEAGUES = ["england", "spain", "italy", "germany", "france"]
-_SEASONS = ["2223", "2324", "2425", "2526"]
+
+def _matches_dir(group: str) -> Path:
+    return _DATA / "01_raw" / "01_matches" / group
+
+
+def _features_dir(group: str) -> Path:
+    return _DATA / "02_features" / group
 
 def _load_phase_limits() -> dict[str, dict[str, pd.Timestamp]]:
     if not _DATES_PATH.exists():
@@ -124,7 +128,7 @@ def _check_missing(teams: set[str], stadiums: dict, league: str, season: str) ->
 
 
 def _load_file(path: Path, stadiums: dict[str, dict], limits: dict) -> pd.DataFrame:
-    league, season = path.stem.split("_", 1)
+    league, season = path.stem.rsplit("_", 1)
     raw = pd.read_csv(path)
 
     all_teams = set(raw["HomeTeam"]) | set(raw["AwayTeam"])
@@ -224,22 +228,20 @@ def _load_file(path: Path, stadiums: dict[str, dict], limits: dict) -> pd.DataFr
     ], axis=1)
 
 
-def build_match_info() -> pd.DataFrame:
+def build_match_info(group: str = "major") -> pd.DataFrame:
     cols = ["match_id"] + _columns()
     limits = _load_phase_limits()
+    features_dir = _features_dir(group)
     frames = []
-    for league in _LEAGUES:
-        for season in _SEASONS:
-            path = _RAW_DIR / f"{league}_{season}.csv"
-            if not path.exists():
-                continue
-            stadiums = _load_stadiums(league, season)
-            frames.append(_load_file(path, stadiums, limits))
+    for path in sorted(_matches_dir(group).glob("*.csv")):
+        league, season = path.stem.rsplit("_", 1)
+        stadiums = _load_stadiums(league, season)
+        frames.append(_load_file(path, stadiums, limits))
 
     df = round_floats(pd.concat(frames, ignore_index=True)[cols])
 
-    _FEATURES_DIR.mkdir(parents=True, exist_ok=True)
-    df.to_csv(_FEATURES_DIR / "match_info.csv", index=False)
-    df.to_parquet(_FEATURES_DIR / "match_info.parquet", index=False)
+    features_dir.mkdir(parents=True, exist_ok=True)
+    df.to_csv(features_dir / "match_info.csv", index=False)
+    df.to_parquet(features_dir / "match_info.parquet", index=False)
 
     return df

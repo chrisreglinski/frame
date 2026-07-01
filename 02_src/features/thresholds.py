@@ -5,13 +5,16 @@ import pandas as pd
 
 
 _ROOT = Path(__file__).parents[2]
-_RAW_STATS_PATH = _ROOT / "01_data" / "01_raw" / "match_raw_stats.parquet"
-_FEATURES_DIR = _ROOT / "01_data" / "02_features"
-_OUT_PATH = _FEATURES_DIR / "thresholds.json"
+_DATA = _ROOT / "01_data"
 
 
-def build_thresholds() -> dict:
-    raw = pd.read_parquet(_RAW_STATS_PATH)
+def _features_dir(group: str) -> Path:
+    return _DATA / "02_features" / group
+
+
+def build_thresholds(group: str = "major") -> dict:
+    features_dir = _features_dir(group)
+    raw = pd.read_parquet(features_dir / "match_raw_stats.parquet")
     raw["goals_total"] = raw["FTHG"] + raw["FTAG"]
     raw["sot_total"]   = raw["HST"]  + raw["AST"]
 
@@ -24,7 +27,7 @@ def build_thresholds() -> dict:
         "shots_on_target_foragst_mean": round(sot_total_mean / 2, 3),
     }
 
-    _FEATURES_DIR.mkdir(parents=True, exist_ok=True)
-    _OUT_PATH.write_text(json.dumps(thresholds, indent=2))
+    features_dir.mkdir(parents=True, exist_ok=True)
+    (features_dir / "thresholds.json").write_text(json.dumps(thresholds, indent=2))
 
     return thresholds

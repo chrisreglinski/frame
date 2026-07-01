@@ -9,12 +9,16 @@ import yaml
 
 
 _ROOT = Path(__file__).parents[2]
-_RAW_DIR = _ROOT / "01_data" / "01_raw" / "01_matches"
-_FEATURES_DIR = _ROOT / "01_data" / "02_features"
+_DATA = _ROOT / "01_data"
 _YAML_PATH = _ROOT / "06_docs" / "data.yaml"
 
-_LEAGUES = ["england", "spain", "italy", "germany", "france"]
-_SEASONS = ["2223", "2324", "2425", "2526"]
+
+def _matches_dir(group: str) -> Path:
+    return _DATA / "01_raw" / "01_matches" / group
+
+
+def _features_dir(group: str) -> Path:
+    return _DATA / "02_features" / group
 
 
 def _columns() -> list[str]:
@@ -31,7 +35,7 @@ def _match_id(league: str, season: str, home: str, away: str) -> str:
 
 
 def _load_file(path: Path) -> pd.DataFrame:
-    league, season = path.stem.split("_", 1)
+    league, season = path.stem.rsplit("_", 1)
     raw = pd.read_csv(path)
 
     return pd.concat([
@@ -62,18 +66,14 @@ def _load_file(path: Path) -> pd.DataFrame:
     ], axis=1)
 
 
-def build_match_target() -> pd.DataFrame:
+def build_match_target(group: str = "major") -> pd.DataFrame:
     cols = ["match_id"] + _columns()
-    frames = [
-        _load_file(path)
-        for league in _LEAGUES
-        for season in _SEASONS
-        if (path := _RAW_DIR / f"{league}_{season}.csv").exists()
-    ]
+    features_dir = _features_dir(group)
+    frames = [_load_file(path) for path in sorted(_matches_dir(group).glob("*.csv"))]
     df = round_floats(pd.concat(frames, ignore_index=True)[cols])
 
-    _FEATURES_DIR.mkdir(parents=True, exist_ok=True)
-    df.to_csv(_FEATURES_DIR / "match_target.csv", index=False)
-    df.to_parquet(_FEATURES_DIR / "match_target.parquet", index=False)
+    features_dir.mkdir(parents=True, exist_ok=True)
+    df.to_csv(features_dir / "match_target.csv", index=False)
+    df.to_parquet(features_dir / "match_target.parquet", index=False)
 
     return df
