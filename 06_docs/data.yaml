@@ -233,7 +233,7 @@ columns:
     dims:
       side: [homet, awayt]
       window: [season, rolling6, rolling8]
-      metric: [points, goals_diff, goals_total]
+      metric: [points, goals_diff, goals_total, shots_on_target_diff, shots_on_target_total]
     dtype: float
 
   "{side}_{window}_{metric}_std":
@@ -242,7 +242,7 @@ columns:
     dims:
       side: [homet, awayt]
       window: [season, rolling6, rolling8]
-      metric: [goals_diff, goals_total]
+      metric: [goals_diff, goals_total, shots_on_target_diff, shots_on_target_total]
     dtype: float
 
   "{side}_{window}_{result}_ratio":
@@ -421,6 +421,38 @@ columns:
   "{side}_season_shots_on_target_agst_cat3q":
     table: team_stats
     description: "tertile of season_shots_on_target_agst_avg from team_season_final (thresholds.json shots_on_target_foragst_p33/p67)"
+    dims:
+      side: [homet, awayt]
+    dtype: string
+    categories: [low, medium, high]
+
+  "{side}_season_shots_on_target_total_cat2m":
+    table: team_stats
+    description: "high if season_shots_on_target_total_avg > global mean (thresholds.json shots_on_target_total_mean), else low"
+    dims:
+      side: [homet, awayt]
+    dtype: string
+    categories: [high, low]
+
+  "{side}_season_shots_on_target_diff_cat2m":
+    table: team_stats
+    description: "positive if season_shots_on_target_diff_avg > 0, else negative"
+    dims:
+      side: [homet, awayt]
+    dtype: string
+    categories: [positive, negative]
+
+  "{side}_season_shots_on_target_total_cat3q":
+    table: team_stats
+    description: "tertile of season_shots_on_target_total_avg from team_season_final (thresholds.json shots_on_target_total_p33/p67)"
+    dims:
+      side: [homet, awayt]
+    dtype: string
+    categories: [low, medium, high]
+
+  "{side}_season_shots_on_target_diff_cat3q":
+    table: team_stats
+    description: "tertile of season_shots_on_target_diff_avg from team_season_final (thresholds.json shots_on_target_diff_p33/p67)"
     dims:
       side: [homet, awayt]
     dtype: string

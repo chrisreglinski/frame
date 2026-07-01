@@ -44,7 +44,7 @@ def _make_stat_cols() -> list[str]:
     cols = ["game_number"]
     for w in _WINDOWS:
         cols += [f"{w}_{m}_{k}_avg" for m in ["goals", "shots", "shots_on_target", "corners", "yellow"] for k in ["for", "agst"]]
-        cols += [f"{w}_{m}_{v}" for m in ["points", "goals_diff", "goals_total"] for v in ["avg", "std"]]
+        cols += [f"{w}_{m}_{v}" for m in ["points", "goals_diff", "goals_total", "shots_on_target_diff", "shots_on_target_total"] for v in ["avg", "std"]]
         cols += [f"{w}_{r}_ratio" for r in ["wins", "draws", "losses"]]
         cols += [f"{w}_goals_total_le{x}_ratio" for x in [0, 1, 2, 3, 4]]
         cols += [f"{w}_goals_{kind}_le{x}_ratio" for kind in ["for", "agst"] for x in [0, 1, 2]]
@@ -133,6 +133,8 @@ def _build_long(raw: pd.DataFrame, league: str, season: str) -> pd.DataFrame:
     long = pd.concat([home, away], ignore_index=True)
     long["goals_diff"] = long["goals_for"] - long["goals_agst"]
     long["goals_total"] = long["goals_for"] + long["goals_agst"]
+    long["shots_on_target_diff"]  = long["shots_on_target_for"] - long["shots_on_target_agst"]
+    long["shots_on_target_total"] = long["shots_on_target_for"] + long["shots_on_target_agst"]
     return long
 
 
@@ -173,7 +175,7 @@ def _add_stats(long: pd.DataFrame) -> pd.DataFrame:
             for k in ["for", "agst"]:
                 long[f"{wname}_{m}_{k}_avg"] = _agg_mean(g, f"{m}_{k}", wsize)
 
-        for m in ["points", "goals_diff", "goals_total"]:
+        for m in ["points", "goals_diff", "goals_total", "shots_on_target_diff", "shots_on_target_total"]:
             long[f"{wname}_{m}_avg"] = _agg_mean(g, m, wsize)
             long[f"{wname}_{m}_std"] = _agg_std(g, m, wsize)
 
@@ -273,7 +275,7 @@ def build_match_team_stats() -> pd.DataFrame:
 
     # tertile thresholds from summary rows (one per team-season, unbiased distribution)
     summary_rows = long[is_summary]
-    for metric in ["goals_total", "goals_diff"]:
+    for metric in ["goals_total", "goals_diff", "shots_on_target_total", "shots_on_target_diff"]:
         col = f"season_{metric}_avg"
         thresholds[f"{metric}_p33"] = round(float(summary_rows[col].quantile(1 / 3)), 3)
         thresholds[f"{metric}_p67"] = round(float(summary_rows[col].quantile(2 / 3)), 3)
@@ -298,18 +300,24 @@ def build_match_team_stats() -> pd.DataFrame:
     long["season_goals_agst_cat3q"]  = _cat3("season_goals_agst_avg",  thresholds["goals_foragst_p33"], thresholds["goals_foragst_p67"])
 
     sot_mean = thresholds["shots_on_target_foragst_mean"]
-    long["season_shots_on_target_for_cat2m"]  = _cat("season_shots_on_target_for_avg",  sot_mean, "high", "low")
-    long["season_shots_on_target_agst_cat2m"] = _cat("season_shots_on_target_agst_avg", sot_mean, "high", "low")
-    long["season_shots_on_target_for_cat3q"]  = _cat3("season_shots_on_target_for_avg",  thresholds["shots_on_target_foragst_p33"], thresholds["shots_on_target_foragst_p67"])
-    long["season_shots_on_target_agst_cat3q"] = _cat3("season_shots_on_target_agst_avg", thresholds["shots_on_target_foragst_p33"], thresholds["shots_on_target_foragst_p67"])
+    long["season_shots_on_target_for_cat2m"]   = _cat("season_shots_on_target_for_avg",   sot_mean, "high", "low")
+    long["season_shots_on_target_agst_cat2m"]  = _cat("season_shots_on_target_agst_avg",  sot_mean, "high", "low")
+    long["season_shots_on_target_total_cat2m"] = _cat("season_shots_on_target_total_avg", thresholds["shots_on_target_total_mean"], "high", "low")
+    long["season_shots_on_target_diff_cat2m"]  = _cat("season_shots_on_target_diff_avg",  0, "positive", "negative")
+    long["season_shots_on_target_for_cat3q"]   = _cat3("season_shots_on_target_for_avg",   thresholds["shots_on_target_foragst_p33"], thresholds["shots_on_target_foragst_p67"])
+    long["season_shots_on_target_agst_cat3q"]  = _cat3("season_shots_on_target_agst_avg",  thresholds["shots_on_target_foragst_p33"], thresholds["shots_on_target_foragst_p67"])
+    long["season_shots_on_target_total_cat3q"] = _cat3("season_shots_on_target_total_avg", thresholds["shots_on_target_total_p33"], thresholds["shots_on_target_total_p67"])
+    long["season_shots_on_target_diff_cat3q"]  = _cat3("season_shots_on_target_diff_avg",  thresholds["shots_on_target_diff_p33"],  thresholds["shots_on_target_diff_p67"])
 
     _cat_cols = [
         "season_goals_total_cat2m", "season_goals_diff_cat2m",
         "season_goals_for_cat2m",   "season_goals_agst_cat2m",
         "season_goals_total_cat3q", "season_goals_diff_cat3q",
         "season_goals_for_cat3q",   "season_goals_agst_cat3q",
-        "season_shots_on_target_for_cat2m",  "season_shots_on_target_agst_cat2m",
-        "season_shots_on_target_for_cat3q",  "season_shots_on_target_agst_cat3q",
+        "season_shots_on_target_for_cat2m",   "season_shots_on_target_agst_cat2m",
+        "season_shots_on_target_total_cat2m", "season_shots_on_target_diff_cat2m",
+        "season_shots_on_target_for_cat3q",   "season_shots_on_target_agst_cat3q",
+        "season_shots_on_target_total_cat3q", "season_shots_on_target_diff_cat3q",
     ]
     _out_cols = _TEAM_SEASON_COLS + _STAT_COLS + _cat_cols + _LOCALITY_STAT_COLS
 
