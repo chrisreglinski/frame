@@ -165,6 +165,10 @@ def _load_file(path: Path, stadiums: dict[str, dict], limits: dict) -> pd.DataFr
         np.minimum(impl["mrkt_home_impl"], impl["mrkt_away_impl"]),
         name="mrkt_undrd_impl",
     )
+    mrkt_home_away_impl_diff = pd.Series(
+        impl["mrkt_home_impl"] - impl["mrkt_away_impl"],
+        name="mrkt_home_away_impl_diff",
+    )
 
     home_is_promoted = raw["HomeTeam"].map(lambda t: stadiums[t]["promoted"])
     away_is_promoted = raw["AwayTeam"].map(lambda t: stadiums[t]["promoted"])
@@ -203,6 +207,7 @@ def _load_file(path: Path, stadiums: dict[str, dict], limits: dict) -> pd.DataFr
         mrkt_impl_order,
         mrkt_favrt_impl,
         mrkt_undrd_impl,
+        mrkt_home_away_impl_diff,
     ], axis=1)
 
 

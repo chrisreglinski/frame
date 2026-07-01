@@ -175,6 +175,12 @@ columns:
     dtype: float
     range: [0, 1]
 
+  mrkt_home_away_impl_diff:
+    table: match_info
+    description: "mrkt home implied probability minus away implied probability; positive = home favoured"
+    dtype: float
+    range: [-1, 1]
+
   "{side}_game_number":
     table: team_stats
     description: "sequential match number for the {side} team in the season (1 = first match)"
