@@ -21,6 +21,8 @@ _LEAGUES = ["england", "spain", "italy", "germany", "france"]
 _SEASONS = ["2223", "2324", "2425", "2526"]
 
 def _load_phase_limits() -> dict[str, dict[str, pd.Timestamp]]:
+    if not _DATES_PATH.exists():
+        return {}
     df = pd.read_csv(_DATES_PATH, dtype={"season": str}, parse_dates=["summer_fall", "fall_winter", "winter_spring"])
     return {
         row["season"]: {
@@ -33,6 +35,8 @@ def _load_phase_limits() -> dict[str, dict[str, pd.Timestamp]]:
 
 
 def _season_4phase(date: pd.Series, season: str, limits: dict) -> pd.Series:
+    if season not in limits:
+        return pd.Series(np.nan, index=date.index)
     lim = limits[season]
     return pd.cut(
         date,
@@ -97,8 +101,10 @@ def _haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     return 2 * R * math.asin(math.sqrt(a))
 
 
-def _load_stadiums(league: str, season: str) -> dict[str, dict]:
+def _load_stadiums(league: str, season: str) -> dict[str, dict] | None:
     path = _STADIUMS_DIR / f"{league}_{season}_stadiums.csv"
+    if not path.exists():
+        return None
     df = pd.read_csv(path)
     return {
         row["TeamName"]: {
@@ -122,8 +128,6 @@ def _load_file(path: Path, stadiums: dict[str, dict], limits: dict) -> pd.DataFr
     raw = pd.read_csv(path)
 
     all_teams = set(raw["HomeTeam"]) | set(raw["AwayTeam"])
-    _check_missing(all_teams, stadiums, league, season)
-
     matches_per_gw = len(all_teams) // 2
     season_game_number = pd.Series(range(1, len(raw) + 1))
     gameweek = ((season_game_number - 1) // matches_per_gw + 1).rename("gameweek")
@@ -170,15 +174,24 @@ def _load_file(path: Path, stadiums: dict[str, dict], limits: dict) -> pd.DataFr
         name="mrkt_home_away_impl_diff",
     )
 
-    home_is_promoted = raw["HomeTeam"].map(lambda t: stadiums[t]["promoted"])
-    away_is_promoted = raw["AwayTeam"].map(lambda t: stadiums[t]["promoted"])
-    travel = pd.Series([
-        _haversine(
-            stadiums[h]["lat"], stadiums[h]["lon"],
-            stadiums[a]["lat"], stadiums[a]["lon"],
-        )
-        for h, a in zip(raw["HomeTeam"], raw["AwayTeam"])
-    ], name="travel_distance_km")
+    phase4 = _season_4phase(date, season, limits)
+    phase3 = _season_3phase(phase4)
+
+    if stadiums is None:
+        blank = pd.Series(np.nan, index=raw.index)
+        home_is_promoted = away_is_promoted = blank
+        travel = blank.rename("travel_distance_km")
+    else:
+        _check_missing(all_teams, stadiums, league, season)
+        home_is_promoted = raw["HomeTeam"].map(lambda t: stadiums[t]["promoted"])
+        away_is_promoted = raw["AwayTeam"].map(lambda t: stadiums[t]["promoted"])
+        travel = pd.Series([
+            _haversine(
+                stadiums[h]["lat"], stadiums[h]["lon"],
+                stadiums[a]["lat"], stadiums[a]["lon"],
+            )
+            for h, a in zip(raw["HomeTeam"], raw["AwayTeam"])
+        ], name="travel_distance_km")
 
     return pd.concat([
         pd.Series(
@@ -192,8 +205,8 @@ def _load_file(path: Path, stadiums: dict[str, dict], limits: dict) -> pd.DataFr
         date.dt.day_name().rename("day_of_week"),
         season_game_number.rename("season_game_number"),
         gameweek,
-        _season_4phase(date, season, limits).rename("season_4phase"),
-        _season_3phase(_season_4phase(date, season, limits)).rename("season_3phase"),
+        phase4.rename("season_4phase"),
+        phase3.rename("season_3phase"),
         raw["HomeTeam"].rename("home_team"),
         raw["AwayTeam"].rename("away_team"),
         home_is_promoted.rename("home_is_promoted"),
