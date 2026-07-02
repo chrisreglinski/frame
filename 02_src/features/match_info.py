@@ -15,6 +15,7 @@ _DATA = _ROOT / "01_data"
 _STADIUMS_DIR = _DATA / "01_raw" / "02_stadiums"
 _YAML_PATH = _ROOT / "06_docs" / "data.yaml"
 _DATES_PATH = _DATA / "01_raw" / "03_dates" / "season_limit_dates.csv"
+_ELO_DIR = _DATA / "01_raw" / "04_elo"
 
 
 def _matches_dir(group: str) -> Path:
@@ -228,6 +229,41 @@ def _load_file(path: Path, stadiums: dict[str, dict], limits: dict) -> pd.DataFr
     ], axis=1)
 
 
+def _attach_elo(df: pd.DataFrame, group: str) -> pd.DataFrame:
+    """Add home_elo / away_elo: the Club Elo rating of each team as of the match date.
+
+    For a match on date D, the rating whose window contains D (From <= D <= To) is the
+    PRE-match rating (Club Elo dates the post-match update to D+1). We resolve it with a
+    point-in-time merge_asof (backward on From), so no future information leaks in.
+    Falls back to NaN if the Elo data or the group's team map is absent, or a team has no
+    rating for that date."""
+    df = df.copy()
+    hist_path = _ELO_DIR / "clubelo_history.csv"
+    tmap_path = _ELO_DIR / group / "team_map.csv"
+    if not hist_path.exists() or not tmap_path.exists():
+        df["home_elo"] = np.nan
+        df["away_elo"] = np.nan
+        return df
+
+    name_to_clubelo = pd.read_csv(tmap_path).set_index("team")["clubelo"].to_dict()
+    hist = pd.read_csv(hist_path, usecols=["clubelo", "Elo", "From"])
+    hist["Elo"] = pd.to_numeric(hist["Elo"], errors="coerce")
+    hist["From"] = pd.to_datetime(hist["From"])
+    hist = hist.dropna(subset=["From"]).sort_values("From").reset_index(drop=True)
+
+    match_date = pd.to_datetime(df["date"])
+    for side in ("home", "away"):
+        left = pd.DataFrame({
+            "_row": range(len(df)),
+            "date": match_date.values,
+            "clubelo": df[f"{side}_team"].map(name_to_clubelo).values,
+        }).sort_values("date")
+        merged = pd.merge_asof(left, hist, left_on="date", right_on="From",
+                               by="clubelo", direction="backward")
+        df[f"{side}_elo"] = merged.sort_values("_row")["Elo"].values
+    return df
+
+
 def build_match_info(group: str = "major") -> pd.DataFrame:
     cols = ["match_id"] + _columns()
     limits = _load_phase_limits()
@@ -238,7 +274,8 @@ def build_match_info(group: str = "major") -> pd.DataFrame:
         stadiums = _load_stadiums(league, season)
         frames.append(_load_file(path, stadiums, limits))
 
-    df = round_floats(pd.concat(frames, ignore_index=True)[cols])
+    base = _attach_elo(pd.concat(frames, ignore_index=True), group)
+    df = round_floats(base[cols])
 
     features_dir.mkdir(parents=True, exist_ok=True)
     df.to_csv(features_dir / "match_info.csv", index=False)
