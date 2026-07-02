@@ -149,15 +149,17 @@ notebooks can import directly: `from features.match_info import build_match_info
 ## Rebuild pipeline
 
 ```bash
-python build_abt.py               # rebuild the 'major' group (default)
-python build_abt.py --group minor # rebuild another league group (minor / other)
+python build_abt.py               # rebuild the pipeline (default: the top-5 'major' group)
+python build_abt.py --group NAME  # rebuild a different league group (a folder under 01_matches/)
 python build_abt.py --skip-raw    # skip match_raw_stats (when raw CSVs are unchanged)
 ```
 
 `build_abt.py` in the project root runs all builders in dependency order for one league
-group and prints timing for each step. Each group reads its match CSVs from
-`01_data/01_raw/01_matches/<group>/` and writes to `01_data/02_features/<group>/` and
-`01_data/03_abt/<group>/`. Use `--skip-raw` when the source CSVs have not changed.
+group and prints timing for each step. The pipeline is parameterized by group: a group reads
+its match CSVs from `01_data/01_raw/01_matches/<group>/` and writes to
+`01_data/02_features/<group>/` and `01_data/03_abt/<group>/`, so additional league groups can
+be dropped in as new folders. Only the top-5 `major` group is active for now. Use `--skip-raw`
+when the source CSVs have not changed.
 
 Or use `03_notebooks/template.ipynb` to load all tables directly.
 
