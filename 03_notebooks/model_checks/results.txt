@@ -1,0 +1,3 @@
+goals_foragst_match_kmeans_lr_draw      G1 PASS  G2 PASS  G3 PASS  |  pooled +0.136 (997 bets)  spread 0.336  [group=major]
+goals_foragst_team_kmeans_lr_draw       G1 PASS  G2 PASS  G3 PASS  |  pooled +0.088 (906 bets)  spread 0.288  [group=major]
+goals_foragst_team_kmeans_lr_home       G1 PASS  G2 PASS  G3 FAIL  |  pooled +0.031 (551 bets)  spread 0.201  [group=major]

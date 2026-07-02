@@ -1,5 +1,26 @@
 # Journal
 
+## 2026-07-02 — other (first divisions) supports the draw edge; gate tooling + GATE 3
+
+- ran the frozen draw pipeline on the **other** group (netherlands + portugal, both TOP FLIGHTS). match-draw:
+  pooled +8.3% at the frozen k=5, GATE 1 3/4, walk-forward clean. team-draw pooled +22% but knob/map-fragile
+  (spikes at types=4, flips negative on the final map at types=5, ~58 honest walk-forward bets) — do not
+  anchor on it; match-draw +8% is the honest number.
+- this REVISES the 2026-07-01 "top-5 only / does not generalize" downgrade. the split that matters is **tier**,
+  not group: FIRST divisions (top-5 major + other's eredivisie/primeira) carry the draw edge; SECOND divisions
+  (minor) do not. a structural boundary (market maturity / public money on favourites), not noise.
+- GATE 2 (drop-best-league) is near-meaningless on a 2-league group: "drop the best of 2" = "is the single
+  remaining league positive", which even a true small edge fails often from variance. its fail on other is
+  discounted; on minor (5 leagues) it still carries weight.
+- honest size is modest and netherlands-leaning (portugal -0.14), wide CI — real but small, clearest in first
+  divisions. the one clean remaining test is forward 2627.
+- TOOLING: the 3 model_checks notebooks (match/team draw, team home) now report GATE 1 / GATE 2 / GATE 3 as
+  colored PASS/FAIL (green/red). GATE 3 promotes the walk-forward from a directional veto to a hard gate: it
+  FAILS if any test season ROI < -0.05, or if both test seasons are negative (on major: match-draw PASS,
+  team-draw PASS, team-home FAIL). each notebook refreshes its one-liner in `model_checks/results.txt`.
+  GROUP is a parameter at the top of each notebook; the `_minor` duplicate notebooks were removed.
+- DECISION DEFERRED: whether to extend the gated analysis systematically to minor / other is left for later.
+
 ## 2026-07-01 — draw signal does NOT generalize to second divisions (minor group)
 - validation on the new minor group (second divisions england2/spain2/italy2/france2/germany2, 2223-2526,
   built via the group-parameterized pipeline). The exact same draw pipeline that passes on major FAILS every
