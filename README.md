@@ -30,6 +30,7 @@ Source: [football-data.co.uk](https://www.football-data.co.uk)
     01_matches/        # raw CSVs from football-data.co.uk (tracked in git)
     02_stadiums/       # stadium coordinates + promoted team flags per league-season
     03_dates/          # season phase boundary dates
+    04_elo/            # Club Elo history (clubelo.com) + per-group team-name maps
   02_features/         # generated feature tables (gitignored, rebuild locally)
   03_abt/              # final wide ABT (gitignored, rebuild locally)
 02_src/
@@ -62,6 +63,10 @@ in `match_info` and are not duplicated in other tables.
 All rolling/expanding statistics use `shift(1)` before any aggregation.
 The current match is never included in its own features.
 
+`home_elo` / `away_elo` are joined point-in-time from Club Elo: the rating whose window
+contains the match date (`From <= date <= To`) is the pre-match value — Club Elo dates each
+post-match update to the following day — so no result leaks into the feature.
+
 ---
 
 ## Feature tables
@@ -76,6 +81,7 @@ One row per match. Context and market features:
 - `season_4phase` — `summer / fall / winter / spring` based on hand-coded boundary dates in `01_raw/03_dates/season_limit_dates.csv`
 - `season_3phase` — `start / mid / end` (fall+winter merged into mid)
 - `home_is_promoted`, `away_is_promoted`, `travel_distance_km`
+- `home_elo`, `away_elo` — Club Elo rating (clubelo.com) of each team as of the match date, joined point-in-time (pre-match; see below)
 - `b365_*` / `mrkt_*` — odds, implied probabilities (1/odds), bookmaker margin, Shannon entropy of normalized implied probs
 - `mrkt_favourite`, `mrkt_impl_order`, `mrkt_favrt_impl`, `mrkt_undrd_impl`, `mrkt_home_away_impl_diff` — derived market signals: favoured side (home/away/balanced), H/D/A ordering by implied prob, stronger/weaker side implied prob, home − away implied gap
 
@@ -123,7 +129,7 @@ Targets prefixed `t_`:
 
 ### ABT (`01_data/03_abt/abt.parquet`)
 
-Wide join of all four tables on `match_id`. ~7 000 rows, ~371 columns.
+Wide join of all four tables on `match_id`. ~7 000 rows, ~373 columns.
 Full table always generated; filter by league/season/phase/game_number downstream.
 
 ---
@@ -143,13 +149,15 @@ notebooks can import directly: `from features.match_info import build_match_info
 ## Rebuild pipeline
 
 ```bash
-python build_abt.py             # rebuild everything
-python build_abt.py --skip-raw  # skip match_raw_stats (when raw CSVs are unchanged)
+python build_abt.py               # rebuild the 'major' group (default)
+python build_abt.py --group minor # rebuild another league group (minor / other)
+python build_abt.py --skip-raw    # skip match_raw_stats (when raw CSVs are unchanged)
 ```
 
-`build_abt.py` in the project root runs all builders in dependency order and prints
-timing for each step. Use `--skip-raw` for the common case where the source CSVs
-in `01_data/01_raw/01_matches/` have not changed.
+`build_abt.py` in the project root runs all builders in dependency order for one league
+group and prints timing for each step. Each group reads its match CSVs from
+`01_data/01_raw/01_matches/<group>/` and writes to `01_data/02_features/<group>/` and
+`01_data/03_abt/<group>/`. Use `--skip-raw` when the source CSVs have not changed.
 
 Or use `03_notebooks/template.ipynb` to load all tables directly.
 
