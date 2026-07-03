@@ -1,8 +1,9 @@
 # frame
 
-Football analytics pipeline for building predictive models on top-5 European leagues.
-The goal is to produce a clean, point-in-time-correct Analytical Base Table (ABT)
-that can be sliced and fed into betting/prediction models downstream.
+Football analytics framework that:
+- produces a clean, point-in-time-correct Analytical Base Table (ABT)
+- enables easy EDA on created features
+- enables predictive/betting model investigation and validation under a fixed validation protocol
 
 ---
 
