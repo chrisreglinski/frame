@@ -125,6 +125,22 @@ columns:
     dtype: float
     range: [1000, 2200]
 
+  "{side}_elo_cat2m":
+    table: match_info
+    description: "high if {side}_elo > global elo mean (thresholds.json elo_mean), else low; None if elo is NaN"
+    dims:
+      side: [hmt, awt]
+    dtype: string
+    categories: [high, low]
+
+  "{side}_elo_cat3q":
+    table: match_info
+    description: "tertile of {side}_elo from the pooled per-match elo distribution (thresholds.json elo_p33/p67); None if elo is NaN"
+    dims:
+      side: [hmt, awt]
+    dtype: string
+    categories: [low, medium, high]
+
   "{bookmaker}_{outcome}_odds":
     table: match_info
     description: "odds from {bookmaker} for outcome {outcome}"

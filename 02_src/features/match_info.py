@@ -1,5 +1,6 @@
 import hashlib
 import itertools
+import json
 import math
 from pathlib import Path
 
@@ -264,6 +265,42 @@ def _attach_elo(df: pd.DataFrame, group: str) -> pd.DataFrame:
     return df
 
 
+def _attach_elo_cats(df: pd.DataFrame, group: str) -> pd.DataFrame:
+    """Categorize hmt_elo / awt_elo against the pooled per-match elo distribution.
+
+    cat2m: high/low vs the global elo mean. cat3q: low/medium/high tertiles (p33/p67).
+    Thresholds come from all hmt_elo + awt_elo values in the group (global, all seasons —
+    same boundary-only convention as the other cat columns) and are recorded in
+    thresholds.json. None where elo is NaN."""
+    df = df.copy()
+    thresholds_path = _features_dir(group) / "thresholds.json"
+    pooled = pd.concat([df["hmt_elo"], df["awt_elo"]]).dropna()
+
+    if pooled.empty:
+        for side in ("hmt", "awt"):
+            df[f"{side}_elo_cat2m"] = None
+            df[f"{side}_elo_cat3q"] = None
+        return df
+
+    elo_mean = round(float(pooled.mean()), 3)
+    elo_p33 = round(float(pooled.quantile(1 / 3)), 3)
+    elo_p67 = round(float(pooled.quantile(2 / 3)), 3)
+
+    thresholds = json.loads(thresholds_path.read_text()) if thresholds_path.exists() else {}
+    thresholds.update({"elo_mean": elo_mean, "elo_p33": elo_p33, "elo_p67": elo_p67})
+    thresholds_path.parent.mkdir(parents=True, exist_ok=True)
+    thresholds_path.write_text(json.dumps(thresholds, indent=2))
+
+    for side in ("hmt", "awt"):
+        e = df[f"{side}_elo"]
+        df[f"{side}_elo_cat2m"] = np.where(e.isna(), None, np.where(e > elo_mean, "high", "low"))
+        df[f"{side}_elo_cat3q"] = np.where(
+            e.isna(), None,
+            np.where(e <= elo_p33, "low", np.where(e <= elo_p67, "medium", "high")),
+        )
+    return df
+
+
 def build_match_info(group: str = "major") -> pd.DataFrame:
     cols = ["match_id"] + _columns()
     limits = _load_phase_limits()
@@ -275,6 +312,7 @@ def build_match_info(group: str = "major") -> pd.DataFrame:
         frames.append(_load_file(path, stadiums, limits))
 
     base = _attach_elo(pd.concat(frames, ignore_index=True), group)
+    base = _attach_elo_cats(base, group)
     df = round_floats(base[cols])
 
     features_dir.mkdir(parents=True, exist_ok=True)

@@ -83,6 +83,7 @@ One row per match. Context and market features:
 - `season_3phase` — `start / mid / end` (fall+winter merged into mid)
 - `hmt_is_promoted`, `awt_is_promoted`, `travel_distance_km`
 - `hmt_elo`, `awt_elo` — Club Elo rating (clubelo.com) of each team as of the match date, joined point-in-time (pre-match; see below)
+- `hmt_elo_cat2m` / `awt_elo_cat2m` (high/low vs the global elo mean) and `hmt_elo_cat3q` / `awt_elo_cat3q` (tertiles of the pooled per-match elo distribution; thresholds in `thresholds.json`)
 - `b365_*` / `mrkt_*` — odds, implied probabilities (1/odds), bookmaker margin, Shannon entropy of normalized implied probs
 - `mrkt_favourite`, `mrkt_impl_order`, `mrkt_favrt_impl`, `mrkt_undrd_impl`, `mrkt_home_away_impl_diff` — derived market signals: favoured side (home/away/balanced), H/D/A ordering by implied prob, stronger/weaker side implied prob, home − away implied gap
 
@@ -130,7 +131,7 @@ Targets prefixed `t_`:
 
 ### ABT (`01_data/03_abt/abt.parquet`)
 
-Wide join of all four tables on `match_id`. ~7 000 rows, ~373 columns.
+Wide join of all four tables on `match_id`. ~7 000 rows, ~377 columns.
 Full table always generated; filter by league/season/phase/game_number downstream.
 
 ---
