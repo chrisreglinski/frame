@@ -135,6 +135,18 @@ Full table always generated; filter by league/season/phase/game_number downstrea
 
 ---
 
+## Home/away feature spaces
+
+A `home_away_feature_space` is a named bundle of symmetric ABT columns describing the
+home and away team — a name plus a list of ABT columns (`home`, `away`, and optionally
+derived columns like `draw_impl`). No transformation happens inside a space; input
+columns are transformed beforehand. Two registries sit on top: a catalogue of existing
+spaces (`goals_foragst`, `shots_on_target_foragst`, `points`, `elo`, `impl`, …) and a
+log of models built on them. Full description:
+[`06_docs/spaces.md`](06_docs/spaces.md).
+
+---
+
 ## Setup
 
 ```bash

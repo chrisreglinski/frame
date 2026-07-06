@@ -1,3 +1,39 @@
+## 2026-07-06 — Home/away feature spaces: a data type + two registries (refines 2026-07-03)
+A `home_away_feature_space` is just a named bundle of symmetric ABT columns (`home`,
+`away`, optional derived like `draw_impl`) — a data type, not a transformer. No
+transformations happen inside a space; input columns are transformed beforehand. No
+dedicated code module.
+
+Two registries live in `06_docs/spaces.md`:
+- **space registry** — the catalogue of existing spaces.
+- **exploration registry** — a log of models built on spaces (space, ABT filter,
+  segmentation, segment filter, LOSO / drop-best-league / walk-forward results); the
+  `space` column links back to the space registry.
+
+Supersedes the 2026-07-03 specifics below: no `02_src/spaces` module and no on-the-fly
+`coordinates` / transform layer.
+
+## 2026-07-03 — Adopt the "analysis space" abstraction for match exploration
+Match exploration (segmentation → profitability → model) is organized around
+*analysis spaces*: each embeds a match in a 2D/2×2D home-vs-away coordinate system
+(`goals_foragst`, `shots_on_target`, `elo`, `points`, `impl`, learned `strength`).
+Full description in `06_docs/spaces.md`.
+
+**Rationale.** The existing segmentation notebooks are all instances of one pattern.
+Making `Space` a first-class declarative object + generic machinery makes new spaces
+cheap and keeps results comparable across spaces — which is what the redundancy /
+landscape work needs. Canonical transform `(home, away) → (diff = tilt, sum = level)`;
+reduced vs rich spaces; the strength ladder.
+
+**Boundaries.** Coordinate transforms live in the analysis layer (`02_src/spaces/`),
+computed on the fly, and are NOT materialized into the `data.yaml` contract. New
+rotations go to Space, not the contract. Existing materialized transforms
+(`match_matchup_stats`, goals `diff`/`total`, …) may be redundant with Space for now;
+cleanup is deferred.
+
+**Non-breaking.** The abstraction sits on top of the current pipeline and evaluation;
+old notebooks remain valid and are portable to the Space approach incrementally.
+
 ## 2026-07-01 — Validation protocol v2: add league dimension, tiered roles
 Supersedes the tiering in the two-tier note below; its rationale (why not random CV, the
 leakage/threshold note) still holds. Each element has an explicit role so hard gates are not
