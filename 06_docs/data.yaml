@@ -5,8 +5,8 @@ ids:
 
   match_id:
     description: "match identifier"
-    built_from: [league, season, home_team, away_team]
-    rule: "md5(league|season|home_team|away_team)"
+    built_from: [league, season, hmt_name, awt_name]
+    rule: "md5(league|season|hmt_name|awt_name)"
     dtype: string
 
 tables:
@@ -44,13 +44,13 @@ columns:
     description: "season, e.g. '2223'"
     dtype: string
 
-  home_team:
+  hmt_name:
     table: match_info
     description: "home team"
     inputs: [HomeTeam]
     dtype: string
 
-  away_team:
+  awt_name:
     table: match_info
     description: "away team"
     inputs: [AwayTeam]
@@ -98,13 +98,13 @@ columns:
     dtype: string
     categories: [start, mid, end]
 
-  home_is_promoted:
+  hmt_is_promoted:
     table: match_info
     description: "home team promoted to the league this season"
     inputs: [Promotee]
     dtype: bool
 
-  away_is_promoted:
+  awt_is_promoted:
     table: match_info
     description: "away team promoted to the league this season"
     inputs: [Promotee]
@@ -121,7 +121,7 @@ columns:
     table: match_info
     description: "Club Elo rating of the {side} team as of the match date (pre-match, From <= date <= To; from clubelo.com via 04_elo/team_map.csv; NaN if the team is unmapped or has no rating for that date)"
     dims:
-      side: [home, away]
+      side: [hmt, awt]
     dtype: float
     range: [1000, 2200]
 
@@ -193,7 +193,7 @@ columns:
     table: team_stats
     description: "sequential match number for the {side} team in the season (1 = first match)"
     dims:
-      side: [homet, awayt]
+      side: [hmt, awt]
     dtype: int
     range: [1, 46]
 
@@ -201,13 +201,13 @@ columns:
     table: team_stats
     description: "arithmetic mean of {metric} {kind} per match over {window}, {side} team"
     dims:
-      side: [homet, awayt]
+      side: [hmt, awt]
       window: [season, rolling6, rolling8]
       metric: [goals, shots, shots_on_target, corners, yellow]
       kind: [for, agst]
     dtype: float
 
-  "homet_home_{window}_{metric}_{kind}_avg":
+  "hmt_home_{window}_{metric}_{kind}_avg":
     table: team_stats
     description: "arithmetic mean of {metric} {kind} per home match over {window}, home team only"
     dims:
@@ -216,7 +216,7 @@ columns:
       kind: [for, agst]
     dtype: float
 
-  "awayt_away_{window}_{metric}_{kind}_avg":
+  "awt_away_{window}_{metric}_{kind}_avg":
     table: team_stats
     description: "arithmetic mean of {metric} {kind} per away match over {window}, away team only"
     dims:
@@ -225,7 +225,7 @@ columns:
       kind: [for, agst]
     dtype: float
 
-  "homet_home_{window}_{metric}_avg":
+  "hmt_home_{window}_{metric}_avg":
     table: team_stats
     description: "arithmetic mean of {metric} per home match over {window}, home team only"
     dims:
@@ -233,7 +233,7 @@ columns:
       metric: [points, goals_diff, goals_total]
     dtype: float
 
-  "awayt_away_{window}_{metric}_avg":
+  "awt_away_{window}_{metric}_avg":
     table: team_stats
     description: "arithmetic mean of {metric} per away match over {window}, away team only"
     dims:
@@ -245,7 +245,7 @@ columns:
     table: team_stats
     description: "arithmetic mean of {metric} per match over {window}, {side} team"
     dims:
-      side: [homet, awayt]
+      side: [hmt, awt]
       window: [season, rolling6, rolling8]
       metric: [points, goals_diff, goals_total, shots_on_target_diff, shots_on_target_total]
     dtype: float
@@ -254,7 +254,7 @@ columns:
     table: team_stats
     description: "standard deviation of {metric} per match over {window}, {side} team"
     dims:
-      side: [homet, awayt]
+      side: [hmt, awt]
       window: [season, rolling6, rolling8]
       metric: [goals_diff, goals_total, shots_on_target_diff, shots_on_target_total]
     dtype: float
@@ -263,7 +263,7 @@ columns:
     table: team_stats
     description: "share of matches with {result} over {window}, {side} team"
     dims:
-      side: [homet, awayt]
+      side: [hmt, awt]
       window: [season, rolling6, rolling8]
       result: [wins, draws, losses]
     dtype: float
@@ -273,7 +273,7 @@ columns:
     table: team_stats
     description: "share of matches with total goals <= {x} over {window}, {side} team"
     dims:
-      side: [homet, awayt]
+      side: [hmt, awt]
       window: [season, rolling6, rolling8]
       x: [0, 1, 2, 3, 4]
     dtype: float
@@ -283,7 +283,7 @@ columns:
     table: team_stats
     description: "share of matches with goals {kind} <= {x} over {window}, {side} team"
     dims:
-      side: [homet, awayt]
+      side: [hmt, awt]
       window: [season, rolling6, rolling8]
       kind: [for, agst]
       x: [0, 1, 2]
@@ -294,7 +294,7 @@ columns:
     table: team_stats
     description: "cumulative shots on target / cumulative shots ({kind}) over {window}, {side} team"
     dims:
-      side: [homet, awayt]
+      side: [hmt, awt]
       window: [season, rolling6, rolling8]
       kind: [for, agst]
     dtype: float
@@ -304,7 +304,7 @@ columns:
     table: team_stats
     description: "average red cards received per match over {window}, {side} team"
     dims:
-      side: [homet, awayt]
+      side: [hmt, awt]
       window: [season, rolling6, rolling8]
     dtype: float
 
@@ -312,14 +312,14 @@ columns:
     table: team_stats
     description: "{side} team received a red card in its previous match (NaN if no previous match)"
     dims:
-      side: [homet, awayt]
+      side: [hmt, awt]
     dtype: bool
 
   "{side}_{window}_impl_{outcome}_avg":
     table: team_stats
     description: "mrkt bookmaker implied probability of {outcome} for {side} team over {window}"
     dims:
-      side: [homet, awayt]
+      side: [hmt, awt]
       window: [season, rolling6, rolling8]
       outcome: [win, draw, loss]
     dtype: float
@@ -329,7 +329,7 @@ columns:
     table: team_stats
     description: "bookmaker expected points per match over {window}: impl_win_avg * 3 + impl_draw_avg"
     dims:
-      side: [homet, awayt]
+      side: [hmt, awt]
       window: [season, rolling6, rolling8]
     dtype: float
     range: [0, 3]
@@ -338,7 +338,7 @@ columns:
     table: team_stats
     description: "edge on {outcome} market over {window}: {outcome}_ratio minus impl_{outcome}_avg"
     dims:
-      side: [homet, awayt]
+      side: [hmt, awt]
       window: [season, rolling6, rolling8]
       outcome: [win, draw, loss]
     dtype: float
@@ -348,7 +348,7 @@ columns:
     table: team_stats
     description: "high if season_goals_total_avg > global mean (thresholds.json goals_total_mean), else low"
     dims:
-      side: [homet, awayt]
+      side: [hmt, awt]
     dtype: string
     categories: [high, low]
 
@@ -356,7 +356,7 @@ columns:
     table: team_stats
     description: "positive if season_goals_diff_avg > 0, else negative"
     dims:
-      side: [homet, awayt]
+      side: [hmt, awt]
     dtype: string
     categories: [positive, negative]
 
@@ -364,7 +364,7 @@ columns:
     table: team_stats
     description: "high if season_goals_for_avg > global mean (thresholds.json goals_for_mean), else low"
     dims:
-      side: [homet, awayt]
+      side: [hmt, awt]
     dtype: string
     categories: [high, low]
 
@@ -372,7 +372,7 @@ columns:
     table: team_stats
     description: "high if season_goals_agst_avg > global mean (thresholds.json goals_agst_mean), else low"
     dims:
-      side: [homet, awayt]
+      side: [hmt, awt]
     dtype: string
     categories: [high, low]
 
@@ -380,7 +380,7 @@ columns:
     table: team_stats
     description: "tertile of season_goals_total_avg from team_season_final (thresholds.json goals_total_p33/p67)"
     dims:
-      side: [homet, awayt]
+      side: [hmt, awt]
     dtype: string
     categories: [low, medium, high]
 
@@ -388,7 +388,7 @@ columns:
     table: team_stats
     description: "tertile of season_goals_diff_avg from team_season_final (thresholds.json goals_diff_p33/p67)"
     dims:
-      side: [homet, awayt]
+      side: [hmt, awt]
     dtype: string
     categories: [low, medium, high]
 
@@ -396,7 +396,7 @@ columns:
     table: team_stats
     description: "tertile of season_goals_for_avg from team_season_final (thresholds.json goals_for_p33/p67)"
     dims:
-      side: [homet, awayt]
+      side: [hmt, awt]
     dtype: string
     categories: [low, medium, high]
 
@@ -404,7 +404,7 @@ columns:
     table: team_stats
     description: "tertile of season_goals_agst_avg from team_season_final (thresholds.json goals_agst_p33/p67)"
     dims:
-      side: [homet, awayt]
+      side: [hmt, awt]
     dtype: string
     categories: [low, medium, high]
 
@@ -412,7 +412,7 @@ columns:
     table: team_stats
     description: "high if season_shots_on_target_for_avg > global mean (thresholds.json shots_on_target_foragst_mean), else low"
     dims:
-      side: [homet, awayt]
+      side: [hmt, awt]
     dtype: string
     categories: [high, low]
 
@@ -420,7 +420,7 @@ columns:
     table: team_stats
     description: "high if season_shots_on_target_agst_avg > global mean (thresholds.json shots_on_target_foragst_mean), else low"
     dims:
-      side: [homet, awayt]
+      side: [hmt, awt]
     dtype: string
     categories: [high, low]
 
@@ -428,7 +428,7 @@ columns:
     table: team_stats
     description: "tertile of season_shots_on_target_for_avg from team_season_final (thresholds.json shots_on_target_foragst_p33/p67)"
     dims:
-      side: [homet, awayt]
+      side: [hmt, awt]
     dtype: string
     categories: [low, medium, high]
 
@@ -436,7 +436,7 @@ columns:
     table: team_stats
     description: "tertile of season_shots_on_target_agst_avg from team_season_final (thresholds.json shots_on_target_foragst_p33/p67)"
     dims:
-      side: [homet, awayt]
+      side: [hmt, awt]
     dtype: string
     categories: [low, medium, high]
 
@@ -444,7 +444,7 @@ columns:
     table: team_stats
     description: "high if season_shots_on_target_total_avg > global mean (thresholds.json shots_on_target_total_mean), else low"
     dims:
-      side: [homet, awayt]
+      side: [hmt, awt]
     dtype: string
     categories: [high, low]
 
@@ -452,7 +452,7 @@ columns:
     table: team_stats
     description: "positive if season_shots_on_target_diff_avg > 0, else negative"
     dims:
-      side: [homet, awayt]
+      side: [hmt, awt]
     dtype: string
     categories: [positive, negative]
 
@@ -460,7 +460,7 @@ columns:
     table: team_stats
     description: "tertile of season_shots_on_target_total_avg from team_season_final (thresholds.json shots_on_target_total_p33/p67)"
     dims:
-      side: [homet, awayt]
+      side: [hmt, awt]
     dtype: string
     categories: [low, medium, high]
 
@@ -468,7 +468,7 @@ columns:
     table: team_stats
     description: "tertile of season_shots_on_target_diff_avg from team_season_final (thresholds.json shots_on_target_diff_p33/p67)"
     dims:
-      side: [homet, awayt]
+      side: [hmt, awt]
     dtype: string
     categories: [low, medium, high]
 
@@ -484,7 +484,7 @@ columns:
     table: match_matchup_stats
     description: "max(goals_for_avg, goals_agst_avg) for {side} team over {window}; measures intensity of play regardless of direction"
     dims:
-      side: [homet, awayt]
+      side: [hmt, awt]
       window: [season, rolling6, rolling8]
     dtype: float
 

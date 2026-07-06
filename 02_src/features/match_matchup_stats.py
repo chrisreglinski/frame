@@ -58,18 +58,18 @@ def build_match_matchup_stats(group: str = "major") -> pd.DataFrame:
     computed = {}
     for w in _windows():
         computed[f"teams_{w}_goals_foragst_avg_max"] = src[[
-            f"homet_{w}_goals_for_avg",
-            f"homet_{w}_goals_agst_avg",
-            f"awayt_{w}_goals_for_avg",
-            f"awayt_{w}_goals_agst_avg",
+            f"hmt_{w}_goals_for_avg",
+            f"hmt_{w}_goals_agst_avg",
+            f"awt_{w}_goals_for_avg",
+            f"awt_{w}_goals_agst_avg",
         ]].max(axis=1)
-        for side in ["homet", "awayt"]:
+        for side in ["hmt", "awt"]:
             computed[f"{side}_{w}_goals_foragst_avg_max"] = src[[
                 f"{side}_{w}_goals_for_avg",
                 f"{side}_{w}_goals_agst_avg",
             ]].max(axis=1)
         computed[f"teams_{w}_goals_diff_diff"] = (
-            src[f"homet_{w}_goals_diff_avg"] - src[f"awayt_{w}_goals_diff_avg"]
+            src[f"hmt_{w}_goals_diff_avg"] - src[f"awt_{w}_goals_diff_avg"]
         )
 
     result = round_floats(pd.concat(

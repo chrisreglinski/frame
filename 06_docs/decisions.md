@@ -133,5 +133,5 @@ Seasons before 2223 excluded because COVID-era matches (2020–2022) had no fans
 measurably reduced home advantage and skewed result distributions — a different data-generating process.
 
 ## 2026-06-12 — match_id
-`match_id` to be built as md5(league|season|home_team|away_team).
+`match_id` to be built as md5(league|season|hmt_name|awt_name).
 the columns have to be in the input table and optionaly can be in (one) output table.

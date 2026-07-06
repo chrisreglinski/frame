@@ -14,10 +14,10 @@ The catalogue of identified spaces.
 
 | space | home | away | derived |
 |---|---|---|---|
-| `goals_foragst` | `homet_season_goals_for_avg`, `homet_season_goals_agst_avg` | `awayt_season_goals_for_avg`, `awayt_season_goals_agst_avg` | — |
-| `shots_on_target_foragst` | `homet_season_shots_on_target_for_avg`, `homet_season_shots_on_target_agst_avg` | `awayt_season_shots_on_target_for_avg`, `awayt_season_shots_on_target_agst_avg` | — |
-| `points` | `homet_season_points_avg` | `awayt_season_points_avg` | — |
-| `elo` | `home_elo` | `away_elo` | — |
+| `goals_foragst` | `hmt_season_goals_for_avg`, `hmt_season_goals_agst_avg` | `awt_season_goals_for_avg`, `awt_season_goals_agst_avg` | — |
+| `shots_on_target_foragst` | `hmt_season_shots_on_target_for_avg`, `hmt_season_shots_on_target_agst_avg` | `awt_season_shots_on_target_for_avg`, `awt_season_shots_on_target_agst_avg` | — |
+| `points` | `hmt_season_points_avg` | `awt_season_points_avg` | — |
+| `elo` | `hmt_elo` | `awt_elo` | — |
 | `impl` | `mrkt_home_impl` | `mrkt_away_impl` | `mrkt_draw_impl` |
 | `strength` *(planned)* | learned scalar per side (LR/PCA over a side's stats) | learned scalar per side | — |
 

@@ -346,17 +346,17 @@ def build_match_team_stats(group: str = "major") -> pd.DataFrame:
     stat_cols = _STAT_COLS + _cat_cols
     home_stats = (
         long[long["is_home"]][["match_id"] + stat_cols]
-        .rename(columns={c: f"homet_{c}" for c in stat_cols})
+        .rename(columns={c: f"hmt_{c}" for c in stat_cols})
     )
     away_stats = (
         long[~long["is_home"]][["match_id"] + stat_cols]
-        .rename(columns={c: f"awayt_{c}" for c in stat_cols})
+        .rename(columns={c: f"awt_{c}" for c in stat_cols})
     )
     base = (
         long[long["is_home"]][["match_id", "league", "season", "date", "team"]]
-        .rename(columns={"team": "home_team"})
+        .rename(columns={"team": "hmt_name"})
         .merge(
-            long[~long["is_home"]][["match_id", "team"]].rename(columns={"team": "away_team"}),
+            long[~long["is_home"]][["match_id", "team"]].rename(columns={"team": "awt_name"}),
             on="match_id",
         )
     )
@@ -365,11 +365,11 @@ def build_match_team_stats(group: str = "major") -> pd.DataFrame:
     _away_loc_cols = [c for c in _LOCALITY_STAT_COLS if c.startswith("away_")]
     home_locality = (
         long[long["is_home"]][["match_id"] + _home_loc_cols]
-        .rename(columns={c: f"homet_{c}" for c in _home_loc_cols})
+        .rename(columns={c: f"hmt_{c}" for c in _home_loc_cols})
     )
     away_locality = (
         long[~long["is_home"]][["match_id"] + _away_loc_cols]
-        .rename(columns={c: f"awayt_{c}" for c in _away_loc_cols})
+        .rename(columns={c: f"awt_{c}" for c in _away_loc_cols})
     )
 
     result = (base

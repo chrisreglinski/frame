@@ -184,12 +184,12 @@ def _load_file(path: Path, stadiums: dict[str, dict], limits: dict) -> pd.DataFr
 
     if stadiums is None:
         blank = pd.Series(np.nan, index=raw.index)
-        home_is_promoted = away_is_promoted = blank
+        hmt_is_promoted = awt_is_promoted = blank
         travel = blank.rename("travel_distance_km")
     else:
         _check_missing(all_teams, stadiums, league, season)
-        home_is_promoted = raw["HomeTeam"].map(lambda t: stadiums[t]["promoted"])
-        away_is_promoted = raw["AwayTeam"].map(lambda t: stadiums[t]["promoted"])
+        hmt_is_promoted = raw["HomeTeam"].map(lambda t: stadiums[t]["promoted"])
+        awt_is_promoted = raw["AwayTeam"].map(lambda t: stadiums[t]["promoted"])
         travel = pd.Series([
             _haversine(
                 stadiums[h]["lat"], stadiums[h]["lon"],
@@ -212,10 +212,10 @@ def _load_file(path: Path, stadiums: dict[str, dict], limits: dict) -> pd.DataFr
         gameweek,
         phase4.rename("season_4phase"),
         phase3.rename("season_3phase"),
-        raw["HomeTeam"].rename("home_team"),
-        raw["AwayTeam"].rename("away_team"),
-        home_is_promoted.rename("home_is_promoted"),
-        away_is_promoted.rename("away_is_promoted"),
+        raw["HomeTeam"].rename("hmt_name"),
+        raw["AwayTeam"].rename("awt_name"),
+        hmt_is_promoted.rename("hmt_is_promoted"),
+        awt_is_promoted.rename("awt_is_promoted"),
         travel,
         pd.DataFrame(odds),
         pd.DataFrame(impl),
@@ -230,7 +230,7 @@ def _load_file(path: Path, stadiums: dict[str, dict], limits: dict) -> pd.DataFr
 
 
 def _attach_elo(df: pd.DataFrame, group: str) -> pd.DataFrame:
-    """Add home_elo / away_elo: the Club Elo rating of each team as of the match date.
+    """Add hmt_elo / awt_elo: the Club Elo rating of each team as of the match date.
 
     For a match on date D, the rating whose window contains D (From <= D <= To) is the
     PRE-match rating (Club Elo dates the post-match update to D+1). We resolve it with a
@@ -241,8 +241,8 @@ def _attach_elo(df: pd.DataFrame, group: str) -> pd.DataFrame:
     hist_path = _ELO_DIR / "clubelo_history.csv"
     tmap_path = _ELO_DIR / group / "team_map.csv"
     if not hist_path.exists() or not tmap_path.exists():
-        df["home_elo"] = np.nan
-        df["away_elo"] = np.nan
+        df["hmt_elo"] = np.nan
+        df["awt_elo"] = np.nan
         return df
 
     name_to_clubelo = pd.read_csv(tmap_path).set_index("team")["clubelo"].to_dict()
@@ -252,15 +252,15 @@ def _attach_elo(df: pd.DataFrame, group: str) -> pd.DataFrame:
     hist = hist.dropna(subset=["From"]).sort_values("From").reset_index(drop=True)
 
     match_date = pd.to_datetime(df["date"])
-    for side in ("home", "away"):
+    for prefix in ("hmt", "awt"):
         left = pd.DataFrame({
             "_row": range(len(df)),
             "date": match_date.values,
-            "clubelo": df[f"{side}_team"].map(name_to_clubelo).values,
+            "clubelo": df[f"{prefix}_name"].map(name_to_clubelo).values,
         }).sort_values("date")
         merged = pd.merge_asof(left, hist, left_on="date", right_on="From",
                                by="clubelo", direction="backward")
-        df[f"{side}_elo"] = merged.sort_values("_row")["Elo"].values
+        df[f"{prefix}_elo"] = merged.sort_values("_row")["Elo"].values
     return df
 
 

@@ -55,8 +55,8 @@ the code. Any schema change requires updating `data.yaml` first, then the code.
 
 ### match_id
 
-All tables join on `match_id = md5(league|season|home_team|away_team)`.
-Natural key columns (`league`, `season`, `home_team`, `away_team`) live only
+All tables join on `match_id = md5(league|season|hmt_name|awt_name)`.
+Natural key columns (`league`, `season`, `hmt_name`, `awt_name`) live only
 in `match_info` and are not duplicated in other tables.
 
 ### Point-in-time correctness
@@ -64,7 +64,7 @@ in `match_info` and are not duplicated in other tables.
 All rolling/expanding statistics use `shift(1)` before any aggregation.
 The current match is never included in its own features.
 
-`home_elo` / `away_elo` are joined point-in-time from Club Elo: the rating whose window
+`hmt_elo` / `awt_elo` are joined point-in-time from Club Elo: the rating whose window
 contains the match date (`From <= date <= To`) is the pre-match value — Club Elo dates each
 post-match update to the following day — so no result leaks into the feature.
 
@@ -76,20 +76,20 @@ post-match update to the following day — so no result leaks into the feature.
 
 One row per match. Context and market features:
 
-- `league`, `season`, `date`, `time`, `day_of_week`, `home_team`, `away_team`
+- `league`, `season`, `date`, `time`, `day_of_week`, `hmt_name`, `awt_name`
 - `season_game_number` — sequential match number in the league-season
 - `gameweek` — derived as `ceil(season_game_number / (n_teams / 2))`; `n_teams` computed dynamically per league-season (handles France's drop from 20 to 18 teams after 2223)
 - `season_4phase` — `summer / fall / winter / spring` based on hand-coded boundary dates in `01_raw/03_dates/season_limit_dates.csv`
 - `season_3phase` — `start / mid / end` (fall+winter merged into mid)
-- `home_is_promoted`, `away_is_promoted`, `travel_distance_km`
-- `home_elo`, `away_elo` — Club Elo rating (clubelo.com) of each team as of the match date, joined point-in-time (pre-match; see below)
+- `hmt_is_promoted`, `awt_is_promoted`, `travel_distance_km`
+- `hmt_elo`, `awt_elo` — Club Elo rating (clubelo.com) of each team as of the match date, joined point-in-time (pre-match; see below)
 - `b365_*` / `mrkt_*` — odds, implied probabilities (1/odds), bookmaker margin, Shannon entropy of normalized implied probs
 - `mrkt_favourite`, `mrkt_impl_order`, `mrkt_favrt_impl`, `mrkt_undrd_impl`, `mrkt_home_away_impl_diff` — derived market signals: favoured side (home/away/balanced), H/D/A ordering by implied prob, stronger/weaker side implied prob, home − away implied gap
 
 ### `match_team_stats`
 
 One row per match, wide format. Team statistics computed from all previous matches in
-the season for both the home team (`homet_` prefix) and away team (`awayt_` prefix).
+the season for both the home team (`hmt_` prefix) and away team (`awt_` prefix).
 
 Three window variants for every statistic:
 
@@ -107,7 +107,7 @@ Statistics per team per window:
 - Goals total / for / against threshold ratios (e.g. over 2.5, clean sheets)
 - Shots on target conversion ratio
 - Red cards average; red card in last match flag
-- Home-only (`homet_home_*`) and away-only (`awayt_away_*`) season splits: goals / shots / shots-on-target for & against, plus points / goals_diff / goals_total, over that team's home (resp. away) matches only
+- Home-only (`hmt_home_*`) and away-only (`awt_away_*`) season splits: goals / shots / shots-on-target for & against, plus points / goals_diff / goals_total, over that team's home (resp. away) matches only
 - `implied_win/draw/loss_avg` — bookmaker's (mrkt) average implied probability for this team's outcome
 - `impl_points_avg` — bookmaker expected points per match (`impl_win_avg * 3 + impl_draw_avg`)
 - `profit_win/draw/loss` — edge: actual ratio minus implied avg (positive = team undervalued by market)
@@ -117,7 +117,7 @@ Statistics per team per window:
 
 Derived from `match_team_stats`. Comparative features per window:
 - `teams_{window}_goals_foragst_avg_max` — max of the four goals averages (home for, home agst, away for, away agst)
-- `homet/awayt_{window}_goals_foragst_avg_max` — per-team max(goals_for_avg, goals_agst_avg) for the home (`homet_`) and away (`awayt_`) side
+- `homet/awt_{window}_goals_foragst_avg_max` — per-team max(goals_for_avg, goals_agst_avg) for the home (`hmt_`) and away (`awt_`) side
 - `teams_{window}_goals_diff_diff` — home goals_diff_avg minus away goals_diff_avg
 
 ### `match_target`
