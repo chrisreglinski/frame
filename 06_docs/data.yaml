@@ -74,6 +74,12 @@ columns:
     inputs: [Date]
     dtype: string
 
+  day_of_week_cat:
+    table: match_info
+    description: "day_of_week grouped: weekend (sat/sun), shoulder (fri/mon), midweek (tue/wed/thu)"
+    dtype: string
+    categories: [weekend, shoulder, midweek]
+
   season_game_number:
     table: match_info
     description: "sequential match number in the league-season (1 = first match of the season)"

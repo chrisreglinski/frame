@@ -54,6 +54,12 @@ def _season_4phase(date: pd.Series, season: str, limits: dict) -> pd.Series:
 
 _3PHASE_MAP = {"summer": "start", "fall": "mid", "winter": "mid", "spring": "end"}
 
+_DOW_CAT = {
+    "Saturday": "weekend", "Sunday": "weekend",
+    "Friday": "shoulder", "Monday": "shoulder",
+    "Tuesday": "midweek", "Wednesday": "midweek", "Thursday": "midweek",
+}
+
 
 def _season_3phase(phase4: pd.Series) -> pd.Series:
     return phase4.map(_3PHASE_MAP)
@@ -209,6 +215,7 @@ def _load_file(path: Path, stadiums: dict[str, dict], limits: dict) -> pd.DataFr
         date.rename("date"),
         raw["Time"].rename("time"),
         date.dt.day_name().rename("day_of_week"),
+        date.dt.day_name().map(_DOW_CAT).rename("day_of_week_cat"),
         season_game_number.rename("season_game_number"),
         gameweek,
         phase4.rename("season_4phase"),
