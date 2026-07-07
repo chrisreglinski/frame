@@ -68,6 +68,20 @@ columns:
     inputs: [Time]
     dtype: string
 
+  time_uk_num:
+    table: match_info
+    description: "kick-off time (UK) as a number: hour + minute/60 (e.g. 19:45 -> 19.75)"
+    inputs: [Time]
+    dtype: float
+    range: [11, 23]
+
+  time_uk_cat:
+    table: match_info
+    description: "kick-off time (UK) bucketed by floor(hour): early (11-13), early_afternoon (14-15), late_afternoon (16-17), evening (18+)"
+    inputs: [Time]
+    dtype: string
+    categories: [early, early_afternoon, late_afternoon, evening]
+
   day_of_week:
     table: match_info
     description: "day of week of the match"

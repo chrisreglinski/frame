@@ -82,6 +82,7 @@ One row per match. Context and market features:
 - `season_4phase` — `summer / fall / winter / spring` based on hand-coded boundary dates in `01_raw/03_dates/season_limit_dates.csv`
 - `season_3phase` — `start / mid / end` (fall+winter merged into mid)
 - `day_of_week_cat` — `weekend` (sat/sun) / `shoulder` (fri/mon) / `midweek` (tue/wed/thu)
+- `time_uk_num` — kick-off time (UK) as a number (`hour + minute/60`); `time_uk_cat` — bucketed by floor(hour): `early` (11–13) / `early_afternoon` (14–15) / `late_afternoon` (16–17) / `evening` (18+)
 - `hmt_is_promoted`, `awt_is_promoted`, `travel_distance_km`
 - `hmt_elo`, `awt_elo` — Club Elo rating (clubelo.com) of each team as of the match date, joined point-in-time (pre-match; see below)
 - `hmt_elo_cat2m` / `awt_elo_cat2m` (high/low vs the global elo mean) and `hmt_elo_cat3q` / `awt_elo_cat3q` (tertiles of the pooled per-match elo distribution; thresholds in `thresholds.json`)
@@ -132,7 +133,7 @@ Targets prefixed `t_`:
 
 ### ABT (`01_data/03_abt/abt.parquet`)
 
-Wide join of all four tables on `match_id`. ~7 000 rows, ~377 columns.
+Wide join of all four tables on `match_id`. ~7 000 rows, ~380 columns.
 Full table always generated; filter by league/season/phase/game_number downstream.
 
 ---

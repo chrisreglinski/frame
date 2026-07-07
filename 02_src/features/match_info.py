@@ -186,6 +186,14 @@ def _load_file(path: Path, stadiums: dict[str, dict], limits: dict) -> pd.DataFr
         name="mrkt_home_away_impl_diff",
     )
 
+    time_parts = raw["Time"].astype("string").str.split(":")
+    _hh = pd.to_numeric(time_parts.str[0], errors="coerce")
+    _mm = pd.to_numeric(time_parts.str[1], errors="coerce")
+    time_uk_num = _hh + _mm / 60.0
+    time_uk_cat = pd.cut(_hh, bins=[0, 13, 15, 17, 24],
+                         labels=["early", "early_afternoon", "late_afternoon", "evening"]).astype(object)
+    time_uk_cat = time_uk_cat.where(time_uk_cat.notna(), None)
+
     phase4 = _season_4phase(date, season, limits)
     phase3 = _season_3phase(phase4)
 
@@ -214,6 +222,8 @@ def _load_file(path: Path, stadiums: dict[str, dict], limits: dict) -> pd.DataFr
         pd.Series([season] * len(raw), name="season"),
         date.rename("date"),
         raw["Time"].rename("time"),
+        time_uk_num.rename("time_uk_num"),
+        time_uk_cat.rename("time_uk_cat"),
         date.dt.day_name().rename("day_of_week"),
         date.dt.day_name().map(_DOW_CAT).rename("day_of_week_cat"),
         season_game_number.rename("season_game_number"),
