@@ -11,5 +11,6 @@ All runs use mrkt (market-consensus) odds.
 | goals_foragst_draw_kmeans_match_lr | goals_foragst | draw | major, gn>8, dropna | KMeans k=5 (match, running, 4D) | train-profitable clusters | PASS | PASS | PASS | pooled +0.112 (1013 bets) | 0.350 |
 | goals_foragst_draw_kmeans_team_lr | goals_foragst | draw | major, gn>8, dropna | KMeans n=3 team archetypes (final) -> 3x3 grid | train-profitable cells | FAIL | PASS | FAIL | pooled +0.065 (1099 bets) | 0.265 |
 | goals_foragst_home_kmeans_team_lr | goals_foragst | home | major, gn>8, dropna | KMeans n=3 team archetypes (final) -> 3x3 grid | train-profitable cells | FAIL | FAIL | FAIL | pooled -0.091 (474 bets) | 0.345 |
-| points_draw_kmeans_match_lr | points | draw | major, gn>8, dropna | KMeans k=5 (match, running, 2D) | train-profitable clusters | FAIL | FAIL | FAIL | pooled -0.018 (689 bets) | 0.508 |
-| shots_on_target_foragst_draw_kmeans_match_lr | shots_on_target_foragst | draw | major, gn>8, dropna | KMeans k=5 (match, running, 4D) | train-profitable clusters | FAIL | FAIL | FAIL | pooled -0.048 (574 bets) | 0.316 |
+| goals_foragst_impl_draw_kmeans_match_lr | goals_foragst_impl | draw | major, gn>8, dropna | KMeans k=5 (match, running, 4D) | train-profitable clusters | PASS | PASS | PASS | pooled +0.183 (1003 bets) | 0.325 |
+| points_draw_kmeans_match_lr | points | draw | major, gn>8, dropna | KMeans k=5 (match, running, 2D) | train-profitable clusters | FAIL | FAIL | FAIL | pooled -0.024 (512 bets) | 0.516 |
+| shots_on_target_foragst_draw_kmeans_match_lr | shots_on_target_foragst | draw | major, gn>8, dropna | KMeans k=5 (match, running, 4D) | train-profitable clusters | PASS | FAIL | FAIL | pooled +0.045 (486 bets) | 0.341 |
