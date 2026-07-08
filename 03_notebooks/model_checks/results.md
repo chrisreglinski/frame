@@ -7,6 +7,7 @@ All runs use mrkt (market-consensus) odds.
 | source | space | target | abt filter | segmentation | segment filter | G1 | G2 | G3 | result | roi_std |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | goals_foragst_draw_favourite_best_lr | goals_foragst | draw | major, gn>8, dropna | mrkt_favourite | best train-edge segment | FAIL | FAIL | FAIL | pooled -0.090 (514 bets) | 0.365 |
-| goals_foragst_draw_kmeans_match_lr | goals_foragst | draw | major, gn>8, dropna | KMeans k=5 (match, 4D) | train-profitable clusters | PASS | PASS | PASS | pooled +0.112 (1013 bets) | 0.350 |
-| goals_foragst_draw_kmeans_team_lr | goals_foragst | draw | major, gn>8, dropna | KMeans k=4 team archetypes -> 4x4 grid | train-profitable cells | PASS | PASS | PASS | pooled +0.081 (933 bets) | 0.279 |
-| goals_foragst_home_kmeans_team_lr | goals_foragst | home | major, gn>8, dropna | KMeans k=4 team archetypes -> 4x4 grid | train-profitable cells | FAIL | PASS | FAIL | pooled +0.031 (571 bets) | 0.185 |
+| goals_foragst_draw_kmeans_match_lr | goals_foragst | draw | major, gn>8, dropna | KMeans k=5 (match, running, 4D) | train-profitable clusters | PASS | PASS | PASS | pooled +0.112 (1013 bets) | 0.350 |
+| goals_foragst_draw_kmeans_team_lr | goals_foragst | draw | major, gn>8, dropna | KMeans n=3 team archetypes (final) -> 3x3 grid | train-profitable cells | FAIL | PASS | FAIL | pooled +0.065 (1099 bets) | 0.265 |
+| goals_foragst_home_kmeans_team_lr | goals_foragst | home | major, gn>8, dropna | KMeans n=3 team archetypes (final) -> 3x3 grid | train-profitable cells | FAIL | FAIL | FAIL | pooled -0.091 (474 bets) | 0.345 |
+| shots_on_target_foragst_draw_kmeans_match_lr | shots_on_target_foragst | draw | major, gn>8, dropna | KMeans k=4 (match, running, 4D) | train-profitable clusters | PASS | PASS | FAIL | pooled +0.020 (713 bets) | 0.229 |
