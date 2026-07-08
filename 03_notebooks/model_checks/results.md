@@ -6,7 +6,7 @@ All runs use mrkt (market-consensus) odds.
 
 | source | space | target | abt filter | segmentation | segment filter | G1 | G2 | G3 | result | roi_std |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| elo_draw_kmeans_match_lr | elo | draw | major, gn>8, dropna | KMeans k=5 (match, running, 2D) | train-profitable clusters | PASS | FAIL | FAIL | pooled +0.007 (592 bets) | 0.389 |
+| elo_draw_kmeans_match_lr | elo | draw | major, gn>8, dropna | KMeans k=2 (match, running, 2D) | train-profitable clusters | FAIL | FAIL | FAIL | pooled -0.252 (294 bets) | 0.255 |
 | goals_foragst_draw_favourite_best_lr | goals_foragst | draw | major, gn>8, dropna | mrkt_favourite | best train-edge segment | FAIL | FAIL | FAIL | pooled -0.090 (514 bets) | 0.365 |
 | goals_foragst_draw_kmeans_match_lr | goals_foragst | draw | major, gn>8, dropna | KMeans k=5 (match, running, 4D) | train-profitable clusters | PASS | PASS | PASS | pooled +0.112 (1013 bets) | 0.350 |
 | goals_foragst_draw_kmeans_team_lr | goals_foragst | draw | major, gn>8, dropna | KMeans n=3 team archetypes (final) -> 3x3 grid | train-profitable cells | FAIL | PASS | FAIL | pooled +0.065 (1099 bets) | 0.265 |
