@@ -27,6 +27,11 @@ Model runs are logged in [`03_notebooks/model_checks/results.md`](../03_notebook
 which **replaces the old `results.txt`**. One row per run, keyed by `source` (the notebook), so re-runs update
 in place. Notebooks write their row via `evaluation.results_registry.upsert(...)` (one market per notebook).
 
+The validation protocol behind each run (folds, the three gates) lives in the model-check framework —
+[`model_check.md`](model_check.md) / [`02_src/evaluation/model_check.py`](../02_src/evaluation/model_check.py)
+— and is **space-independent**: a run may use a registered space or any mixed set of ABT input columns, in
+which case the `space` column just names that feature set.
+
 Columns:
 
 - **source** — the `model_checks/` notebook (the row key).

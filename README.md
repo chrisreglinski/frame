@@ -150,6 +150,20 @@ log of models built on them. Full description:
 
 ---
 
+## Model-check framework
+
+Betting strategies are validated by the model-check framework in
+[`02_src/evaluation/model_check.py`](02_src/evaluation/model_check.py) — the source of truth for the
+protocol (no versioned spec). A check is: filter the ABT → segment the matches → fit a bet-signal
+model (train only, per fold) → bet where the model beats the market → score, then pass three
+robustness gates (LOSO time, drop-best-league, walk-forward floor). Each `model_checks/` notebook
+supplies only the changing parts — the **space**, **target**, **segmenter** and **model** — in
+dedicated cells; the folds, gates and registry write come from the framework. The protocol is
+space-independent (works on any feature set). Full description:
+[`06_docs/model_check.md`](06_docs/model_check.md).
+
+---
+
 ## Setup
 
 ```bash
