@@ -188,25 +188,31 @@ def run_check(matches, *, features, outcome, implied, segmenter, make_model, buf
                  segmenter=segmenter, make_model=make_model, buffer=buffer)
 
     if r["empty"]:
-        print("SUMMARY: no bets placed under this pipeline")
+        print("no bets placed under this pipeline")
         return r
 
-    wf, wf_detail = r["wf"], (
-        "  ".join(f"{fold}:{value:+.3f}" for fold, value in r["wf"].items())
-        if not r["walk"].empty else "no bets"
-    )
-    print(f"SUMMARY ({source}, b365, group from caller)")
-    print(f"  pooled ROI                       {r['pooled']:+.4f}  ({len(r['bets'])} bets)")
-    print(f"  GATE 1  (LOSO >= 3/4 seasons)     {_paint(r['g1'])}  "
-          f"(+{int((r['per_season'] > 0).sum())}/{len(r['per_season'])})")
-    print(f"  GATE 2  (drop best league)        {_paint(r['g2'])}  "
-          f"(drop {r['best_league']} -> {r['without_league'][r['best_league']]:+.4f})")
-    print(f"  GATE 3  (walk-forward floor)      {_paint(r['g3'])}  ({wf_detail})")
-    print(f"  diagnostic spread (std league x season ROI)   {r['spread']:.3f}")
+    bets = r["bets"]
+    per_league = roi_grouped(bets, "league").sort_values(ascending=False)  # each league's own ROI
+    row = lambda pairs: "    " + "    ".join(f"{k} {v:+.3f}" for k, v in pairs)
+
+    print(f"{source}   pooled {r['pooled']:+.3f} ({len(bets)} bets)   [b365]\n")
+
+    # (a) GATE 1 — the seasons that were the held-out test fold in LOSO, each with its ROI.
+    print(f"GATE 1  LOSO — ROI by test season           {_paint(r['g1'])}  "
+          f"(+{int((r['per_season'] > 0).sum())}/{len(r['per_season'])} seasons)")
+    print(row(r["per_season"].items()))
+
+    # (b) GATE 2 — each league's own ROI, then the pooled ROI once the strongest league is dropped.
+    print(f"\nGATE 2  league — ROI by league / drop best   {_paint(r['g2'])}")
+    print(row(per_league.items()))
+    print(f"    pooled without best league ({r['best_league']}): {r['without_league'][r['best_league']]:+.3f}")
+
+    # (c) GATE 3 — the walk-forward test seasons (trained on the past only), each with its ROI.
+    print(f"\nGATE 3  walk-forward — ROI by test season    {_paint(r['g3'])}")
+    print("    no bets" if r["walk"].empty else row(r["wf"].items()))
 
     upsert(source=source, space=space, target=target, abt_filter=abt_filter,
            segmentation=segmentation, segment_filter=segment_filter,
            g1=_verdict(r["g1"]), g2=_verdict(r["g2"]), g3=_verdict(r["g3"]),
-           result=f"pooled {r['pooled']:+.3f} ({len(r['bets'])} bets)", roi_std=f"{r['spread']:.3f}")
-    print(f"\nlogged to model_checks/results.md: {source}")
+           result=f"pooled {r['pooled']:+.3f} ({len(bets)} bets)", roi_std=f"{r['spread']:.3f}")
     return r
