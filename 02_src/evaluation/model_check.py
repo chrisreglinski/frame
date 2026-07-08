@@ -195,7 +195,8 @@ def run_check(matches, *, features, outcome, implied, segmenter, make_model, buf
     per_league = roi_grouped(bets, "league").sort_values(ascending=False)  # each league's own ROI
     row = lambda pairs: "    " + "    ".join(f"{k} {v:+.3f}" for k, v in pairs)
 
-    print(f"{source}   pooled {r['pooled']:+.3f} ({len(bets)} bets)   [b365]\n")
+    odds = implied.split("_")[0]  # odds source, read off the implied column (e.g. mrkt_draw_impl -> mrkt)
+    print(f"{source}   pooled {r['pooled']:+.3f} ({len(bets)} bets)   [{odds}]\n")
 
     # (a) GATE 1 — the seasons that were the held-out test fold in LOSO, each with its ROI.
     print(f"GATE 1  LOSO — ROI by test season           {_paint(r['g1'])}  "

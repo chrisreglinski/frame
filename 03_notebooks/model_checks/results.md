@@ -2,11 +2,11 @@
 
 Replaces the old `results.txt`. One row per model run, keyed by `source` (a `model_checks/` notebook).
 Written by `evaluation.results_registry.upsert(...)`. Convention: [`06_docs/spaces.md`](../../06_docs/spaces.md).
-All runs use b365 odds.
+All runs use mrkt (market-consensus) odds.
 
 | source | space | target | abt filter | segmentation | segment filter | G1 | G2 | G3 | result | roi_std |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| goals_foragst_draw_favourite_best_lr | goals_foragst | draw | major, gn>8, dropna | mrkt_favourite | best train-edge segment | FAIL | FAIL | PASS | pooled -0.097 (495 bets) | 0.404 |
-| goals_foragst_draw_kmeans_match_lr | goals_foragst | draw | major, gn>8, dropna | KMeans k=5 (match, 4D) | train-profitable clusters | PASS | PASS | PASS | pooled +0.136 (997 bets) | 0.336 |
-| goals_foragst_draw_kmeans_team_lr | goals_foragst | draw | major, gn>8, dropna | KMeans k=4 team archetypes -> 4x4 grid | train-profitable cells | PASS | PASS | PASS | pooled +0.088 (906 bets) | 0.288 |
-| goals_foragst_home_kmeans_team_lr | goals_foragst | home | major, gn>8, dropna | KMeans k=4 team archetypes -> 4x4 grid | train-profitable cells | PASS | PASS | FAIL | pooled +0.031 (551 bets) | 0.201 |
+| goals_foragst_draw_favourite_best_lr | goals_foragst | draw | major, gn>8, dropna | mrkt_favourite | best train-edge segment | FAIL | FAIL | FAIL | pooled -0.090 (514 bets) | 0.365 |
+| goals_foragst_draw_kmeans_match_lr | goals_foragst | draw | major, gn>8, dropna | KMeans k=5 (match, 4D) | train-profitable clusters | PASS | PASS | PASS | pooled +0.112 (1013 bets) | 0.350 |
+| goals_foragst_draw_kmeans_team_lr | goals_foragst | draw | major, gn>8, dropna | KMeans k=4 team archetypes -> 4x4 grid | train-profitable cells | PASS | PASS | PASS | pooled +0.081 (933 bets) | 0.279 |
+| goals_foragst_home_kmeans_team_lr | goals_foragst | home | major, gn>8, dropna | KMeans k=4 team archetypes -> 4x4 grid | train-profitable cells | FAIL | PASS | FAIL | pooled +0.031 (571 bets) | 0.185 |
