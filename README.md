@@ -86,6 +86,7 @@ One row per match. Context and market features:
 - `hmt_is_promoted`, `awt_is_promoted`, `travel_distance_km`
 - `hmt_elo`, `awt_elo` — Club Elo rating (clubelo.com) of each team as of the match date, joined point-in-time (pre-match; see below)
 - `hmt_elo_cat2m` / `awt_elo_cat2m` (high/low vs the global elo mean) and `hmt_elo_cat3q` / `awt_elo_cat3q` (tertiles of the pooled per-match elo distribution; thresholds in `thresholds.json`)
+- `elo_diff` (`hmt_elo − awt_elo`, the matchup strength tilt) and `elo_sum` (`hmt_elo + awt_elo`, the overall rating level)
 - `b365_*` / `mrkt_*` — odds, implied probabilities (1/odds), bookmaker margin, Shannon entropy of normalized implied probs
 - `mrkt_favourite`, `mrkt_impl_order`, `mrkt_favrt_impl`, `mrkt_undrd_impl`, `mrkt_home_away_impl_diff` — derived market signals: favoured side (home/away/balanced), H/D/A ordering by implied prob, stronger/weaker side implied prob, home − away implied gap
 
@@ -121,7 +122,11 @@ Statistics per team per window:
 Derived from `match_team_stats`. Comparative features per window:
 - `teams_{window}_goals_foragst_avg_max` — max of the four goals averages (home for, home agst, away for, away agst)
 - `homet/awt_{window}_goals_foragst_avg_max` — per-team max(goals_for_avg, goals_agst_avg) for the home (`hmt_`) and away (`awt_`) side
-- `teams_{window}_goals_diff_diff` — home goals_diff_avg minus away goals_diff_avg
+- Matchup "tilt" diffs (home minus away; positive = home side stronger on that axis):
+  `teams_{window}_goals_diff_avg_diff`, `teams_{window}_shots_on_target_diff_avg_diff`,
+  `teams_{window}_points_avg_diff`, `teams_{window}_impl_points_avg_diff`. Naming: a for/agst
+  quantity already carries an inner for−agst diff (`goals_diff`), so its matchup diff is `_diff_avg_diff`;
+  a per-side average (points, impl_points) gives `_avg_diff`. (Elo's `elo_diff`/`elo_sum` live in `match_info`.)
 
 ### `match_target`
 

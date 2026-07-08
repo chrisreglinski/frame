@@ -330,6 +330,9 @@ def build_match_info(group: str = "major") -> pd.DataFrame:
 
     base = _attach_elo(pd.concat(frames, ignore_index=True), group)
     base = _attach_elo_cats(base, group)
+    # matchup elo tilt (diff) and level (sum); raw ratings, so no averaging in the name
+    base["elo_diff"] = base["hmt_elo"] - base["awt_elo"]
+    base["elo_sum"] = base["hmt_elo"] + base["awt_elo"]
     df = round_floats(base[cols])
 
     features_dir.mkdir(parents=True, exist_ok=True)

@@ -68,8 +68,20 @@ def build_match_matchup_stats(group: str = "major") -> pd.DataFrame:
                 f"{side}_{w}_goals_for_avg",
                 f"{side}_{w}_goals_agst_avg",
             ]].max(axis=1)
-        computed[f"teams_{w}_goals_diff_diff"] = (
+        # matchup "tilt" diffs: home per-team quantity minus away per-team quantity.
+        # for/agst quantities carry an inner for-agst diff already (goals_diff, shots_on_target_diff),
+        # so between-teams gives *_diff_avg_diff; the per-side scalars (points, impl_points) give *_avg_diff.
+        computed[f"teams_{w}_goals_diff_avg_diff"] = (
             src[f"hmt_{w}_goals_diff_avg"] - src[f"awt_{w}_goals_diff_avg"]
+        )
+        computed[f"teams_{w}_shots_on_target_diff_avg_diff"] = (
+            src[f"hmt_{w}_shots_on_target_diff_avg"] - src[f"awt_{w}_shots_on_target_diff_avg"]
+        )
+        computed[f"teams_{w}_points_avg_diff"] = (
+            src[f"hmt_{w}_points_avg"] - src[f"awt_{w}_points_avg"]
+        )
+        computed[f"teams_{w}_impl_points_avg_diff"] = (
+            src[f"hmt_{w}_impl_points_avg"] - src[f"awt_{w}_impl_points_avg"]
         )
 
     result = round_floats(pd.concat(

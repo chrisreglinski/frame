@@ -161,6 +161,16 @@ columns:
     dtype: string
     categories: [low, medium, high]
 
+  elo_diff:
+    table: match_info
+    description: "hmt_elo minus awt_elo; positive = home team higher-rated (the matchup strength tilt). NaN if either elo is NaN"
+    dtype: float
+
+  elo_sum:
+    table: match_info
+    description: "hmt_elo plus awt_elo; the overall rating level of the matchup (how strong both sides are). NaN if either elo is NaN"
+    dtype: float
+
   "{bookmaker}_{outcome}_odds":
     table: match_info
     description: "odds from {bookmaker} for outcome {outcome}"
@@ -524,9 +534,30 @@ columns:
       window: [season, rolling6, rolling8]
     dtype: float
 
-  "teams_{window}_goals_diff_diff":
+  "teams_{window}_goals_diff_avg_diff":
     table: match_matchup_stats
     description: "home {window} goals_diff avg minus away {window} goals_diff avg; positive = home team stronger on goal balance"
+    dims:
+      window: [season, rolling6, rolling8]
+    dtype: float
+
+  "teams_{window}_shots_on_target_diff_avg_diff":
+    table: match_matchup_stats
+    description: "home {window} shots_on_target_diff avg minus away {window} shots_on_target_diff avg; positive = home team stronger on shots-on-target balance"
+    dims:
+      window: [season, rolling6, rolling8]
+    dtype: float
+
+  "teams_{window}_points_avg_diff":
+    table: match_matchup_stats
+    description: "home {window} points avg minus away {window} points avg; positive = home team stronger on form/points"
+    dims:
+      window: [season, rolling6, rolling8]
+    dtype: float
+
+  "teams_{window}_impl_points_avg_diff":
+    table: match_matchup_stats
+    description: "home {window} impl_points avg minus away {window} impl_points avg; positive = market expects the home team to earn more points"
     dims:
       window: [season, rolling6, rolling8]
     dtype: float
