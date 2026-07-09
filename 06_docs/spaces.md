@@ -15,6 +15,7 @@ The catalogue of identified spaces.
 | space | home | away | derived |
 |---|---|---|---|
 | `goals_foragst` | `hmt_season_goals_for_avg`, `hmt_season_goals_agst_avg` | `awt_season_goals_for_avg`, `awt_season_goals_agst_avg` | — |
+| ↳ `goals_totaldiff` *(rotation of `goals_foragst`)* | `hmt_season_goals_total_avg`, `hmt_season_goals_diff_avg` | `awt_season_goals_total_avg`, `awt_season_goals_diff_avg` | — |
 | `shots_on_target_foragst` | `hmt_season_shots_on_target_for_avg`, `hmt_season_shots_on_target_agst_avg` | `awt_season_shots_on_target_for_avg`, `awt_season_shots_on_target_agst_avg` | — |
 | `points` | `hmt_season_points_avg` | `awt_season_points_avg` | — |
 | `elo` | `hmt_elo` | `awt_elo` | — |
