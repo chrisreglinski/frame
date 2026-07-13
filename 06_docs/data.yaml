@@ -161,16 +161,6 @@ columns:
     dtype: string
     categories: [low, medium, high]
 
-  elo_diff:
-    table: match_info
-    description: "hmt_elo minus awt_elo; positive = home team higher-rated (the matchup strength tilt). NaN if either elo is NaN"
-    dtype: float
-
-  elo_sum:
-    table: match_info
-    description: "hmt_elo plus awt_elo; the overall rating level of the matchup (how strong both sides are). NaN if either elo is NaN"
-    dtype: float
-
   "{bookmaker}_{outcome}_odds":
     table: match_info
     description: "odds from {bookmaker} for outcome {outcome}"
@@ -560,6 +550,44 @@ columns:
     description: "home {window} impl_points avg minus away {window} impl_points avg; positive = market expects the home team to earn more points"
     dims:
       window: [season, rolling6, rolling8]
+    dtype: float
+
+  "teams_{window}_goals_total_avg_total":
+    table: match_matchup_stats
+    description: "home {window} goals_total avg plus away {window} goals_total avg; combined scoring intensity of the matchup"
+    dims:
+      window: [season, rolling6, rolling8]
+    dtype: float
+
+  "teams_{window}_shots_on_target_total_avg_total":
+    table: match_matchup_stats
+    description: "home {window} shots_on_target_total avg plus away {window} shots_on_target_total avg; combined shooting intensity of the matchup"
+    dims:
+      window: [season, rolling6, rolling8]
+    dtype: float
+
+  "teams_{window}_points_avg_total":
+    table: match_matchup_stats
+    description: "home {window} points avg plus away {window} points avg; combined quality level of the matchup"
+    dims:
+      window: [season, rolling6, rolling8]
+    dtype: float
+
+  "teams_{window}_impl_points_avg_total":
+    table: match_matchup_stats
+    description: "home {window} impl_points avg plus away {window} impl_points avg; combined market-expected quality of the matchup"
+    dims:
+      window: [season, rolling6, rolling8]
+    dtype: float
+
+  teams_elo_diff:
+    table: match_matchup_stats
+    description: "hmt_elo minus awt_elo; positive = home team higher-rated (matchup strength tilt). NaN if either elo is NaN"
+    dtype: float
+
+  teams_elo_total:
+    table: match_matchup_stats
+    description: "hmt_elo plus awt_elo; overall rating level of the matchup. NaN if either elo is NaN"
     dtype: float
 
 

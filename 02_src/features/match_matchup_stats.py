@@ -54,6 +54,9 @@ def _windows() -> list[str]:
 def build_match_matchup_stats(group: str = "major") -> pd.DataFrame:
     features_dir = _features_dir(group)
     src = pd.read_parquet(features_dir / "match_team_stats.parquet")
+    # elo lives in match_info, not match_team_stats — pull it in for the matchup elo features
+    elo = pd.read_parquet(features_dir / "match_info.parquet")[["match_id", "hmt_elo", "awt_elo"]]
+    src = src.merge(elo, on="match_id", how="left")
 
     computed = {}
     for w in _windows():
@@ -83,6 +86,23 @@ def build_match_matchup_stats(group: str = "major") -> pd.DataFrame:
         computed[f"teams_{w}_impl_points_avg_diff"] = (
             src[f"hmt_{w}_impl_points_avg"] - src[f"awt_{w}_impl_points_avg"]
         )
+        # matchup "total": home per-team quantity plus away — combined intensity / level of the match.
+        computed[f"teams_{w}_goals_total_avg_total"] = (
+            src[f"hmt_{w}_goals_total_avg"] + src[f"awt_{w}_goals_total_avg"]
+        )
+        computed[f"teams_{w}_shots_on_target_total_avg_total"] = (
+            src[f"hmt_{w}_shots_on_target_total_avg"] + src[f"awt_{w}_shots_on_target_total_avg"]
+        )
+        computed[f"teams_{w}_points_avg_total"] = (
+            src[f"hmt_{w}_points_avg"] + src[f"awt_{w}_points_avg"]
+        )
+        computed[f"teams_{w}_impl_points_avg_total"] = (
+            src[f"hmt_{w}_impl_points_avg"] + src[f"awt_{w}_impl_points_avg"]
+        )
+
+    # matchup elo (not windowed — elo is a raw pre-match rating)
+    computed["teams_elo_diff"] = src["hmt_elo"] - src["awt_elo"]
+    computed["teams_elo_total"] = src["hmt_elo"] + src["awt_elo"]
 
     result = round_floats(pd.concat(
         [src[["match_id"]], pd.DataFrame(computed, index=src.index)],
