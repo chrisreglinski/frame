@@ -380,7 +380,7 @@ columns:
     dtype: float
     range: [0, 3]
 
-  "{side}_{window}_profit_{outcome}":
+  "{side}_{window}_{outcome}_profit":
     table: team_stats
     description: "edge on {outcome} market over {window}: {outcome}_ratio minus impl_{outcome}_avg"
     dims:

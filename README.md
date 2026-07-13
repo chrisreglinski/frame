@@ -114,7 +114,7 @@ Statistics per team per window:
 - Home-only (`hmt_home_*`) and away-only (`awt_away_*`) season splits: goals / shots / shots-on-target for & against, plus points / goals_diff / goals_total, over that team's home (resp. away) matches only
 - `implied_win/draw/loss_avg` — bookmaker's (mrkt) average implied probability for this team's outcome
 - `impl_points_avg` — bookmaker expected points per match (`impl_win_avg * 3 + impl_draw_avg`)
-- `profit_win/draw/loss` — edge: actual ratio minus implied avg (positive = team undervalued by market)
+- `win/draw/loss_profit` — edge: actual ratio minus implied avg (positive = team undervalued by market)
 - Season-level categoricals (`season` window only): `*_cat2m` (binary — vs global mean, or sign) and `*_cat3q` (tertiles from `team_season_final`) for goals and shots-on-target total / diff / for / against
 
 ### `match_matchup_stats`

@@ -55,7 +55,7 @@ def _make_stat_cols() -> list[str]:
         cols += [f"{w}_red_for_avg"]
         cols += [f"{w}_impl_{o}_avg" for o in ["win", "draw", "loss"]]
         cols += [f"{w}_impl_points_avg"]
-        cols += [f"{w}_profit_{o}" for o in ["win", "draw", "loss"]]
+        cols += [f"{w}_{o}_profit" for o in ["win", "draw", "loss"]]
     cols += ["red_last_match"]
     return cols
 
@@ -202,7 +202,7 @@ def _add_stats(long: pd.DataFrame) -> pd.DataFrame:
             long[f"{wname}_impl_{o}_avg"] = _agg_mean(g, f"impl_{o}", wsize)
         long[f"{wname}_impl_points_avg"] = long[f"{wname}_impl_win_avg"] * 3 + long[f"{wname}_impl_draw_avg"]
         for o, r in [("win", "wins"), ("draw", "draws"), ("loss", "losses")]:
-            long[f"{wname}_profit_{o}"] = long[f"{wname}_{r}_ratio"] - long[f"{wname}_impl_{o}_avg"]
+            long[f"{wname}_{o}_profit"] = long[f"{wname}_{r}_ratio"] - long[f"{wname}_impl_{o}_avg"]
 
     red_shifted = g["red_for"].transform(lambda x: x.shift(1))
     long["red_last_match"] = (
