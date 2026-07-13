@@ -1,5 +1,12 @@
 # Journal
 
+## 2026-07-13 — PCA of inputs: nothing jumped out
+
+- ran PCA over the numeric season-window features (landscape task). the space is low-dimensional (~5 axes,
+  ~58% variance: favourite-tilt, level, tempo, tempo-mismatch, draw-balance) — confirms the correlation
+  grouping, but nothing new or actionable surfaced. descriptive only, not a feature-engineering path.
+- notebook was throwaway / distracting, deleted; correlation / varclus / vif notebooks stay.
+
 ## 2026-07-02 — other (first divisions) supports the draw edge; gate tooling + GATE 3
 
 - ran the frozen draw pipeline on the **other** group (netherlands + portugal, both TOP FLIGHTS). match-draw:
