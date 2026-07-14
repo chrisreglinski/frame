@@ -130,12 +130,31 @@ columns:
     inputs: [Promotee]
     dtype: bool
 
+  hmt_is_island:
+    table: match_info
+    description: "home team is on a geographically isolated island (Canaries/Balearics/Sardinia/Corsica): Las Palmas, Mallorca, Cagliari, Ajaccio"
+    inputs: [Island]
+    dtype: bool
+
+  awt_is_island:
+    table: match_info
+    description: "away team is on a geographically isolated island (Canaries/Balearics/Sardinia/Corsica): Las Palmas, Mallorca, Cagliari, Ajaccio"
+    inputs: [Island]
+    dtype: bool
+
   travel_distance_km:
     table: match_info
     description: "haversine distance between home and away team stadiums"
     inputs: [Latitude, Longitude]
     dtype: float
     range: [0, 4000]
+
+  travel_distance_cat:
+    table: match_info
+    description: "travel_distance_km bucketed: derby (<30, city rivalries), domestic (30-500, coach / high-speed rail incl. Barcelona-Real 499km AVE), long_haul (500+, flight territory)"
+    inputs: [Latitude, Longitude]
+    dtype: string
+    categories: [derby, domestic, long_haul]
 
   "{side}_elo":
     table: match_info

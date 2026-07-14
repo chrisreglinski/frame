@@ -123,6 +123,7 @@ def _load_stadiums(league: str, season: str) -> dict[str, dict] | None:
             "lat": row["Latitude"],
             "lon": row["Longitude"],
             "promoted": bool(row["Promotee"]),
+            "island": bool(row["Island"]),
         }
         for _, row in df.iterrows()
     }
@@ -200,11 +201,14 @@ def _load_file(path: Path, stadiums: dict[str, dict], limits: dict) -> pd.DataFr
     if stadiums is None:
         blank = pd.Series(np.nan, index=raw.index)
         hmt_is_promoted = awt_is_promoted = blank
+        hmt_is_island = awt_is_island = blank
         travel = blank.rename("travel_distance_km")
     else:
         _check_missing(all_teams, stadiums, league, season)
         hmt_is_promoted = raw["HomeTeam"].map(lambda t: stadiums[t]["promoted"])
         awt_is_promoted = raw["AwayTeam"].map(lambda t: stadiums[t]["promoted"])
+        hmt_is_island = raw["HomeTeam"].map(lambda t: stadiums[t]["island"])
+        awt_is_island = raw["AwayTeam"].map(lambda t: stadiums[t]["island"])
         travel = pd.Series([
             _haversine(
                 stadiums[h]["lat"], stadiums[h]["lon"],
@@ -212,6 +216,16 @@ def _load_file(path: Path, stadiums: dict[str, dict], limits: dict) -> pd.DataFr
             )
             for h, a in zip(raw["HomeTeam"], raw["AwayTeam"])
         ], name="travel_distance_km")
+
+    # bucket the distance: derby (<30, city rivalries) / domestic (30-500, coach or high-speed rail)
+    # / long_haul (500+, flight territory). Thresholds anchored on transport reality: 30 km separates
+    # true city derbies from regional trips; 500 km sits just above the Barcelona-Real AVE (499 km),
+    # so high-speed-rail trips stay domestic and only flight-range trips become long_haul.
+    travel_cat = pd.cut(
+        travel, bins=[0, 30, 500, np.inf], right=False,
+        labels=["derby", "domestic", "long_haul"],
+    ).astype(object)
+    travel_cat = travel_cat.where(travel_cat.notna(), None)
 
     return pd.concat([
         pd.Series(
@@ -234,7 +248,10 @@ def _load_file(path: Path, stadiums: dict[str, dict], limits: dict) -> pd.DataFr
         raw["AwayTeam"].rename("awt_name"),
         hmt_is_promoted.rename("hmt_is_promoted"),
         awt_is_promoted.rename("awt_is_promoted"),
+        hmt_is_island.rename("hmt_is_island"),
+        awt_is_island.rename("awt_is_island"),
         travel,
+        travel_cat.rename("travel_distance_cat"),
         pd.DataFrame(odds),
         pd.DataFrame(impl),
         pd.DataFrame(margins),
