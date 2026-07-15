@@ -141,9 +141,16 @@ def _load_file(path: Path, stadiums: dict[str, dict], limits: dict) -> pd.DataFr
     raw = pd.read_csv(path)
 
     all_teams = set(raw["HomeTeam"]) | set(raw["AwayTeam"])
-    matches_per_gw = len(all_teams) // 2
+    n_teams = len(all_teams)
+    matches_per_gw = n_teams // 2
     season_game_number = pd.Series(range(1, len(raw) + 1))
     gameweek = ((season_game_number - 1) // matches_per_gw + 1).rename("gameweek")
+
+    # counted from the end, anchored to the FULL-season counts (from team count), not the rows
+    # present — so a skipped/abandoned match leaves the last match at -2 rather than -1.
+    n_expected = n_teams * (n_teams - 1)                      # full-season match count
+    season_game_number_inv = (season_game_number - n_expected - 1).rename("season_game_number_inv")
+    gameweek_inv = (gameweek - 2 * (n_teams - 1) - 1).rename("gameweek_inv")
 
     date = _parse_dates(raw["Date"])
     odds, impl, margins = {}, {}, {}
@@ -242,7 +249,9 @@ def _load_file(path: Path, stadiums: dict[str, dict], limits: dict) -> pd.DataFr
         date.dt.day_name().rename("day_of_week"),
         date.dt.day_name().map(_DOW_CAT).rename("day_of_week_cat"),
         season_game_number.rename("season_game_number"),
+        season_game_number_inv,
         gameweek,
+        gameweek_inv,
         phase4.rename("season_4phase"),
         phase3.rename("season_3phase"),
         raw["HomeTeam"].rename("hmt_name"),

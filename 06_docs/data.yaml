@@ -100,11 +100,23 @@ columns:
     dtype: int
     range: [1, 552]
 
+  season_game_number_inv:
+    table: match_info
+    description: "season_game_number counted from the end: -1 = last match of the season, down to -N for the first (N = full-season match count = n_teams*(n_teams-1)); a skipped match leaves the last match at -2 (e.g. france 2526, 305/306)"
+    dtype: int
+    range: [-552, -1]
+
   gameweek:
     table: match_info
     description: "gameweek number; derived as ceil(season_game_number / (n_teams/2)) where n_teams is counted per league-season"
     dtype: int
     range: [1, 46]
+
+  gameweek_inv:
+    table: match_info
+    description: "gameweek counted from the end: -1 = last gameweek, down to -G for the first (G = full-season gameweek count = 2*(n_teams-1))"
+    dtype: int
+    range: [-46, -1]
 
   season_4phase:
     table: match_info

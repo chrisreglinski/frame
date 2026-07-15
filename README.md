@@ -77,8 +77,8 @@ post-match update to the following day — so no result leaks into the feature.
 One row per match. Context and market features:
 
 - `league`, `season`, `date`, `time`, `day_of_week`, `hmt_name`, `awt_name`
-- `season_game_number` — sequential match number in the league-season
-- `gameweek` — derived as `ceil(season_game_number / (n_teams / 2))`; `n_teams` computed dynamically per league-season (handles France's drop from 20 to 18 teams after 2223)
+- `season_game_number` — sequential match number in the league-season; `season_game_number_inv` — the same counted from the end (`-1` = last match, `-N` = first, `N` = full-season match count from team count; a skipped match leaves the last at `-2`)
+- `gameweek` — derived as `ceil(season_game_number / (n_teams / 2))`; `n_teams` computed dynamically per league-season (handles France's drop from 20 to 18 teams after 2223); `gameweek_inv` — same counted from the end (`-1` = last gameweek)
 - `season_4phase` — `summer / fall / winter / spring` based on hand-coded boundary dates in `01_raw/03_dates/season_limit_dates.csv`
 - `season_3phase` — `start / mid / end` (fall+winter merged into mid)
 - `day_of_week_cat` — `weekend` (sat/sun) / `shoulder` (fri/mon) / `midweek` (tue/wed/thu)
