@@ -217,13 +217,14 @@ def _load_file(path: Path, stadiums: dict[str, dict], limits: dict) -> pd.DataFr
             for h, a in zip(raw["HomeTeam"], raw["AwayTeam"])
         ], name="travel_distance_km")
 
-    # bucket the distance: derby (<30, city rivalries) / domestic (30-500, coach or high-speed rail)
-    # / long_haul (500+, flight territory). Thresholds anchored on transport reality: 30 km separates
-    # true city derbies from regional trips; 500 km sits just above the Barcelona-Real AVE (499 km),
-    # so high-speed-rail trips stay domestic and only flight-range trips become long_haul.
+    # bucket the distance: derby (<30, city rivalries) / regional (30-100, neighbouring cities in the
+    # same region) / domestic (100-500, coach or high-speed rail) / long_haul (500+, flight territory).
+    # Thresholds anchored on transport reality: 30 km separates true city derbies from regional trips;
+    # 500 km sits just above the Barcelona-Real AVE (499 km), so high-speed-rail trips stay domestic and
+    # only flight-range trips become long_haul.
     travel_cat = pd.cut(
-        travel, bins=[0, 30, 500, np.inf], right=False,
-        labels=["derby", "domestic", "long_haul"],
+        travel, bins=[0, 30, 100, 500, np.inf], right=False,
+        labels=["derby", "regional", "domestic", "long_haul"],
     ).astype(object)
     travel_cat = travel_cat.where(travel_cat.notna(), None)
 

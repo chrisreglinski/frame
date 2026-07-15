@@ -151,10 +151,10 @@ columns:
 
   travel_distance_cat:
     table: match_info
-    description: "travel_distance_km bucketed: derby (<30, city rivalries), domestic (30-500, coach / high-speed rail incl. Barcelona-Real 499km AVE), long_haul (500+, flight territory)"
+    description: "travel_distance_km bucketed: derby (<30, city rivalries), regional (30-100, neighbouring cities same region), domestic (100-500, coach / high-speed rail incl. Barcelona-Real 499km AVE), long_haul (500+, flight territory)"
     inputs: [Latitude, Longitude]
     dtype: string
-    categories: [derby, domestic, long_haul]
+    categories: [derby, regional, domestic, long_haul]
 
   "{side}_elo":
     table: match_info
