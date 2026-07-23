@@ -26,6 +26,8 @@ _WINDOWS = {"season": None, "rolling6": 6, "rolling8": 8}
 
 _LOCALITY_METRICS = ["goals", "shots", "shots_on_target"]
 _LOCALITY_SCALAR_METRICS = ["points", "goals_diff", "goals_total"]
+_LOCALITY_RATIO_RESULTS = ["wins", "draws", "losses"]
+_LOCALITY_ADV_METRICS = ["points", "impl_points"]
 _LOCALITY_STAT_COLS = [
     f"{loc}_season_{m}_{k}_avg"
     for loc in ["home", "away"]
@@ -35,6 +37,17 @@ _LOCALITY_STAT_COLS = [
     f"{loc}_season_{m}_avg"
     for loc in ["home", "away"]
     for m in _LOCALITY_SCALAR_METRICS
+] + [
+    f"{loc}_season_{r}_ratio"
+    for loc in ["home", "away"]
+    for r in _LOCALITY_RATIO_RESULTS
+] + [
+    f"{loc}_season_impl_points_avg"
+    for loc in ["home", "away"]
+] + [
+    f"{loc}_season_{m}_avg_adv"
+    for loc in ["home", "away"]
+    for m in _LOCALITY_ADV_METRICS
 ]
 
 _TEAM_SEASON_COLS = [
@@ -55,7 +68,6 @@ def _make_stat_cols() -> list[str]:
         cols += [f"{w}_red_for_avg"]
         cols += [f"{w}_impl_{o}_avg" for o in ["win", "draw", "loss"]]
         cols += [f"{w}_impl_points_avg"]
-        cols += [f"{w}_{o}_profit" for o in ["win", "draw", "loss"]]
     cols += ["red_last_match"]
     return cols
 
@@ -138,6 +150,7 @@ def _build_long(raw: pd.DataFrame, league: str, season: str) -> pd.DataFrame:
     long["goals_total"] = long["goals_for"] + long["goals_agst"]
     long["shots_on_target_diff"]  = long["shots_on_target_for"] - long["shots_on_target_agst"]
     long["shots_on_target_total"] = long["shots_on_target_for"] + long["shots_on_target_agst"]
+    long["impl_points"] = long["impl_win"] * 3 + long["impl_draw"]
     return long
 
 
@@ -201,8 +214,6 @@ def _add_stats(long: pd.DataFrame) -> pd.DataFrame:
         for o in ["win", "draw", "loss"]:
             long[f"{wname}_impl_{o}_avg"] = _agg_mean(g, f"impl_{o}", wsize)
         long[f"{wname}_impl_points_avg"] = long[f"{wname}_impl_win_avg"] * 3 + long[f"{wname}_impl_draw_avg"]
-        for o, r in [("win", "wins"), ("draw", "draws"), ("loss", "losses")]:
-            long[f"{wname}_{o}_profit"] = long[f"{wname}_{r}_ratio"] - long[f"{wname}_impl_{o}_avg"]
 
     red_shifted = g["red_for"].transform(lambda x: x.shift(1))
     long["red_last_match"] = (
@@ -223,6 +234,19 @@ def _add_stats(long: pd.DataFrame) -> pd.DataFrame:
         long[f"_away_{m}"] = long[m].where(~long["is_home"])
         long[f"home_season_{m}_avg"] = _agg_mean(g, f"_home_{m}", None)
         long[f"away_season_{m}_avg"] = _agg_mean(g, f"_away_{m}", None)
+
+    # home/away split: win/draw/loss ratio and expected (implied) points
+    for loc, mask in [("home", long["is_home"]), ("away", ~long["is_home"])]:
+        for r, c in [("wins", "is_win"), ("draws", "is_draw"), ("losses", "is_loss")]:
+            long[f"_{loc}_{r}"] = long[c].where(mask)
+            long[f"{loc}_season_{r}_ratio"] = _agg_mean(g, f"_{loc}_{r}", None)
+        long[f"_{loc}_impl_points"] = long["impl_points"].where(mask)
+        long[f"{loc}_season_impl_points_avg"] = _agg_mean(g, f"_{loc}_impl_points", None)
+
+    # venue advantage: a team's form where it plays this match minus at the other venue
+    for m in _LOCALITY_ADV_METRICS:
+        long[f"home_season_{m}_avg_adv"] = long[f"home_season_{m}_avg"] - long[f"away_season_{m}_avg"]
+        long[f"away_season_{m}_avg_adv"] = long[f"away_season_{m}_avg"] - long[f"home_season_{m}_avg"]
 
     # mask rolling windows for matches with insufficient history
     for wname, wsize in _WINDOWS.items():

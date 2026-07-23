@@ -308,6 +308,58 @@ columns:
       metric: [points, goals_diff, goals_total]
     dtype: float
 
+  "hmt_home_{window}_{result}_ratio":
+    table: team_stats
+    description: "share of home matches with {result} over {window}, home team only"
+    dims:
+      window: [season]
+      result: [wins, draws, losses]
+    dtype: float
+    range: [0, 1]
+
+  "awt_away_{window}_{result}_ratio":
+    table: team_stats
+    description: "share of away matches with {result} over {window}, away team only"
+    dims:
+      window: [season]
+      result: [wins, draws, losses]
+    dtype: float
+    range: [0, 1]
+
+  "hmt_home_{window}_impl_points_avg":
+    table: team_stats
+    description: "bookmaker expected points per home match over {window}, home team only: impl_win_avg * 3 + impl_draw_avg"
+    dims:
+      window: [season]
+    dtype: float
+    range: [0, 3]
+
+  "awt_away_{window}_impl_points_avg":
+    table: team_stats
+    description: "bookmaker expected points per away match over {window}, away team only: impl_win_avg * 3 + impl_draw_avg"
+    dims:
+      window: [season]
+    dtype: float
+    range: [0, 3]
+
+  "hmt_home_{window}_{metric}_avg_adv":
+    table: team_stats
+    description: "home-venue advantage of home team: home {metric} avg minus away {metric} avg over {window} (positive = better at home)"
+    dims:
+      window: [season]
+      metric: [points, impl_points]
+    dtype: float
+    range: [-3, 3]
+
+  "awt_away_{window}_{metric}_avg_adv":
+    table: team_stats
+    description: "away-venue advantage of away team: away {metric} avg minus home {metric} avg over {window} (usually negative = disadvantage)"
+    dims:
+      window: [season]
+      metric: [points, impl_points]
+    dtype: float
+    range: [-3, 3]
+
   "{side}_{window}_{metric}_avg":
     table: team_stats
     description: "arithmetic mean of {metric} per match over {window}, {side} team"
@@ -400,16 +452,6 @@ columns:
       window: [season, rolling6, rolling8]
     dtype: float
     range: [0, 3]
-
-  "{side}_{window}_{outcome}_profit":
-    table: team_stats
-    description: "edge on {outcome} market over {window}: {outcome}_ratio minus impl_{outcome}_avg"
-    dims:
-      side: [hmt, awt]
-      window: [season, rolling6, rolling8]
-      outcome: [win, draw, loss]
-    dtype: float
-    range: [-1, 1]
 
   "{side}_season_goals_total_cat2m":
     table: team_stats

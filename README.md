@@ -112,10 +112,9 @@ Statistics per team per window:
 - Goals total / for / against threshold ratios (e.g. over 2.5, clean sheets)
 - Shots on target conversion ratio
 - Red cards average; red card in last match flag
-- Home-only (`hmt_home_*`) and away-only (`awt_away_*`) season splits: goals / shots / shots-on-target for & against, plus points / goals_diff / goals_total, over that team's home (resp. away) matches only
+- Home-only (`hmt_home_*`) and away-only (`awt_away_*`) season splits over that team's home (resp. away) matches only: goals / shots / shots-on-target for & against, points / goals_diff / goals_total, win/draw/loss ratio, and `impl_points_avg` (expected points). Plus `points_avg_adv` / `impl_points_avg_adv` — venue advantage: the team's form where it plays this match minus its form at the other venue (home team: home − away, positive = better at home; away team: away − home, usually negative = away disadvantage)
 - `implied_win/draw/loss_avg` — bookmaker's (mrkt) average implied probability for this team's outcome
 - `impl_points_avg` — bookmaker expected points per match (`impl_win_avg * 3 + impl_draw_avg`)
-- `win/draw/loss_profit` — edge: actual ratio minus implied avg (positive = team undervalued by market)
 - Season-level categoricals (`season` window only): `*_cat2m` (binary — vs global mean, or sign) and `*_cat3q` (tertiles from `team_season_final`) for goals and shots-on-target total / diff / for / against
 
 ### `match_matchup_stats`
