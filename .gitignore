@@ -36,6 +36,9 @@ venv/
 05_reports/*
 !05_reports/.gitkeep
 
+# Personal notes
+07_notes/
+
 # OS
 .DS_Store
 Thumbs.db

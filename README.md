@@ -174,6 +174,37 @@ space-independent (works on any feature set). Full description:
 
 ---
 
+## Two ways to stake a portfolio
+
+Once a model selects which matches to bet, there are two distinct ways to size those
+bets — and they answer two different questions. The project uses both, deliberately, and
+they should never be conflated.
+
+**Proportional (implied) staking — "is there an edge, and where?"**
+Every bet stakes an amount proportional to the market's implied probability. Exposure per bet is
+fixed and the current bankroll is ignored, so the result is **scale-independent**: the headline
+number is ROI / yield — profit per unit staked. This is the right lens for *measuring the edge
+itself* and for comparing decisions like the bet threshold (buffer), because it isolates selection
+quality from the path-dependent luck of when wins and losses arrive.
+
+**Kelly on a bankroll — "what would the money actually do?"**
+Each bet stakes a fraction of the **current** bankroll, where the fraction comes from the Kelly
+formula and grows or shrinks with both wealth and the probability edge (usually run at a
+conservative fraction — half- or quarter-Kelly). The bankroll compounds, so this is
+**path-dependent**: order matters, drawdowns are real, and the output is a capital trajectory, not
+a single yield. This is the right lens for *the realistic money story* and for judging survival
+(drawdown, risk of ruin).
+
+A subtlety that ties the two together: the probability fed into Kelly need not be the model's raw
+`p`. Because the model is a good *selector* but not necessarily well *calibrated*, staking can use
+a recalibrated estimate — e.g. the market price scaled by the measured edge, `implied × (1 + ROI)` —
+so selection stays with the model while sizing rests on the more trustworthy, aggregate edge.
+
+Rule of thumb: use **proportional staking to prove and tune the edge**, and **Kelly-on-bankroll to
+show and stress-test the capital**.
+
+---
+
 ## Setup
 
 ```bash
