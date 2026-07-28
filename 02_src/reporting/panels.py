@@ -1,0 +1,49 @@
+"""Tearsheet panels — each takes a predictions frame and returns a figure and/or a table.
+
+Panels are presentation only: they call the evaluation layer to compute, then draw. Nothing here
+fits models or decides staking.
+"""
+import matplotlib.pyplot as plt
+import pandas as pd
+
+from evaluation.stats import buffer_curve, pick_buffers, portfolio_stats
+
+# Match the chart's font to the HTML (Consolas monospace) so the whole report reads as one.
+plt.rcParams["font.family"] = "monospace"
+plt.rcParams["font.monospace"] = ["Consolas", "DejaVu Sans Mono"]
+
+_MARK = {"left": "#7f8c8d", "peak": "#c0392b", "right": "#7f8c8d"}
+
+
+def panel_buffer_profit(preds):
+    """Profit vs bet threshold, with left/peak/right marked. Shows the model separating good bets
+    from bad (the peak) and how the edge collapses when selection gets too liberal (negative buffer).
+    Returns (fig, points) where points = {'left', 'peak', 'right'} buffers.
+    """
+    curve = buffer_curve(preds)
+    points = pick_buffers(curve)
+
+    fig, ax = plt.subplots(figsize=(8.5, 3.0))
+    ax.plot(curve.index, curve["profit"], color="#c0392b", lw=2)
+    ax.axhline(0, color="#999", lw=0.8)
+    for name, buffer in points.items():
+        ax.axvline(buffer, ls="--", lw=1, color=_MARK[name])
+    for i, (name, buffer) in enumerate(reversed(points.items())):
+        ax.text(0.985, 0.04 + i * 0.07, f"{name}  {buffer:.3f}", transform=ax.transAxes,
+                ha="right", va="bottom", fontsize=8, color=_MARK[name])
+    ax.set_xlabel("bufor  (model_p − implied)")
+    ax.set_ylabel("profit  (implied staking)")
+    ax.grid(alpha=0.3)
+    fig.tight_layout()
+    return fig, points
+
+
+_SHOWN = ["n_matches", "breakeven", "hit_rate", "roi"]
+
+
+def group_stats(preds, group, buffer):
+    """Per-group stats at one bet threshold, straight from portfolio_stats: n_matches, breakeven,
+    hit_rate, roi. `group` is a column name like 'season' or 'league'.
+    """
+    bets = preds[preds["model_p"] > preds["implied"] + buffer]
+    return bets.groupby(group).apply(portfolio_stats, include_groups=False)[_SHOWN]

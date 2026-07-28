@@ -10,6 +10,12 @@ import pandas as pd
 from scipy.stats import norm
 
 
+# Buffer grid swept by the profit-vs-buffer analysis (bet threshold = implied + buffer).
+# Starts below zero so the curve shows the liberal side too — betting even where the model barely
+# disagrees with, or sits under, the price — and how profit collapses there.
+DEFAULT_BUFFER_GRID = np.round(np.arange(-0.04, 0.1201, 0.001), 4)
+
+
 def portfolio_stats(matches, implied="implied", outcome="y"):
     """Proportional-staking stats for a subset of matches.
 
@@ -40,3 +46,28 @@ def portfolio_stats(matches, implied="implied", outcome="y"):
         "breakeven": imp.mean() if len(imp) else np.nan,
         "p_value":   p_value,
     })
+
+
+def buffer_curve(preds, grid=DEFAULT_BUFFER_GRID):
+    """Profit and ROI at every candidate bet threshold (bet where model_p > implied + buffer).
+
+    Sweeping the buffer never refits the model — it only re-thresholds the same predictions, so
+    the whole curve is cheap. Returns a DataFrame indexed by buffer with profit, roi, n_matches.
+    """
+    rows = []
+    for buffer in grid:
+        bets = preds[preds["model_p"] > preds["implied"] + buffer]
+        stats = portfolio_stats(bets)
+        rows.append({"buffer": buffer, "profit": stats["profit"],
+                     "roi": stats["roi"], "n_matches": stats["n_matches"]})
+    return pd.DataFrame(rows).set_index("buffer")
+
+
+def pick_buffers(curve, frac=0.5):
+    """Three buffers off the profit curve: the peak, and the edges of the band where profit stays
+    within `frac` of its maximum. Deterministic — no eyeballing. The report bets at `peak` and
+    uses `left`/`right` to show the result holds across a plateau, not just at the cherry-picked max.
+    """
+    profit = curve["profit"]
+    band = profit.index[profit >= frac * profit.max()]
+    return {"left": float(band.min()), "peak": float(profit.idxmax()), "right": float(band.max())}
