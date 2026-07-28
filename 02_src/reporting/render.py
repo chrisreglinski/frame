@@ -88,6 +88,10 @@ def _colwidth(label, value_width):
     return max(len(label), value_width)
 
 
+# One uniform width for every metric column (the widest label/value across all of them).
+_UNIFORM_W = max(_colwidth(label, w) for label, _, w in _TCOLS)
+
+
 def _trow(label, cells, bold=False):
     shown = f"<b>{label}</b>" if bold else label
     return shown + " " * max(1, _TLABEL_WIDTH - len(label)) + cells
@@ -97,15 +101,15 @@ _TINDENT = "    "
 
 
 def _cells(row):
-    return _TSEP.join(f"{_fmt(col, row[col]):>{_colwidth(label, w)}}" for label, col, w in _TCOLS)
+    return _TSEP.join(f"{_fmt(col, row[col]):>{_UNIFORM_W}}" for _, col, _w in _TCOLS)
 
 
 def stats_header():
     """The metric-name header row, rendered once above a set of stats_table blocks. Its columns line
     up with every block's rows because they share the same indent, label width and column widths.
     Padding stays as real spaces and only the label text is bolded, so alignment is preserved."""
-    header = _TSEP.join(" " * (_colwidth(label, w) - len(label)) + f"<b>{label}</b>"
-                        for label, _, w in _TCOLS)
+    header = _TSEP.join(" " * (_UNIFORM_W - len(label)) + f"<b>{label}</b>"
+                        for label, _, _w in _TCOLS)
     return '<div class="blk">' + _TINDENT + _trow("", header) + "</div>"
 
 
