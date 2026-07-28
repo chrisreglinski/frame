@@ -41,6 +41,8 @@ _LABELS = {"n_matches": "matches", "breakeven": "breakeven", "hit_rate": "hit ra
 def _fmt(col, value):
     if col == "n_matches":
         return f"{int(value)}"
+    if col == "profit":
+        return f"{value:+.1f}"
     if col == "roi":
         return f"{value * 100:+.1f}%"
     return f"{value * 100:.1f}%"
@@ -79,7 +81,7 @@ def stats_block(title, all_stats, group_df):
 # (label, column, value-field width) — each column is as wide as the wider of its label and values,
 # so a long two-word label like "hit rate" fills its column exactly, like the others.
 _TCOLS = [("matches", "n_matches", 4), ("breakeven", "breakeven", 5),
-          ("hit rate", "hit_rate", 5), ("ROI", "roi", 6)]
+          ("hit rate", "hit_rate", 5), ("ROI", "roi", 6), ("profit", "profit", 6)]
 _TSEP = "  "
 _TLABEL_WIDTH = 13
 
@@ -123,6 +125,16 @@ def stats_table(title, all_stats, group_df):
     return '<div class="blk">' + "\n".join(lines) + "</div>"
 
 
+def stats_block_rows(title, rows_df, highlight=False):
+    """A block like stats_table but with arbitrary labelled rows (index = row label) and no
+    all-seasons summary. Columns align with stats_header. Used for the inverted out-of-sample
+    block: a 'season 25/26' title with the left/peak/right buffers indented beneath it."""
+    body = [_TINDENT + _trow(str(name), _cells(row), bold=True) for name, row in rows_df.iterrows()]
+    lines = [f"<b>{title}</b>"] + body
+    css = "blk hl" if highlight else "blk"
+    return f'<div class="{css}">' + "\n".join(lines) + "</div>"
+
+
 def cols(*fragments):
     """Equal-width side-by-side columns."""
     inner = "".join(f'<div class="col-eq">{f}</div>' for f in fragments)
@@ -153,13 +165,14 @@ _PAGE = """<!doctype html>
  .cols-eq {{ display: flex; align-items: flex-start; gap: 32px; margin-top: 18px; }}
  .col-eq {{ flex: 1; min-width: 0; text-align: center; }}
  .split {{ display: flex; align-items: stretch; gap: 36px; }}
- .side-main {{ flex: 2; min-width: 0; }}
+ .side-main {{ flex: 1; min-width: 0; }}
  .side-narrow {{ flex: 1; min-width: 0; padding-top: 6px; }}
  .side-narrow .blk {{ display: block; text-align: left; margin-bottom: 16px; }}
  .side-narrow .blk:last-child {{ margin-bottom: 0; }}
+ .hl {{ background: #fbecea; padding: 10px 0; margin-top: 6px; }}
  .hrow {{ display: flex; align-items: flex-start; gap: 28px; flex-wrap: wrap; }}
  .blk {{ font-family: "Consolas", ui-monospace, "Cascadia Code", monospace;
-         font-size: 16px; white-space: pre; line-height: 1.1; margin-bottom: 20px; color: #444;
+         font-size: 15px; white-space: pre; line-height: 1.1; margin-bottom: 20px; color: #444;
          display: inline-block; text-align: left; }}
  .blk:last-child {{ margin-bottom: 0; }}
 </style></head><body>

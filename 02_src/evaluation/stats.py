@@ -8,6 +8,7 @@ baseline on a full set.
 import numpy as np
 import pandas as pd
 from scipy.stats import norm
+from scipy.signal import savgol_filter, find_peaks
 
 
 # Buffer grid swept by the profit-vs-buffer analysis (bet threshold = implied + buffer).
@@ -48,11 +49,13 @@ def portfolio_stats(matches, implied="implied", outcome="y"):
     })
 
 
-def buffer_curve(preds, grid=DEFAULT_BUFFER_GRID):
+def buffer_curve(preds, grid=DEFAULT_BUFFER_GRID, smooth_window=21, smooth_poly=2):
     """Profit and ROI at every candidate bet threshold (bet where model_p > implied + buffer).
 
     Sweeping the buffer never refits the model — it only re-thresholds the same predictions, so
-    the whole curve is cheap. Returns a DataFrame indexed by buffer with profit, roi, n_matches.
+    the whole curve is cheap. The raw profit is noisy (few bets remain at high buffers), so a
+    Savitzky-Golay smoothing is added as `profit_smooth`; buffer choice reads that, not the raw
+    spikes. Returns a DataFrame indexed by buffer with profit, profit_smooth, roi, n_matches.
     """
     rows = []
     for buffer in grid:
@@ -60,14 +63,32 @@ def buffer_curve(preds, grid=DEFAULT_BUFFER_GRID):
         stats = portfolio_stats(bets)
         rows.append({"buffer": buffer, "profit": stats["profit"],
                      "roi": stats["roi"], "n_matches": stats["n_matches"]})
-    return pd.DataFrame(rows).set_index("buffer")
+    curve = pd.DataFrame(rows).set_index("buffer")
+
+    window = min(smooth_window, len(curve) - (1 - len(curve) % 2))  # odd, <= length
+    if window > smooth_poly:
+        curve["profit_smooth"] = savgol_filter(curve["profit"].to_numpy(), window, smooth_poly)
+    else:
+        curve["profit_smooth"] = curve["profit"]
+    return curve
 
 
-def pick_buffers(curve, frac=0.5):
-    """Three buffers off the profit curve: the peak, and the edges of the band where profit stays
-    within `frac` of its maximum. Deterministic — no eyeballing. The report bets at `peak` and
-    uses `left`/`right` to show the result holds across a plateau, not just at the cherry-picked max.
+def pick_buffers(curve):
+    """Three reference buffers off the smoothed profit curve, from its local maxima:
+
+    - `left`   — the first local maximum from the left: where sieving off the clear losers is done
+      and the marginal edge first hits zero. The operative choice — it generalizes best; anything
+      higher is a dev-specific bump that overfits.
+    - `right`  — the last local maximum: the highest buffer where adding matches still adds profit.
+    - `middle` — the midpoint between `left` and `right`.
     """
-    profit = curve["profit"]
-    band = profit.index[profit >= frac * profit.max()]
-    return {"left": float(band.min()), "peak": float(profit.idxmax()), "right": float(band.max())}
+    profit = curve["profit_smooth"].to_numpy()
+    buffers = curve.index.to_numpy()
+
+    prominence = 0.01 * (profit.max() - profit.min())
+    peaks, _ = find_peaks(profit, prominence=prominence)
+    if len(peaks) == 0:
+        peaks = [int(profit.argmax())]
+
+    left, right = float(buffers[peaks[0]]), float(buffers[peaks[-1]])
+    return {"left": left, "middle": (left + right) / 2, "right": right}
