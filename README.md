@@ -41,6 +41,7 @@ Source: [football-data.co.uk](https://www.football-data.co.uk)
 04_models/             # trained models (gitignored)
 05_reports/            # outputs (gitignored)
 06_docs/               # contract, decisions, raw data notes
+tests/                 # pytest suite on small hand-built data (run: `pytest`)
 ```
 
 ---
