@@ -49,6 +49,7 @@ def _load_file(path: Path) -> pd.DataFrame:
         (raw["FTR"] == "H").rename("t_home_flg"),
         (raw["FTR"] == "D").rename("t_draw_flg"),
         (raw["FTR"] == "A").rename("t_away_flg"),
+        raw["FTR"].map({"H": 1, "D": 0, "A": -1}).rename("t_flg_diff"),
         (raw["FTHG"] - raw["FTAG"]).rename("t_goals_diff"),
         (raw["FTHG"] + raw["FTAG"]).rename("t_goals_total"),
         pd.Series(

@@ -150,6 +150,7 @@ Derived from `match_team_stats`. Comparative features per window:
 Targets prefixed `t_`:
 - `t_home_goals`, `t_away_goals`, `t_result`
 - `t_home_flg`, `t_draw_flg`, `t_away_flg`
+- `t_flg_diff` — signed result: 1 home / 0 draw / −1 away (`t_home_flg − t_away_flg`)
 - `t_goals_diff`, `t_goals_total`
 - `t_home_profit`, `t_draw_profit`, `t_away_profit` — profit from a unit stake on that outcome at mrkt odds (win: `1 - impl`; lose: `-impl`)
 

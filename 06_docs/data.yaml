@@ -732,6 +732,12 @@ target_columns:
     inputs: [FTR]
     dtype: bool
 
+  t_flg_diff:
+    table: match_target
+    description: "signed match result: 1 home win, 0 draw, -1 away win (= t_home_flg - t_away_flg). Same scale as teams_elo_diff_rr_impl_diff, whose fit targets it"
+    inputs: [FTR]
+    dtype: int
+
   t_goals_diff:
     table: match_target
     description: "home_goals - away_goals"
