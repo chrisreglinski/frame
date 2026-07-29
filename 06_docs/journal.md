@@ -1,5 +1,41 @@
 # Journal
 
+## 2026-07-29 — the market compresses home advantage toward the middle (5 truth-measures agree)
+
+- Fitted the per-league home-field intercept (lhfa: expected p_home - p_away at equal strength) on
+  gw>8, using FIVE independent strength axes as the zero-point: elo, and season-form points /
+  impl_points / goals / shots-on-target diffs. They agree tightly (per-league std ~0.005) and span
+  **italy 0.09 -> spain 0.20**. This is not an elo quirk — every strength measure sees the same
+  league home-advantage ordering.
+- Systematic detail: every form axis sits ~+0.01 ABOVE elo (impl_points highest). Likely because elo
+  is the cleanest venue-neutral rating (Club Elo separates home advantage), while raw form averages
+  carry residual home-advantage contamination (odds-derived impl_points most of all). So for the
+  cleanest HA estimate, use the elo version.
+- The MARKET's priced HA (fit mrkt_home_away_impl_diff on elo, same subset) is COMPRESSED to
+  0.13-0.17 vs the truth's 0.09-0.20. Mispricing (market - true): **italy +0.040, france +0.030**
+  (market overstates their weak home edge), **spain -0.021** (understates the fortress); england/
+  germany ~right. France keeps showing up anomalous (also the weak league in the promoted/away bets).
+- Tradeable hypothesis (for a forward-test, not proven): fade the home side in italy/france, back it
+  in spain — where the market's HA error is largest and one-directional. Now backed by 5 agreeing
+  truth-measures, not a single fit.
+- Aside: the four season-form strength axes add essentially nothing over elo for predicting the
+  result margin (all 0.83-0.96 correlated with elo, incremental R2 < 0.007, and worse early where
+  form is small-sample noise). Not worth materializing as features; elo + market columns suffice.
+
+## 2026-07-29 — late-season outcomes are less strength-determined (every rating, not just elo)
+
+- Regressing the result margin (t_flg_diff) on a strength axis, R² drops from early to late season
+  (elo: 0.20 gw1-8 -> 0.15 gw>8). First read this as "elo goes stale" — wrong.
+- Controlling for the strength spread (|d|<200, since early season has more lopsided fixtures that
+  inflate raw R²), **both** elo and the market's implied margin lose ~0.03 R² from gw1-8 to gw>8
+  (elo 0.119->0.088, market 0.141->0.114). The market's edge over elo barely moves (+0.021->+0.026).
+- So it is NOT elo-specific decay. **Late-season results are simply less determined by team strength
+  — for any strength measure.** Plausible drivers: dead rubbers, rotation, secured/lost objectives,
+  fixture congestion — noise no rating captures because it isn't about strength.
+- Corollary for feature-fitting: elo is fine fit on all matches (it's if anything crisper early — the
+  early-high R² was mostly the wider-spread composition, not elo quality). Form-window axes still fit
+  on gw>8, but for the small-sample reason, not "elo is noisy early".
+
 ## 2026-07-29 — early-season mispricing, Italy's home advantage, and the elo→prob margin feature
 
 Session mixed exploratory betting analysis with a feature-engineering outcome. All betting findings
