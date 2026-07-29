@@ -1,4 +1,5 @@
 import itertools
+import json
 from pathlib import Path
 
 import pandas as pd
@@ -54,9 +55,10 @@ def _windows() -> list[str]:
 def build_match_matchup_stats(group: str = "major") -> pd.DataFrame:
     features_dir = _features_dir(group)
     src = pd.read_parquet(features_dir / "match_team_stats.parquet")
-    # elo lives in match_info, not match_team_stats — pull it in for the matchup elo features
-    elo = pd.read_parquet(features_dir / "match_info.parquet")[["match_id", "hmt_elo", "awt_elo"]]
-    src = src.merge(elo, on="match_id", how="left")
+    # elo and league live in match_info, not match_team_stats — pull them in for the matchup
+    # elo features (league is needed for the per-league home-field intercept)
+    info = pd.read_parquet(features_dir / "match_info.parquet")[["match_id", "hmt_elo", "awt_elo", "league"]]
+    src = src.merge(info, on="match_id", how="left")
 
     computed = {}
     for w in _windows():
@@ -103,6 +105,17 @@ def build_match_matchup_stats(group: str = "major") -> pd.DataFrame:
     # matchup elo (not windowed — elo is a raw pre-match rating)
     computed["teams_elo_diff"] = src["hmt_elo"] - src["awt_elo"]
     computed["teams_elo_total"] = src["hmt_elo"] + src["awt_elo"]
+
+    # elo-implied outcome margin g(d) = a0[league] + a1*d + a2*d^2 + a3*d^3, split into
+    # strength (odd: a1*d + a3*d^3) and league home-field (even: a0[league] + a2*d^2).
+    # Coefficients are a fixed offline fit stored in thresholds.json (see features/thresholds.py).
+    fit = json.loads((features_dir / "thresholds.json").read_text())["elo_impl"]
+    d = computed["teams_elo_diff"]
+    tilt = fit["a1"] * d + fit["a3"] * d ** 3
+    lhfa = src["league"].map(fit["a0"]) + fit["a2"] * d ** 2
+    computed["teams_elo_diff_impl_tilt"] = tilt
+    computed["teams_elo_diff_impl_lhfa"] = lhfa
+    computed["teams_elo_diff_impl_diff"] = tilt + lhfa
 
     result = round_floats(pd.concat(
         [src[["match_id"]], pd.DataFrame(computed, index=src.index)],
