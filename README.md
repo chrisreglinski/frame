@@ -30,6 +30,8 @@ Source: [football-data.co.uk](https://www.football-data.co.uk)
   01_raw/
     01_matches/        # raw CSVs from football-data.co.uk (tracked in git)
     02_stadiums/       # stadium coordinates + promoted team flags per league-season
+                       # (minor/other groups: promotee + island flags only, coordinates
+                       #  empty -> travel_distance stays NaN there)
     03_dates/          # season phase boundary dates
     04_elo/            # Club Elo history (clubelo.com) + per-group team-name maps
   02_features/         # generated feature tables (gitignored, rebuild locally)
