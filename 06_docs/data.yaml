@@ -663,19 +663,34 @@ columns:
     description: "hmt_elo plus awt_elo; overall rating level of the matchup. NaN if either elo is NaN"
     dtype: float
 
-  teams_elo_diff_impl_diff:
+  teams_elo_diff_rr_impl_diff:
     table: match_matchup_stats
-    description: "elo-implied home-minus-away win-probability margin: expected p_home - p_away reconstructed from teams_elo_diff and league. Cubic g(d) = a0[league] + a1*d + a2*d^2 + a3*d^3 fit to realized outcomes (t_home_flg - t_away_flg); coefficients are a fixed offline population fit per group (stored in thresholds.json, not refit per build). Same units as mrkt_home_away_impl_diff. Equals teams_elo_diff_impl_tilt + teams_elo_diff_impl_lhfa. NaN if teams_elo_diff is NaN"
+    description: "elo-implied home-minus-away win-probability margin, RESULTS regression (rr): expected p_home - p_away reconstructed from teams_elo_diff and league. Cubic g(d) = a0[league] + a1*d + a2*d^2 + a3*d^3 fit to realized outcomes (t_home_flg - t_away_flg); coefficients are a fixed offline population fit per group (stored in thresholds.json as elo_rr, not refit per build). Same units as mrkt_home_away_impl_diff. Equals teams_elo_diff_rr_impl_tilt + teams_elo_diff_rr_impl_lhfa. NaN if teams_elo_diff is NaN"
     dtype: float
 
-  teams_elo_diff_impl_tilt:
+  teams_elo_diff_rr_impl_tilt:
     table: match_matchup_stats
-    description: "strength component of teams_elo_diff_impl_diff: the antisymmetric (venue-free) part a1*d + a3*d^3, odd in teams_elo_diff so it flips sign when the teams swap. NaN if teams_elo_diff is NaN"
+    description: "strength component of teams_elo_diff_rr_impl_diff: the antisymmetric (venue-free) part a1*d + a3*d^3, odd in teams_elo_diff so it flips sign when the teams swap. NaN if teams_elo_diff is NaN"
     dtype: float
 
-  teams_elo_diff_impl_lhfa:
+  teams_elo_diff_rr_impl_lhfa:
     table: match_matchup_stats
-    description: "league home-field-advantage component of teams_elo_diff_impl_diff: per-league intercept a0[league] plus the symmetric a2*d^2 term. The strength-controlled home edge for this league at this mismatch (a0 lowest in italy, highest in spain). NaN if teams_elo_diff is NaN"
+    description: "league home-field-advantage component of teams_elo_diff_rr_impl_diff: per-league intercept a0[league] plus the symmetric a2*d^2 term. The strength-controlled TRUE home edge for this league (a0 lowest in italy, highest in spain). NaN if teams_elo_diff is NaN"
+    dtype: float
+
+  teams_elo_diff_mr_impl_diff:
+    table: match_matchup_stats
+    description: "elo-implied home-minus-away margin, MARKET regression (mr): the same cubic g(d) = a0[league] + a1*d + a2*d^2 + a3*d^3 but fit to the market price mrkt_home_away_impl_diff instead of outcomes (coefficients stored in thresholds.json as elo_mr). Reconstructs the market's elo+league pricing skeleton (~0.95 corr with mrkt_home_away_impl_diff). Equals teams_elo_diff_mr_impl_tilt + teams_elo_diff_mr_impl_lhfa. NaN if teams_elo_diff is NaN"
+    dtype: float
+
+  teams_elo_diff_mr_impl_tilt:
+    table: match_matchup_stats
+    description: "strength component of teams_elo_diff_mr_impl_diff: the antisymmetric part a1*d + a3*d^3 of the market-price fit. NaN if teams_elo_diff is NaN"
+    dtype: float
+
+  teams_elo_diff_mr_impl_lhfa:
+    table: match_matchup_stats
+    description: "league home-field-advantage component of teams_elo_diff_mr_impl_diff: per-league intercept a0[league] plus a2*d^2, from the market-price fit — the home edge the market PRICES per league. The difference (rr_impl_lhfa - mr_impl_lhfa) is the market's per-league home-advantage mispricing: the market compresses toward the middle, underpricing spain and overpricing italy. NaN if teams_elo_diff is NaN"
     dtype: float
 
 

@@ -106,16 +106,19 @@ def build_match_matchup_stats(group: str = "major") -> pd.DataFrame:
     computed["teams_elo_diff"] = src["hmt_elo"] - src["awt_elo"]
     computed["teams_elo_total"] = src["hmt_elo"] + src["awt_elo"]
 
-    # elo-implied outcome margin g(d) = a0[league] + a1*d + a2*d^2 + a3*d^3, split into
-    # strength (odd: a1*d + a3*d^3) and league home-field (even: a0[league] + a2*d^2).
-    # Coefficients are a fixed offline fit stored in thresholds.json (see features/thresholds.py).
-    fit = json.loads((features_dir / "thresholds.json").read_text())["elo_impl"]
+    # elo-implied margin g(d) = a0[league] + a1*d + a2*d^2 + a3*d^3, split into strength
+    # (odd: a1*d + a3*d^3) and league home-field (even: a0[league] + a2*d^2). Two fits, both
+    # fixed offline coefficients in thresholds.json (see features/thresholds.py):
+    #   rr = g fit to realized outcomes (true margin);  mr = g fit to market price (pricing skeleton)
+    thresholds = json.loads((features_dir / "thresholds.json").read_text())
     d = computed["teams_elo_diff"]
-    tilt = fit["a1"] * d + fit["a3"] * d ** 3
-    lhfa = src["league"].map(fit["a0"]) + fit["a2"] * d ** 2
-    computed["teams_elo_diff_impl_tilt"] = tilt
-    computed["teams_elo_diff_impl_lhfa"] = lhfa
-    computed["teams_elo_diff_impl_diff"] = tilt + lhfa
+    for prefix, key in [("rr", "elo_rr"), ("mr", "elo_mr")]:
+        fit = thresholds[key]
+        tilt = fit["a1"] * d + fit["a3"] * d ** 3
+        lhfa = src["league"].map(fit["a0"]) + fit["a2"] * d ** 2
+        computed[f"teams_elo_diff_{prefix}_impl_tilt"] = tilt
+        computed[f"teams_elo_diff_{prefix}_impl_lhfa"] = lhfa
+        computed[f"teams_elo_diff_{prefix}_impl_diff"] = tilt + lhfa
 
     result = round_floats(pd.concat(
         [src[["match_id"]], pd.DataFrame(computed, index=src.index)],
