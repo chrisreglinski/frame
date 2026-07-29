@@ -1,5 +1,41 @@
 # Journal
 
+## 2026-07-29 — early-season mispricing, Italy's home advantage, and the elo→prob margin feature
+
+Session mixed exploratory betting analysis with a feature-engineering outcome. All betting findings
+below are **in-sample on the 4 major seasons** unless stated — noted for the record, not proven.
+
+- **Home advantage differs sharply by league; the market doesn't price it per-league.** Strength-
+  controlled HA (intercept of the elo→outcome fit, i.e. HA between equal teams) runs from **italy 0.099**
+  up to **spain 0.188**, with eng/ger/fra ~0.12–0.14. The market carries one near-flat home premium per
+  league across the whole season (implied HA barely moves by phase). This is a systematic gap, not noise.
+
+- **Italy is the odd league — because its home advantage is the smallest, not because away teams win more.**
+  Serie A has the FEWEST home wins and the MOST draws, not more away wins (early-season "away teams do well"
+  was a perspective illusion — it's really excess draws). Same team gains ~half as much at home as in Spain
+  (venue points gap 0.27 vs 0.54 ppg). Likely structural: old athletics-track stadiums, low attendance,
+  defensive culture that "travels well". Why Italy looks *reversed* at season start: other leagues SUSPEND
+  their large home advantage early (crowds not yet warm), Italy has little to suspend, so only the early
+  draw-heavy mode shows.
+
+- **The bookmaker's 1X2 skeleton is ~90% reconstructible from elo + a per-league home premium** (R²=0.90 on
+  the implied H−A margin). The remaining ~10% (±10pp) is the market's private info; regressing outcome-
+  residuals on price-residuals gave beta≈1.36 — the market slightly UNDER-weights its own extra signal.
+
+- **Promoted away teams gw1-3 are overpriced by the market** (frozen rule: 1X, gw1-3, home odds >1.66 →
+  ROI +16%, p=0.02, all 4 seasons and 5 leagues positive in major). It's the *promoted label*, not weakness:
+  a placebo on the 3 lowest-elo incumbents REVERSED (they overperform). BUT it failed out-of-sample on minor
+  (2nd divisions, −11%) and other (NL/PT, −6.5%) — likely top-5-only (money/crowd size). Frozen for an
+  Aug-2026 forward-test at small stakes; needs a pre-set pass/fail threshold before the season.
+
+- **Feature shipped: `teams_elo_diff_impl_{diff,tilt,lhfa}`** (matchup table). `diff` = g(d) = expected
+  p_home−p_away from elo (the reconstruction above); splits additively into `tilt` (strength, odd part) and
+  `lhfa` (per-league home-field advantage, even part — bakes the italy/spain gap straight into a column,
+  strength-controlled). Cubic fit to realized outcomes, coefficients a fixed offline population fit stored in
+  thresholds.json. The deferred `mrkt_home_away_impl_diff − teams_elo_diff_impl_diff` would isolate that ~10%
+  residual where anomalies like the promoted-away edge live. First member of a possible family (goals / sot
+  axes could get the same odd-part treatment).
+
 ## 2026-07-13 — PCA of inputs: nothing jumped out
 
 - ran PCA over the numeric season-window features (landscape task). the space is low-dimensional (~5 axes,
