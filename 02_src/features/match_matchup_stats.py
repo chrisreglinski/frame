@@ -114,8 +114,19 @@ def build_match_matchup_stats(group: str = "major") -> pd.DataFrame:
     d = computed["teams_elo_diff"]
     for prefix, key in [("rr", "elo_rr"), ("mr", "elo_mr")]:
         fit = thresholds[key]
-        tilt = fit["a1"] * d + fit["a3"] * d ** 3
-        lhfa = src["league"].map(fit["a0"]) + fit["a2"] * d ** 2
+        a1, a2, a3 = fit["a1"], fit["a2"], fit["a3"]
+        # clamp d to the cubic's monotone range: g turns over where dg/dd = 3a3*d^2 + 2a2*d + a1 = 0.
+        # past those turning points a stronger favourite would get a *smaller* margin (the negative-a3
+        # runaway), so hold d at the turning point — the extreme margin becomes a plateau, not a reversal.
+        disc = (2 * a2) ** 2 - 12 * a3 * a1
+        if a3 < 0 < disc:
+            r1 = (-2 * a2 + disc ** 0.5) / (6 * a3)
+            r2 = (-2 * a2 - disc ** 0.5) / (6 * a3)
+            dc = d.clip(min(r1, r2), max(r1, r2))
+        else:
+            dc = d
+        tilt = a1 * dc + a3 * dc ** 3
+        lhfa = src["league"].map(fit["a0"]) + a2 * dc ** 2
         computed[f"teams_elo_diff_{prefix}_impl_tilt"] = tilt
         computed[f"teams_elo_diff_{prefix}_impl_lhfa"] = lhfa
         computed[f"teams_elo_diff_{prefix}_impl_diff"] = tilt + lhfa

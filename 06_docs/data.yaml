@@ -665,7 +665,7 @@ columns:
 
   teams_elo_diff_rr_impl_diff:
     table: match_matchup_stats
-    description: "elo-implied home-minus-away win-probability margin, RESULTS regression (rr): expected p_home - p_away reconstructed from teams_elo_diff and league. Cubic g(d) = a0[league] + a1*d + a2*d^2 + a3*d^3 fit to realized outcomes (t_home_flg - t_away_flg); coefficients are a fixed offline population fit per group (stored in thresholds.json as elo_rr, not refit per build). Same units as mrkt_home_away_impl_diff. Equals teams_elo_diff_rr_impl_tilt + teams_elo_diff_rr_impl_lhfa. NaN if teams_elo_diff is NaN"
+    description: "elo-implied home-minus-away win-probability margin, RESULTS regression (rr): expected p_home - p_away reconstructed from teams_elo_diff and league. Cubic g(d) = a0[league] + a1*d + a2*d^2 + a3*d^3 fit to realized outcomes (t_home_flg - t_away_flg); coefficients are a fixed offline population fit per group (stored in thresholds.json as elo_rr, not refit per build). d is clamped to the cubic's monotone range so extreme mismatches plateau instead of hitting the polynomial turnover. Same units as mrkt_home_away_impl_diff. Equals teams_elo_diff_rr_impl_tilt + teams_elo_diff_rr_impl_lhfa. NaN if teams_elo_diff is NaN"
     dtype: float
 
   teams_elo_diff_rr_impl_tilt:
@@ -680,7 +680,7 @@ columns:
 
   teams_elo_diff_mr_impl_diff:
     table: match_matchup_stats
-    description: "elo-implied home-minus-away margin, MARKET regression (mr): the same cubic g(d) = a0[league] + a1*d + a2*d^2 + a3*d^3 but fit to the market price mrkt_home_away_impl_diff instead of outcomes (coefficients stored in thresholds.json as elo_mr). Reconstructs the market's elo+league pricing skeleton (~0.95 corr with mrkt_home_away_impl_diff). Equals teams_elo_diff_mr_impl_tilt + teams_elo_diff_mr_impl_lhfa. NaN if teams_elo_diff is NaN"
+    description: "elo-implied home-minus-away margin, MARKET regression (mr): the same cubic g(d) = a0[league] + a1*d + a2*d^2 + a3*d^3 but fit to the market price mrkt_home_away_impl_diff instead of outcomes (coefficients stored in thresholds.json as elo_mr). d clamped to the monotone range as for rr. Reconstructs the market's elo+league pricing skeleton (~0.95 corr with mrkt_home_away_impl_diff). Equals teams_elo_diff_mr_impl_tilt + teams_elo_diff_mr_impl_lhfa. NaN if teams_elo_diff is NaN"
     dtype: float
 
   teams_elo_diff_mr_impl_tilt:
