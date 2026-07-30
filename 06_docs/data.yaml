@@ -13,7 +13,7 @@ tables:
 
   match_info:
     id: match_id
-    source: [raw/matches, raw/stadiums]
+    source: [raw/matches, raw/attributes]
 
   match_target:
     id: match_id
@@ -140,6 +140,34 @@ columns:
     table: match_info
     description: "away team promoted to the league this season"
     inputs: [Promotee]
+    dtype: bool
+
+  hmt_is_top3_last:
+    table: match_info
+    groups: [major, other]
+    description: "home team finished top 3 in this league last season (reigning top-3, analogous to promoted for the previous season's best). Top-tier groups only. Seeded from external final tables for the earliest season; agrees with team_season_final rankings for all later seasons"
+    inputs: [Top3Last]
+    dtype: bool
+
+  awt_is_top3_last:
+    table: match_info
+    groups: [major, other]
+    description: "away team finished top 3 in this league last season (reigning top-3, analogous to promoted for the previous season's best). Top-tier groups only. Seeded from external final tables for the earliest season; agrees with team_season_final rankings for all later seasons"
+    inputs: [Top3Last]
+    dtype: bool
+
+  hmt_is_relegated:
+    table: match_info
+    groups: [minor]
+    description: "home team was relegated from the tier above into this league this season (minor group only; the second-tier analogue of is_top3_last)"
+    inputs: [Relegated]
+    dtype: bool
+
+  awt_is_relegated:
+    table: match_info
+    groups: [minor]
+    description: "away team was relegated from the tier above into this league this season (minor group only; the second-tier analogue of is_top3_last)"
+    inputs: [Relegated]
     dtype: bool
 
   hmt_is_island:

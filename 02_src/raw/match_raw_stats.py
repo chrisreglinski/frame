@@ -35,7 +35,7 @@ def _match_id(league: str, season: str, home: str, away: str) -> str:
 def build_match_raw_stats(group: str = "major") -> pd.DataFrame:
     frames = []
     for path in sorted(_matches_dir(group).glob("*.csv")):
-        league, season = path.stem.rsplit("_", 1)
+        league, season = path.stem.removesuffix("_matches").rsplit("_", 1)
         raw = pd.read_csv(path, usecols=lambda c: c in _RAW_COLS)
         raw.insert(0, "match_id", [
             _match_id(league, season, h, a)

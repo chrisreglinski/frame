@@ -13,7 +13,7 @@ from features.utils import round_floats
 
 _ROOT = Path(__file__).parents[2]
 _DATA = _ROOT / "01_data"
-_STADIUMS_DIR = _DATA / "01_raw" / "02_stadiums"
+_ATTR_DIR = _DATA / "01_raw" / "02_attributes"
 _YAML_PATH = _ROOT / "06_docs" / "data.yaml"
 _DATES_PATH = _DATA / "01_raw" / "03_dates" / "season_limit_dates.csv"
 _ELO_DIR = _DATA / "01_raw" / "04_elo"
@@ -71,7 +71,19 @@ _RAW_ODDS = {
 }
 
 
-def _columns() -> list[str]:
+# Per-group "reigning strength" flag carried in the team-attribute files: the raw column name and
+# the output column suffix. Top-tier groups (major, other) use last season's top 3
+# (Top3Last -> {side}_is_top3_last); minor uses relegated from the tier above
+# (Relegated -> {side}_is_relegated). The matching contract columns are tagged with
+# `groups:` in data.yaml so each group's ABT carries only the flag that applies to it.
+_LAST_FLAG = {
+    "major": {"raw": "Top3Last",  "out": "is_top3_last"},
+    "other": {"raw": "Top3Last",  "out": "is_top3_last"},
+    "minor": {"raw": "Relegated", "out": "is_relegated"},
+}
+
+
+def _columns(group: str) -> list[str]:
     with open(_YAML_PATH) as f:
         schema = yaml.safe_load(f)
     result = []
@@ -80,6 +92,9 @@ def _columns() -> list[str]:
             continue
         table = meta.get("table")
         if "match_info" not in (table if isinstance(table, list) else [table]):
+            continue
+        groups = meta.get("groups")
+        if groups is not None and group not in groups:
             continue
         if "dims" in meta:
             keys = list(meta["dims"].keys())
@@ -113,31 +128,35 @@ def _haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     return 2 * R * math.asin(math.sqrt(a))
 
 
-def _load_stadiums(league: str, season: str) -> dict[str, dict] | None:
-    path = _STADIUMS_DIR / f"{league}_{season}_stadiums.csv"
+def _load_attributes(league: str, season: str, group: str) -> dict[str, dict] | None:
+    path = _ATTR_DIR / group / f"{league}_{season}_attributes.csv"
     if not path.exists():
         return None
     df = pd.read_csv(path)
+    flag = _LAST_FLAG.get(group)
+    # source files may not carry the flag column yet -> default to False until they are filled
+    has_flag = flag is not None and flag["raw"] in df.columns
     return {
         row["TeamName"]: {
             "lat": row["Latitude"],
             "lon": row["Longitude"],
             "promoted": bool(row["Promotee"]),
             "island": bool(row["Island"]),
+            "last_flag": bool(row[flag["raw"]]) if has_flag else False,
         }
         for _, row in df.iterrows()
     }
 
 
-def _check_missing(teams: set[str], stadiums: dict, league: str, season: str) -> None:
-    missing = sorted(teams - stadiums.keys())
+def _check_missing(teams: set[str], attrs: dict, league: str, season: str) -> None:
+    missing = sorted(teams - attrs.keys())
     if missing:
         lines = [f"  {league} {season}: {t}" for t in missing]
-        raise ValueError("missing stadium entries:\n" + "\n".join(lines))
+        raise ValueError("missing team-attribute entries:\n" + "\n".join(lines))
 
 
-def _load_file(path: Path, stadiums: dict[str, dict], limits: dict) -> pd.DataFrame:
-    league, season = path.stem.rsplit("_", 1)
+def _load_file(path: Path, attrs: dict[str, dict], limits: dict, group: str) -> pd.DataFrame:
+    league, season = path.stem.removesuffix("_matches").rsplit("_", 1)
     raw = pd.read_csv(path)
 
     all_teams = set(raw["HomeTeam"]) | set(raw["AwayTeam"])
@@ -205,21 +224,24 @@ def _load_file(path: Path, stadiums: dict[str, dict], limits: dict) -> pd.DataFr
     phase4 = _season_4phase(date, season, limits)
     phase3 = _season_3phase(phase4)
 
-    if stadiums is None:
+    if attrs is None:
         blank = pd.Series(np.nan, index=raw.index)
         hmt_is_promoted = awt_is_promoted = blank
         hmt_is_island = awt_is_island = blank
+        hmt_last = awt_last = blank
         travel = blank.rename("travel_distance_km")
     else:
-        _check_missing(all_teams, stadiums, league, season)
-        hmt_is_promoted = raw["HomeTeam"].map(lambda t: stadiums[t]["promoted"])
-        awt_is_promoted = raw["AwayTeam"].map(lambda t: stadiums[t]["promoted"])
-        hmt_is_island = raw["HomeTeam"].map(lambda t: stadiums[t]["island"])
-        awt_is_island = raw["AwayTeam"].map(lambda t: stadiums[t]["island"])
+        _check_missing(all_teams, attrs, league, season)
+        hmt_is_promoted = raw["HomeTeam"].map(lambda t: attrs[t]["promoted"])
+        awt_is_promoted = raw["AwayTeam"].map(lambda t: attrs[t]["promoted"])
+        hmt_is_island = raw["HomeTeam"].map(lambda t: attrs[t]["island"])
+        awt_is_island = raw["AwayTeam"].map(lambda t: attrs[t]["island"])
+        hmt_last = raw["HomeTeam"].map(lambda t: attrs[t]["last_flag"])
+        awt_last = raw["AwayTeam"].map(lambda t: attrs[t]["last_flag"])
         travel = pd.Series([
             _haversine(
-                stadiums[h]["lat"], stadiums[h]["lon"],
-                stadiums[a]["lat"], stadiums[a]["lon"],
+                attrs[h]["lat"], attrs[h]["lon"],
+                attrs[a]["lat"], attrs[a]["lon"],
             )
             for h, a in zip(raw["HomeTeam"], raw["AwayTeam"])
         ], name="travel_distance_km")
@@ -235,7 +257,7 @@ def _load_file(path: Path, stadiums: dict[str, dict], limits: dict) -> pd.DataFr
     ).astype(object)
     travel_cat = travel_cat.where(travel_cat.notna(), None)
 
-    return pd.concat([
+    out = pd.concat([
         pd.Series(
             [_match_id(league, season, h, a) for h, a in zip(raw["HomeTeam"], raw["AwayTeam"])],
             name="match_id",
@@ -272,6 +294,15 @@ def _load_file(path: Path, stadiums: dict[str, dict], limits: dict) -> pd.DataFr
         mrkt_undrd_impl,
         mrkt_home_away_impl_diff,
     ], axis=1)
+
+    # the reigning-strength flag is group-specific (major/other: is_top3_last; minor:
+    # is_relegated); attach it under the group's name so base[cols] can select it.
+    flag = _LAST_FLAG.get(group)
+    if flag:
+        out[f"hmt_{flag['out']}"] = hmt_last.values
+        out[f"awt_{flag['out']}"] = awt_last.values
+
+    return out
 
 
 def _attach_elo(df: pd.DataFrame, group: str) -> pd.DataFrame:
@@ -346,14 +377,14 @@ def _attach_elo_cats(df: pd.DataFrame, group: str) -> pd.DataFrame:
 
 
 def build_match_info(group: str = "major") -> pd.DataFrame:
-    cols = ["match_id"] + _columns()
+    cols = ["match_id"] + _columns(group)
     limits = _load_phase_limits()
     features_dir = _features_dir(group)
     frames = []
     for path in sorted(_matches_dir(group).glob("*.csv")):
-        league, season = path.stem.rsplit("_", 1)
-        stadiums = _load_stadiums(league, season)
-        frames.append(_load_file(path, stadiums, limits))
+        league, season = path.stem.removesuffix("_matches").rsplit("_", 1)
+        attrs = _load_attributes(league, season, group)
+        frames.append(_load_file(path, attrs, limits, group))
 
     base = _attach_elo(pd.concat(frames, ignore_index=True), group)
     base = _attach_elo_cats(base, group)

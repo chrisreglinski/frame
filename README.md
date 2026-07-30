@@ -27,13 +27,14 @@ Source: [football-data.co.uk](https://www.football-data.co.uk)
 
 ```
 01_data/
-  01_raw/
+  01_raw/              # per-league-season payload: {group}/{league}_{season}_{domain}.csv
     01_matches/        # raw CSVs from football-data.co.uk (tracked in git)
-    02_stadiums/       # stadium coordinates + promoted team flags per league-season
+    02_attributes/     # per-team attributes: venue coordinates + promoted / reigning-top3 flags
                        # (minor/other groups: promotee + island flags only, coordinates
                        #  empty -> travel_distance stays NaN there)
-    03_dates/          # season phase boundary dates
-    04_elo/            # Club Elo history (clubelo.com) + per-group team-name maps
+    03_dates/          # season phase boundary dates (shared, global)
+    04_elo/            # Club Elo history (clubelo.com, shared) + per-group team-name maps
+    05_xg/             # Understat match xG per league-season + per-group team-name map
   02_features/         # generated feature tables (gitignored, rebuild locally)
   03_abt/              # final wide ABT (gitignored, rebuild locally)
 02_src/
@@ -87,6 +88,7 @@ One row per match. Context and market features:
 - `day_of_week_cat` — `weekend` (sat/sun) / `shoulder` (fri/mon) / `midweek` (tue/wed/thu)
 - `time_uk_num` — kick-off time (UK) as a number (`hour + minute/60`); `time_uk_cat` — bucketed by floor(hour): `early` (11–13) / `early_afternoon` (14–15) / `late_afternoon` (16–17) / `evening` (18+)
 - `hmt_is_promoted`, `awt_is_promoted`, `travel_distance_km`
+- `hmt_is_top3_last`, `awt_is_top3_last` — team finished top 3 in this league last season (reigning top-3; top-tier groups `major`/`other` only). Earliest season seeded from external final tables; later seasons match `team_season_final` rankings. The `minor` group carries the second-tier analogue `hmt_is_relegated` / `awt_is_relegated` (relegated from the tier above) instead — both are group-scoped in `data.yaml` via `groups:`
 - `hmt_is_island`, `awt_is_island` — team is on a geographically isolated island (Las Palmas, Mallorca, Cagliari, Ajaccio)
 - `travel_distance_cat` — `travel_distance_km` bucketed: `derby` (<30 km) / `regional` (30–100 km) / `domestic` (100–500 km, coach / high-speed rail) / `long_haul` (500+ km, flights)
 - `hmt_elo`, `awt_elo` — Club Elo rating (clubelo.com) of each team as of the match date, joined point-in-time (pre-match; see below)

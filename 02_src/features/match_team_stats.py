@@ -282,7 +282,7 @@ def build_match_team_stats(group: str = "major") -> pd.DataFrame:
     thresholds_path = features_dir / "thresholds.json"
     frames = []
     for path in sorted(_matches_dir(group).glob("*.csv")):
-        league, season = path.stem.rsplit("_", 1)
+        league, season = path.stem.removesuffix("_matches").rsplit("_", 1)
         frames.append(_build_long(pd.read_csv(path), league, season))
 
     long = _add_stats(_add_summary_stubs(pd.concat(frames, ignore_index=True)))

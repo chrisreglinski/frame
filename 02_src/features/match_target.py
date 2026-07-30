@@ -35,7 +35,7 @@ def _match_id(league: str, season: str, home: str, away: str) -> str:
 
 
 def _load_file(path: Path) -> pd.DataFrame:
-    league, season = path.stem.rsplit("_", 1)
+    league, season = path.stem.removesuffix("_matches").rsplit("_", 1)
     raw = pd.read_csv(path)
 
     return pd.concat([
