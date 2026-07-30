@@ -21,10 +21,12 @@ tables:
 
   team_stats:
     id: match_id
-    source: raw/matches
+    source: [raw/matches, raw/xg]
     note: "one row per match; team statistics as home_/away_ dimensioned
            features. all stats computed from matches strictly BEFORE the
-           match date (current match excluded). first matches carry NaN stats"
+           match date (current match excluded). first matches carry NaN stats.
+           xg metrics are sourced from Understat and exist only where Understat
+           covers the league (major group); NaN elsewhere."
 
   match_matchup_stats:
     id: match_id
@@ -298,7 +300,7 @@ columns:
     dims:
       side: [hmt, awt]
       window: [season, rolling6, rolling8]
-      metric: [goals, shots, shots_on_target, corners, yellow]
+      metric: [goals, shots, shots_on_target, corners, yellow, xg]
       kind: [for, agst]
     dtype: float
 
@@ -394,7 +396,7 @@ columns:
     dims:
       side: [hmt, awt]
       window: [season, rolling6, rolling8]
-      metric: [points, goals_diff, goals_total, shots_on_target_diff, shots_on_target_total]
+      metric: [points, goals_diff, goals_total, shots_on_target_diff, shots_on_target_total, xg_diff, xg_total]
     dtype: float
 
   "{side}_{window}_{metric}_std":
@@ -403,7 +405,7 @@ columns:
     dims:
       side: [hmt, awt]
       window: [season, rolling6, rolling8]
-      metric: [goals_diff, goals_total, shots_on_target_diff, shots_on_target_total]
+      metric: [goals_diff, goals_total, shots_on_target_diff, shots_on_target_total, xg_diff, xg_total]
     dtype: float
 
   "{side}_{window}_{result}_ratio":
@@ -639,6 +641,13 @@ columns:
       window: [season, rolling6, rolling8]
     dtype: float
 
+  "teams_{window}_xg_diff_avg_diff":
+    table: match_matchup_stats
+    description: "home {window} xg_diff avg minus away {window} xg_diff avg; positive = home team stronger on xG balance. NaN outside the major group (Understat coverage)"
+    dims:
+      window: [season, rolling6, rolling8]
+    dtype: float
+
   "teams_{window}_points_avg_diff":
     table: match_matchup_stats
     description: "home {window} points avg minus away {window} points avg; positive = home team stronger on form/points"
@@ -663,6 +672,13 @@ columns:
   "teams_{window}_shots_on_target_total_avg_total":
     table: match_matchup_stats
     description: "home {window} shots_on_target_total avg plus away {window} shots_on_target_total avg; combined shooting intensity of the matchup"
+    dims:
+      window: [season, rolling6, rolling8]
+    dtype: float
+
+  "teams_{window}_xg_total_avg_total":
+    table: match_matchup_stats
+    description: "home {window} xg_total avg plus away {window} xg_total avg; combined xG intensity of the matchup. NaN outside the major group (Understat coverage)"
     dims:
       window: [season, rolling6, rolling8]
     dtype: float

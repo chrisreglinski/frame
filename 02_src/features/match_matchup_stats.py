@@ -82,6 +82,9 @@ def build_match_matchup_stats(group: str = "major") -> pd.DataFrame:
         computed[f"teams_{w}_shots_on_target_diff_avg_diff"] = (
             src[f"hmt_{w}_shots_on_target_diff_avg"] - src[f"awt_{w}_shots_on_target_diff_avg"]
         )
+        computed[f"teams_{w}_xg_diff_avg_diff"] = (
+            src[f"hmt_{w}_xg_diff_avg"] - src[f"awt_{w}_xg_diff_avg"]
+        )
         computed[f"teams_{w}_points_avg_diff"] = (
             src[f"hmt_{w}_points_avg"] - src[f"awt_{w}_points_avg"]
         )
@@ -94,6 +97,9 @@ def build_match_matchup_stats(group: str = "major") -> pd.DataFrame:
         )
         computed[f"teams_{w}_shots_on_target_total_avg_total"] = (
             src[f"hmt_{w}_shots_on_target_total_avg"] + src[f"awt_{w}_shots_on_target_total_avg"]
+        )
+        computed[f"teams_{w}_xg_total_avg_total"] = (
+            src[f"hmt_{w}_xg_total_avg"] + src[f"awt_{w}_xg_total_avg"]
         )
         computed[f"teams_{w}_points_avg_total"] = (
             src[f"hmt_{w}_points_avg"] + src[f"awt_{w}_points_avg"]

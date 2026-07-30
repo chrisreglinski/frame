@@ -22,6 +22,26 @@ def _matches_dir(group: str) -> Path:
 def _features_dir(group: str) -> Path:
     return _DATA / "02_features" / group
 
+
+_XG_DIR = _DATA / "01_raw" / "05_xg"
+
+
+def _attach_xg(raw: pd.DataFrame, league: str, season: str, group: str) -> pd.DataFrame:
+    """Merge Understat home_xg/away_xg onto the raw match rows by (HomeTeam, AwayTeam).
+    Understat names are translated to ours via the group's team_map; matches with no xg
+    row (or groups Understat does not cover) keep NaN xg."""
+    path = _XG_DIR / group / f"{league}_{season}_xg.csv"
+    tmap = _XG_DIR / group / "team_map.csv"
+    if not path.exists() or not tmap.exists():
+        return raw.assign(home_xg=np.nan, away_xg=np.nan)
+    u2o = pd.read_csv(tmap).set_index("understat")["team"].to_dict()
+    xg = pd.read_csv(path, usecols=["home_team", "away_team", "home_xg", "away_xg"])
+    xg["HomeTeam"] = xg["home_team"].map(lambda t: u2o.get(t, t))
+    xg["AwayTeam"] = xg["away_team"].map(lambda t: u2o.get(t, t))
+    return raw.merge(xg[["HomeTeam", "AwayTeam", "home_xg", "away_xg"]],
+                     on=["HomeTeam", "AwayTeam"], how="left")
+
+
 _WINDOWS = {"season": None, "rolling6": 6, "rolling8": 8}
 
 _LOCALITY_METRICS = ["goals", "shots", "shots_on_target"]
@@ -59,8 +79,8 @@ _TEAM_SEASON_COLS = [
 def _make_stat_cols() -> list[str]:
     cols = ["game_number"]
     for w in _WINDOWS:
-        cols += [f"{w}_{m}_{k}_avg" for m in ["goals", "shots", "shots_on_target", "corners", "yellow"] for k in ["for", "agst"]]
-        cols += [f"{w}_{m}_{v}" for m in ["points", "goals_diff", "goals_total", "shots_on_target_diff", "shots_on_target_total"] for v in ["avg", "std"]]
+        cols += [f"{w}_{m}_{k}_avg" for m in ["goals", "shots", "shots_on_target", "corners", "yellow", "xg"] for k in ["for", "agst"]]
+        cols += [f"{w}_{m}_{v}" for m in ["points", "goals_diff", "goals_total", "shots_on_target_diff", "shots_on_target_total", "xg_diff", "xg_total"] for v in ["avg", "std"]]
         cols += [f"{w}_{r}_ratio" for r in ["wins", "draws", "losses"]]
         cols += [f"{w}_goals_total_le{x}_ratio" for x in [0, 1, 2, 3, 4]]
         cols += [f"{w}_goals_{kind}_le{x}_ratio" for kind in ["for", "agst"] for x in [0, 1, 2]]
@@ -115,6 +135,10 @@ def _build_long(raw: pd.DataFrame, league: str, season: str) -> pd.DataFrame:
 
     avg_h, avg_d, avg_a = raw["AvgH"].values, raw["AvgD"].values, raw["AvgA"].values
 
+    # xg is Understat-sourced (major only); absent for groups/matches without coverage -> NaN
+    home_xg = raw["home_xg"].values if "home_xg" in raw else np.full(len(raw), np.nan)
+    away_xg = raw["away_xg"].values if "away_xg" in raw else np.full(len(raw), np.nan)
+
     home = pd.DataFrame({
         **base, "is_home": True, "team": raw["HomeTeam"].values, "opponent": raw["AwayTeam"].values,
         "goals_for": raw["FTHG"].values,    "goals_agst": raw["FTAG"].values,
@@ -122,6 +146,7 @@ def _build_long(raw: pd.DataFrame, league: str, season: str) -> pd.DataFrame:
         "shots_on_target_for": raw["HST"].values, "shots_on_target_agst": raw["AST"].values,
         "corners_for": raw["HC"].values,     "corners_agst": raw["AC"].values,
         "yellow_for": raw["HY"].values,      "yellow_agst": raw["AY"].values,
+        "xg_for": home_xg,                   "xg_agst": away_xg,
         "red_for": raw["HR"].values,
         "points": raw["FTR"].map({"H": 3, "D": 1, "A": 0}).values,
         "is_win":  (raw["FTR"] == "H").astype(float).values,
@@ -137,6 +162,7 @@ def _build_long(raw: pd.DataFrame, league: str, season: str) -> pd.DataFrame:
         "shots_on_target_for": raw["AST"].values, "shots_on_target_agst": raw["HST"].values,
         "corners_for": raw["AC"].values,     "corners_agst": raw["HC"].values,
         "yellow_for": raw["AY"].values,      "yellow_agst": raw["HY"].values,
+        "xg_for": away_xg,                   "xg_agst": home_xg,
         "red_for": raw["AR"].values,
         "points": raw["FTR"].map({"A": 3, "D": 1, "H": 0}).values,
         "is_win":  (raw["FTR"] == "A").astype(float).values,
@@ -150,6 +176,8 @@ def _build_long(raw: pd.DataFrame, league: str, season: str) -> pd.DataFrame:
     long["goals_total"] = long["goals_for"] + long["goals_agst"]
     long["shots_on_target_diff"]  = long["shots_on_target_for"] - long["shots_on_target_agst"]
     long["shots_on_target_total"] = long["shots_on_target_for"] + long["shots_on_target_agst"]
+    long["xg_diff"]  = long["xg_for"] - long["xg_agst"]
+    long["xg_total"] = long["xg_for"] + long["xg_agst"]
     long["impl_points"] = long["impl_win"] * 3 + long["impl_draw"]
     return long
 
@@ -187,11 +215,11 @@ def _add_stats(long: pd.DataFrame) -> pd.DataFrame:
             long[f"_ind_g{kind[0]}le{x}"] = (long[f"goals_{kind}"] <= x).astype(float)
 
     for wname, wsize in _WINDOWS.items():
-        for m in ["goals", "shots", "shots_on_target", "corners", "yellow"]:
+        for m in ["goals", "shots", "shots_on_target", "corners", "yellow", "xg"]:
             for k in ["for", "agst"]:
                 long[f"{wname}_{m}_{k}_avg"] = _agg_mean(g, f"{m}_{k}", wsize)
 
-        for m in ["points", "goals_diff", "goals_total", "shots_on_target_diff", "shots_on_target_total"]:
+        for m in ["points", "goals_diff", "goals_total", "shots_on_target_diff", "shots_on_target_total", "xg_diff", "xg_total"]:
             long[f"{wname}_{m}_avg"] = _agg_mean(g, m, wsize)
             long[f"{wname}_{m}_std"] = _agg_std(g, m, wsize)
 
@@ -283,7 +311,8 @@ def build_match_team_stats(group: str = "major") -> pd.DataFrame:
     frames = []
     for path in sorted(_matches_dir(group).glob("*.csv")):
         league, season = path.stem.removesuffix("_matches").rsplit("_", 1)
-        frames.append(_build_long(pd.read_csv(path), league, season))
+        raw = _attach_xg(pd.read_csv(path), league, season, group)
+        frames.append(_build_long(raw, league, season))
 
     long = _add_stats(_add_summary_stubs(pd.concat(frames, ignore_index=True)))
 

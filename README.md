@@ -110,9 +110,10 @@ Three window variants for every statistic:
 | `rolling8` | last 8 matches (`min_periods=8`, NaN if fewer) |
 
 Statistics per team per window:
-- Goals, shots, shots on target, corners, yellow cards — for & against averages
+- Goals, shots, shots on target, corners, yellow cards, xG — for & against averages
 - Points — average
-- goals_diff, goals_total, shots_on_target_diff, shots_on_target_total — average & std
+- goals_diff, goals_total, shots_on_target_diff, shots_on_target_total, xg_diff, xg_total — average & std
+- xG is sourced from Understat (`05_xg/`, mapped via `team_map`); available only where Understat covers the league (major group) — NaN elsewhere
 - Win / draw / loss ratio
 - Goals total / for / against threshold ratios (e.g. over 2.5, clean sheets)
 - Shots on target conversion ratio
@@ -127,13 +128,13 @@ Statistics per team per window:
 Derived from `match_team_stats`. Comparative features per window:
 - `teams_{window}_goals_foragst_avg_max` — max of the four goals averages (home for, home agst, away for, away agst)
 - `homet/awt_{window}_goals_foragst_avg_max` — per-team max(goals_for_avg, goals_agst_avg) for the home (`hmt_`) and away (`awt_`) side
-- Matchup pairs, per axis (goals, shots_on_target, points, impl_points, elo):
+- Matchup pairs, per axis (goals, shots_on_target, xg, points, impl_points, elo):
   - **tilt** (home − away, positive = home stronger): `teams_{window}_goals_diff_avg_diff`,
-    `teams_{window}_shots_on_target_diff_avg_diff`, `teams_{window}_points_avg_diff`,
-    `teams_{window}_impl_points_avg_diff`, `teams_elo_diff`.
+    `teams_{window}_shots_on_target_diff_avg_diff`, `teams_{window}_xg_diff_avg_diff`,
+    `teams_{window}_points_avg_diff`, `teams_{window}_impl_points_avg_diff`, `teams_elo_diff`.
   - **total** (home + away, combined intensity / level): `teams_{window}_goals_total_avg_total`,
-    `teams_{window}_shots_on_target_total_avg_total`, `teams_{window}_points_avg_total`,
-    `teams_{window}_impl_points_avg_total`, `teams_elo_total`.
+    `teams_{window}_shots_on_target_total_avg_total`, `teams_{window}_xg_total_avg_total`,
+    `teams_{window}_points_avg_total`, `teams_{window}_impl_points_avg_total`, `teams_elo_total`.
 - Naming: a for/agst quantity carries an inner for−agst / for+agst term (`goals_diff`, `goals_total`),
   so its matchup feature is `_diff_avg_diff` / `_total_avg_total`; a per-side average (points, impl_points)
   gives `_avg_diff` / `_avg_total`. Elo is a raw rating, so `teams_elo_diff` / `teams_elo_total` (no window).
