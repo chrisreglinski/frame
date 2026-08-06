@@ -66,8 +66,10 @@ def _season_3phase(phase4: pd.Series) -> pd.Series:
 
 
 _RAW_ODDS = {
-    "b365": {"home": "B365H", "draw": "B365D", "away": "B365A"},
-    "mrkt": {"home": "AvgH",  "draw": "AvgD",  "away": "AvgA"},
+    "b365":  {"home": "B365H",  "draw": "B365D",  "away": "B365A"},
+    "mrkt":  {"home": "AvgH",   "draw": "AvgD",   "away": "AvgA"},
+    "b365c": {"home": "B365CH", "draw": "B365CD", "away": "B365CA"},   # closing (kickoff) line
+    "mrktc": {"home": "AvgCH",  "draw": "AvgCD",  "away": "AvgCA"},
 }
 
 
@@ -172,13 +174,14 @@ def _load_file(path: Path, attrs: dict[str, dict], limits: dict, group: str) -> 
     gameweek_inv = (gameweek - 2 * (n_teams - 1) - 1).rename("gameweek_inv")
 
     date = _parse_dates(raw["Date"])
-    odds, impl, margins = {}, {}, {}
+    odds, impl, margins, hadiffs = {}, {}, {}, {}
 
     for bk, mapping in _RAW_ODDS.items():
         for outcome, raw_col in mapping.items():
             odds[f"{bk}_{outcome}_odds"] = raw[raw_col]
             impl[f"{bk}_{outcome}_impl"] = 1.0 / raw[raw_col]
         margins[f"{bk}_margin"] = sum(1.0 / raw[c] for c in mapping.values()) - 1
+        hadiffs[f"{bk}_home_away_impl_diff"] = impl[f"{bk}_home_impl"] - impl[f"{bk}_away_impl"]
 
     entropies = {}
     for bk, mapping in _RAW_ODDS.items():
@@ -207,10 +210,6 @@ def _load_file(path: Path, attrs: dict[str, dict], limits: dict, group: str) -> 
     mrkt_undrd_impl = pd.Series(
         np.minimum(impl["mrkt_home_impl"], impl["mrkt_away_impl"]),
         name="mrkt_undrd_impl",
-    )
-    mrkt_home_away_impl_diff = pd.Series(
-        impl["mrkt_home_impl"] - impl["mrkt_away_impl"],
-        name="mrkt_home_away_impl_diff",
     )
 
     time_parts = raw["Time"].astype("string").str.split(":")
@@ -292,7 +291,7 @@ def _load_file(path: Path, attrs: dict[str, dict], limits: dict, group: str) -> 
         mrkt_impl_order,
         mrkt_favrt_impl,
         mrkt_undrd_impl,
-        mrkt_home_away_impl_diff,
+        pd.DataFrame(hadiffs),
     ], axis=1)
 
     # the reigning-strength flag is group-specific (major/other: is_top3_last; minor:

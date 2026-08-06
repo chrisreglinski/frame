@@ -224,9 +224,9 @@ columns:
 
   "{bookmaker}_{outcome}_odds":
     table: match_info
-    description: "odds from {bookmaker} for outcome {outcome}"
+    description: "odds from {bookmaker} for outcome {outcome}. b365/mrkt are the pre-closing line (football-data non-C columns); b365c/mrktc are the closing (kickoff) line (football-data C columns) — same bookmaker/market with a trailing c. Empty where football-data has no closing price"
     dims:
-      bookmaker: [b365, mrkt]
+      bookmaker: [b365, mrkt, b365c, mrktc]
       outcome: [home, draw, away]
     dtype: float
     range: [1.01, 100]
@@ -235,7 +235,7 @@ columns:
     table: match_info
     description: "implied probability of {outcome} from {bookmaker} odds (1/odds)"
     dims:
-      bookmaker: [b365, mrkt]
+      bookmaker: [b365, mrkt, b365c, mrktc]
       outcome: [home, draw, away]
     dtype: float
     range: [0, 1]
@@ -244,7 +244,7 @@ columns:
     table: match_info
     description: "{bookmaker} overround on HDA market (sum of implied - 1)"
     dims:
-      bookmaker: [b365, mrkt]
+      bookmaker: [b365, mrkt, b365c, mrktc]
     dtype: float
     range: [0, 0.2]
 
@@ -252,7 +252,7 @@ columns:
     table: match_info
     description: "shannon entropy of normalized {bookmaker} implied probabilities (H/D/A); max = log2(3) ~ 1.585"
     dims:
-      bookmaker: [b365, mrkt]
+      bookmaker: [b365, mrkt, b365c, mrktc]
     dtype: float
     range: [0, 1.585]
 
@@ -280,9 +280,11 @@ columns:
     dtype: float
     range: [0, 1]
 
-  mrkt_home_away_impl_diff:
+  "{bookmaker}_home_away_impl_diff":
     table: match_info
-    description: "mrkt home implied probability minus away implied probability; positive = home favoured"
+    description: "{bookmaker} home implied probability minus away implied probability; positive = home favoured. b365/mrkt pre-closing, b365c/mrktc closing"
+    dims:
+      bookmaker: [b365, mrkt, b365c, mrktc]
     dtype: float
     range: [-1, 1]
 
@@ -356,19 +358,21 @@ columns:
     dtype: float
     range: [0, 1]
 
-  "hmt_home_{window}_impl_points_avg":
+  "hmt_home_{window}_{scale}_impl_points_avg":
     table: team_stats
-    description: "bookmaker expected points per home match over {window}, home team only: impl_win_avg * 3 + impl_draw_avg"
+    description: "market-expected points per home match over {window}, home team only, on the {scale} line (mp pre-closing / mc closing): {scale}_impl_win_avg * 3 + {scale}_impl_draw_avg"
     dims:
       window: [season]
+      scale: [mp, mc]
     dtype: float
     range: [0, 3]
 
-  "awt_away_{window}_impl_points_avg":
+  "awt_away_{window}_{scale}_impl_points_avg":
     table: team_stats
-    description: "bookmaker expected points per away match over {window}, away team only: impl_win_avg * 3 + impl_draw_avg"
+    description: "market-expected points per away match over {window}, away team only, on the {scale} line (mp pre-closing / mc closing): {scale}_impl_win_avg * 3 + {scale}_impl_draw_avg"
     dims:
       window: [season]
+      scale: [mp, mc]
     dtype: float
     range: [0, 3]
 
@@ -377,7 +381,7 @@ columns:
     description: "home-venue advantage of home team: home {metric} avg minus away {metric} avg over {window} (positive = better at home)"
     dims:
       window: [season]
-      metric: [points, impl_points]
+      metric: [points, mp_impl_points, mc_impl_points]
     dtype: float
     range: [-3, 3]
 
@@ -386,7 +390,7 @@ columns:
     description: "away-venue advantage of away team: away {metric} avg minus home {metric} avg over {window} (usually negative = disadvantage)"
     dims:
       window: [season]
-      metric: [points, impl_points]
+      metric: [points, mp_impl_points, mc_impl_points]
     dtype: float
     range: [-3, 3]
 
@@ -464,22 +468,24 @@ columns:
       side: [hmt, awt]
     dtype: bool
 
-  "{side}_{window}_impl_{outcome}_avg":
+  "{side}_{window}_{scale}_impl_{outcome}_avg":
     table: team_stats
-    description: "mrkt bookmaker implied probability of {outcome} for {side} team over {window}"
+    description: "market implied probability of {outcome} for {side} team over {window}, on the {scale} line (mp = market pre-closing, mc = market closing; mc empty where no closing price)"
     dims:
       side: [hmt, awt]
       window: [season, rolling6, rolling8]
+      scale: [mp, mc]
       outcome: [win, draw, loss]
     dtype: float
     range: [0, 1]
 
-  "{side}_{window}_impl_points_avg":
+  "{side}_{window}_{scale}_impl_points_avg":
     table: team_stats
-    description: "bookmaker expected points per match over {window}: impl_win_avg * 3 + impl_draw_avg"
+    description: "market-expected points per match over {window} on the {scale} line (mp pre-closing / mc closing): {scale}_impl_win_avg * 3 + {scale}_impl_draw_avg"
     dims:
       side: [hmt, awt]
       window: [season, rolling6, rolling8]
+      scale: [mp, mc]
     dtype: float
     range: [0, 3]
 
@@ -655,11 +661,12 @@ columns:
       window: [season, rolling6, rolling8]
     dtype: float
 
-  "teams_{window}_impl_points_avg_diff":
+  "teams_{window}_{scale}_impl_points_avg_diff":
     table: match_matchup_stats
-    description: "home {window} impl_points avg minus away {window} impl_points avg; positive = market expects the home team to earn more points"
+    description: "home {window} {scale}_impl_points avg minus away {window} {scale}_impl_points avg on the {scale} line (mp pre-closing / mc closing); positive = market expects the home team to earn more points"
     dims:
       window: [season, rolling6, rolling8]
+      scale: [mp, mc]
     dtype: float
 
   "teams_{window}_goals_total_avg_total":
@@ -690,11 +697,12 @@ columns:
       window: [season, rolling6, rolling8]
     dtype: float
 
-  "teams_{window}_impl_points_avg_total":
+  "teams_{window}_{scale}_impl_points_avg_total":
     table: match_matchup_stats
-    description: "home {window} impl_points avg plus away {window} impl_points avg; combined market-expected quality of the matchup"
+    description: "home {window} {scale}_impl_points avg plus away {window} {scale}_impl_points avg on the {scale} line (mp pre-closing / mc closing); combined market-expected quality of the matchup"
     dims:
       window: [season, rolling6, rolling8]
+      scale: [mp, mc]
     dtype: float
 
   teams_elo_diff:

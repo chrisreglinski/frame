@@ -47,7 +47,7 @@ _WINDOWS = {"season": None, "rolling6": 6, "rolling8": 8}
 _LOCALITY_METRICS = ["goals", "shots", "shots_on_target"]
 _LOCALITY_SCALAR_METRICS = ["points", "goals_diff", "goals_total"]
 _LOCALITY_RATIO_RESULTS = ["wins", "draws", "losses"]
-_LOCALITY_ADV_METRICS = ["points", "impl_points"]
+_LOCALITY_ADV_METRICS = ["points", "mp_impl_points", "mc_impl_points"]
 _LOCALITY_STAT_COLS = [
     f"{loc}_season_{m}_{k}_avg"
     for loc in ["home", "away"]
@@ -62,8 +62,9 @@ _LOCALITY_STAT_COLS = [
     for loc in ["home", "away"]
     for r in _LOCALITY_RATIO_RESULTS
 ] + [
-    f"{loc}_season_impl_points_avg"
+    f"{loc}_season_{scale}_impl_points_avg"
     for loc in ["home", "away"]
+    for scale in ["mp", "mc"]
 ] + [
     f"{loc}_season_{m}_avg_adv"
     for loc in ["home", "away"]
@@ -86,8 +87,8 @@ def _make_stat_cols() -> list[str]:
         cols += [f"{w}_goals_{kind}_le{x}_ratio" for kind in ["for", "agst"] for x in [0, 1, 2]]
         cols += [f"{w}_shots_on_target_{k}_ratio" for k in ["for", "agst"]]
         cols += [f"{w}_red_for_avg"]
-        cols += [f"{w}_impl_{o}_avg" for o in ["win", "draw", "loss"]]
-        cols += [f"{w}_impl_points_avg"]
+        cols += [f"{w}_{scale}_impl_{o}_avg" for scale in ["mp", "mc"] for o in ["win", "draw", "loss"]]
+        cols += [f"{w}_{scale}_impl_points_avg" for scale in ["mp", "mc"]]
     cols += ["red_last_match"]
     return cols
 
@@ -134,6 +135,10 @@ def _build_long(raw: pd.DataFrame, league: str, season: str) -> pd.DataFrame:
     base = dict(match_id=ids, league=league, season=season, date=date.values)
 
     avg_h, avg_d, avg_a = raw["AvgH"].values, raw["AvgD"].values, raw["AvgA"].values
+    # mp = market pre-closing (AvgH/D/A); mc = market closing (AvgCH/CD/CA, may be absent -> NaN)
+    def _col(name):
+        return raw[name].values if name in raw.columns else np.full(len(raw), np.nan)
+    avgc_h, avgc_d, avgc_a = _col("AvgCH"), _col("AvgCD"), _col("AvgCA")
 
     # xg is Understat-sourced (major only); absent for groups/matches without coverage -> NaN
     home_xg = raw["home_xg"].values if "home_xg" in raw else np.full(len(raw), np.nan)
@@ -152,7 +157,8 @@ def _build_long(raw: pd.DataFrame, league: str, season: str) -> pd.DataFrame:
         "is_win":  (raw["FTR"] == "H").astype(float).values,
         "is_draw": (raw["FTR"] == "D").astype(float).values,
         "is_loss": (raw["FTR"] == "A").astype(float).values,
-        "impl_win": 1.0 / avg_h, "impl_draw": 1.0 / avg_d, "impl_loss": 1.0 / avg_a,
+        "mp_impl_win": 1.0 / avg_h, "mp_impl_draw": 1.0 / avg_d, "mp_impl_loss": 1.0 / avg_a,
+        "mc_impl_win": 1.0 / avgc_h, "mc_impl_draw": 1.0 / avgc_d, "mc_impl_loss": 1.0 / avgc_a,
     })
 
     away = pd.DataFrame({
@@ -168,7 +174,8 @@ def _build_long(raw: pd.DataFrame, league: str, season: str) -> pd.DataFrame:
         "is_win":  (raw["FTR"] == "A").astype(float).values,
         "is_draw": (raw["FTR"] == "D").astype(float).values,
         "is_loss": (raw["FTR"] == "H").astype(float).values,
-        "impl_win": 1.0 / avg_a, "impl_draw": 1.0 / avg_d, "impl_loss": 1.0 / avg_h,
+        "mp_impl_win": 1.0 / avg_a, "mp_impl_draw": 1.0 / avg_d, "mp_impl_loss": 1.0 / avg_h,
+        "mc_impl_win": 1.0 / avgc_a, "mc_impl_draw": 1.0 / avgc_d, "mc_impl_loss": 1.0 / avgc_h,
     })
 
     long = pd.concat([home, away], ignore_index=True)
@@ -178,7 +185,8 @@ def _build_long(raw: pd.DataFrame, league: str, season: str) -> pd.DataFrame:
     long["shots_on_target_total"] = long["shots_on_target_for"] + long["shots_on_target_agst"]
     long["xg_diff"]  = long["xg_for"] - long["xg_agst"]
     long["xg_total"] = long["xg_for"] + long["xg_agst"]
-    long["impl_points"] = long["impl_win"] * 3 + long["impl_draw"]
+    long["mp_impl_points"] = long["mp_impl_win"] * 3 + long["mp_impl_draw"]
+    long["mc_impl_points"] = long["mc_impl_win"] * 3 + long["mc_impl_draw"]
     return long
 
 
@@ -239,9 +247,12 @@ def _add_stats(long: pd.DataFrame) -> pd.DataFrame:
 
         long[f"{wname}_red_for_avg"] = _agg_mean(g, "red_for", wsize)
 
-        for o in ["win", "draw", "loss"]:
-            long[f"{wname}_impl_{o}_avg"] = _agg_mean(g, f"impl_{o}", wsize)
-        long[f"{wname}_impl_points_avg"] = long[f"{wname}_impl_win_avg"] * 3 + long[f"{wname}_impl_draw_avg"]
+        for scale in ["mp", "mc"]:
+            for o in ["win", "draw", "loss"]:
+                long[f"{wname}_{scale}_impl_{o}_avg"] = _agg_mean(g, f"{scale}_impl_{o}", wsize)
+            long[f"{wname}_{scale}_impl_points_avg"] = (
+                long[f"{wname}_{scale}_impl_win_avg"] * 3 + long[f"{wname}_{scale}_impl_draw_avg"]
+            )
 
     red_shifted = g["red_for"].transform(lambda x: x.shift(1))
     long["red_last_match"] = (
@@ -268,8 +279,9 @@ def _add_stats(long: pd.DataFrame) -> pd.DataFrame:
         for r, c in [("wins", "is_win"), ("draws", "is_draw"), ("losses", "is_loss")]:
             long[f"_{loc}_{r}"] = long[c].where(mask)
             long[f"{loc}_season_{r}_ratio"] = _agg_mean(g, f"_{loc}_{r}", None)
-        long[f"_{loc}_impl_points"] = long["impl_points"].where(mask)
-        long[f"{loc}_season_impl_points_avg"] = _agg_mean(g, f"_{loc}_impl_points", None)
+        for scale in ["mp", "mc"]:
+            long[f"_{loc}_{scale}_impl_points"] = long[f"{scale}_impl_points"].where(mask)
+            long[f"{loc}_season_{scale}_impl_points_avg"] = _agg_mean(g, f"_{loc}_{scale}_impl_points", None)
 
     # venue advantage: a team's form where it plays this match minus at the other venue
     for m in _LOCALITY_ADV_METRICS:

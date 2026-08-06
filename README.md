@@ -93,8 +93,9 @@ One row per match. Context and market features:
 - `travel_distance_cat` — `travel_distance_km` bucketed: `derby` (<30 km) / `regional` (30–100 km) / `domestic` (100–500 km, coach / high-speed rail) / `long_haul` (500+ km, flights)
 - `hmt_elo`, `awt_elo` — Club Elo rating (clubelo.com) of each team as of the match date, joined point-in-time (pre-match; see below)
 - `hmt_elo_cat2m` / `awt_elo_cat2m` (high/low vs the global elo mean) and `hmt_elo_cat3q` / `awt_elo_cat3q` (tertiles of the pooled per-match elo distribution; thresholds in `thresholds.json`)
-- `b365_*` / `mrkt_*` — odds, implied probabilities (1/odds), bookmaker margin, Shannon entropy of normalized implied probs
-- `mrkt_favourite`, `mrkt_impl_order`, `mrkt_favrt_impl`, `mrkt_undrd_impl`, `mrkt_home_away_impl_diff` — derived market signals: favoured side (home/away/balanced), H/D/A ordering by implied prob, stronger/weaker side implied prob, home − away implied gap
+- `b365_*` / `mrkt_*` — odds, implied probabilities (1/odds), bookmaker margin, Shannon entropy of normalized implied probs (pre-closing line). `b365c_*` / `mrktc_*` — the same for the **closing** (kickoff) line (football-data C columns); empty where no closing price
+- `mrkt_favourite`, `mrkt_impl_order`, `mrkt_favrt_impl`, `mrkt_undrd_impl` — derived market signals (mrkt only): favoured side (home/away/balanced), H/D/A ordering by implied prob, stronger/weaker side implied prob
+- `{bookmaker}_home_away_impl_diff` — home − away implied gap, for all 4 books (`b365`/`mrkt` pre-closing, `b365c`/`mrktc` closing)
 
 ### `match_team_stats`
 
@@ -118,9 +119,9 @@ Statistics per team per window:
 - Goals total / for / against threshold ratios (e.g. over 2.5, clean sheets)
 - Shots on target conversion ratio
 - Red cards average; red card in last match flag
-- Home-only (`hmt_home_*`) and away-only (`awt_away_*`) season splits over that team's home (resp. away) matches only: goals / shots / shots-on-target for & against, points / goals_diff / goals_total, win/draw/loss ratio, and `impl_points_avg` (expected points). Plus `points_avg_adv` / `impl_points_avg_adv` — venue advantage: the team's form where it plays this match minus its form at the other venue (home team: home − away, positive = better at home; away team: away − home, usually negative = away disadvantage)
-- `implied_win/draw/loss_avg` — bookmaker's (mrkt) average implied probability for this team's outcome
-- `impl_points_avg` — bookmaker expected points per match (`impl_win_avg * 3 + impl_draw_avg`)
+- Home-only (`hmt_home_*`) and away-only (`awt_away_*`) season splits over that team's home (resp. away) matches only: goals / shots / shots-on-target for & against, points / goals_diff / goals_total, win/draw/loss ratio, and `{mp,mc}_impl_points_avg` (expected points). Plus `points_avg_adv` / `{mp,mc}_impl_points_avg_adv` — venue advantage: the team's form where it plays this match minus its form at the other venue (home team: home − away, positive = better at home; away team: away − home, usually negative = away disadvantage)
+- `{mp,mc}_impl_{win,draw,loss}_avg` — market average implied probability for this team's outcome, on the **mp** (market pre-closing) / **mc** (market closing) line
+- `{mp,mc}_impl_points_avg` — market-expected points per match (`impl_win_avg * 3 + impl_draw_avg`), mp / mc lines
 - Season-level categoricals (`season` window only): `*_cat2m` (binary — vs global mean, or sign) and `*_cat3q` (tertiles from `team_season_final`) for goals and shots-on-target total / diff / for / against
 
 ### `match_matchup_stats`
@@ -131,10 +132,10 @@ Derived from `match_team_stats`. Comparative features per window:
 - Matchup pairs, per axis (goals, shots_on_target, xg, points, impl_points, elo):
   - **tilt** (home − away, positive = home stronger): `teams_{window}_goals_diff_avg_diff`,
     `teams_{window}_shots_on_target_diff_avg_diff`, `teams_{window}_xg_diff_avg_diff`,
-    `teams_{window}_points_avg_diff`, `teams_{window}_impl_points_avg_diff`, `teams_elo_diff`.
+    `teams_{window}_points_avg_diff`, `teams_{window}_{mp,mc}_impl_points_avg_diff`, `teams_elo_diff`.
   - **total** (home + away, combined intensity / level): `teams_{window}_goals_total_avg_total`,
     `teams_{window}_shots_on_target_total_avg_total`, `teams_{window}_xg_total_avg_total`,
-    `teams_{window}_points_avg_total`, `teams_{window}_impl_points_avg_total`, `teams_elo_total`.
+    `teams_{window}_points_avg_total`, `teams_{window}_{mp,mc}_impl_points_avg_total`, `teams_elo_total`.
 - Naming: a for/agst quantity carries an inner for−agst / for+agst term (`goals_diff`, `goals_total`),
   so its matchup feature is `_diff_avg_diff` / `_total_avg_total`; a per-side average (points, impl_points)
   gives `_avg_diff` / `_avg_total`. Elo is a raw rating, so `teams_elo_diff` / `teams_elo_total` (no window).

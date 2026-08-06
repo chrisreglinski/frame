@@ -88,9 +88,10 @@ def build_match_matchup_stats(group: str = "major") -> pd.DataFrame:
         computed[f"teams_{w}_points_avg_diff"] = (
             src[f"hmt_{w}_points_avg"] - src[f"awt_{w}_points_avg"]
         )
-        computed[f"teams_{w}_impl_points_avg_diff"] = (
-            src[f"hmt_{w}_impl_points_avg"] - src[f"awt_{w}_impl_points_avg"]
-        )
+        for scale in ["mp", "mc"]:
+            computed[f"teams_{w}_{scale}_impl_points_avg_diff"] = (
+                src[f"hmt_{w}_{scale}_impl_points_avg"] - src[f"awt_{w}_{scale}_impl_points_avg"]
+            )
         # matchup "total": home per-team quantity plus away — combined intensity / level of the match.
         computed[f"teams_{w}_goals_total_avg_total"] = (
             src[f"hmt_{w}_goals_total_avg"] + src[f"awt_{w}_goals_total_avg"]
@@ -104,9 +105,10 @@ def build_match_matchup_stats(group: str = "major") -> pd.DataFrame:
         computed[f"teams_{w}_points_avg_total"] = (
             src[f"hmt_{w}_points_avg"] + src[f"awt_{w}_points_avg"]
         )
-        computed[f"teams_{w}_impl_points_avg_total"] = (
-            src[f"hmt_{w}_impl_points_avg"] + src[f"awt_{w}_impl_points_avg"]
-        )
+        for scale in ["mp", "mc"]:
+            computed[f"teams_{w}_{scale}_impl_points_avg_total"] = (
+                src[f"hmt_{w}_{scale}_impl_points_avg"] + src[f"awt_{w}_{scale}_impl_points_avg"]
+            )
 
     # matchup elo (not windowed — elo is a raw pre-match rating)
     computed["teams_elo_diff"] = src["hmt_elo"] - src["awt_elo"]
