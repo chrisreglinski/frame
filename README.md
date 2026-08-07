@@ -72,6 +72,14 @@ The current match is never included in its own features.
 contains the match date (`From <= date <= To`) is the pre-match value — Club Elo dates each
 post-match update to the following day — so no result leaks into the feature.
 
+### Pre-closing vs closing odds
+
+`mrkt`/`b365` are the **pre-closing** line; `mrktc`/`b365c` are the **closing** line (near
+kickoff). Only the pre-closing line may enter a model — it is the only price available when the match
+is evaluated; the closing line does not exist yet. The closing line is for **validation only**:
+settling a pre-closing signal at closing odds checks whether the edge still earns at that sharper
+price. It is never a model input.
+
 ---
 
 ## Feature tables
