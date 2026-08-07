@@ -139,15 +139,24 @@ Derived from `match_team_stats`. Comparative features per window:
 - Naming: a for/agst quantity carries an inner for−agst / for+agst term (`goals_diff`, `goals_total`),
   so its matchup feature is `_diff_avg_diff` / `_total_avg_total`; a per-side average (points, impl_points)
   gives `_avg_diff` / `_avg_total`. Elo is a raw rating, so `teams_elo_diff` / `teams_elo_total` (no window).
-- **Elo → probability margin**: the expected `p_home − p_away` implied by `teams_elo_diff`, via a
-  cubic `g(d) = a0[league] + a1·d + a2·d² + a3·d³` fit once (offline, per group) and stored in
-  `thresholds.json`. Two fits: **`rr`** (results regression — `g` fit to realized outcomes, the true
-  margin) and **`mr`** (market regression — `g` fit to `mrkt_home_away_impl_diff`, the market's pricing
-  skeleton, ~0.95 corr with it). Each splits additively into `..._tilt` (strength, the odd part
-  `a1·d + a3·d³`) and `..._lhfa` (league home-field advantage, the even part `a0[league] + a2·d²`),
-  giving `teams_elo_diff_{rr,mr}_impl_{diff,tilt,lhfa}`. Same units as `mrkt_home_away_impl_diff`.
-  The `rr_impl_lhfa − mr_impl_lhfa` gap is the market's per-league home-advantage mispricing
-  (it underprices spain's fortress, overprices italy's weak home edge).
+- **Elo → probability margin**: the expected `p_home − p_away` implied by `teams_elo_diff`, mapped four
+  ways on a 2×2 grid — **form** (cubic / logistic) × **fit** (to results / to market) — each fit once
+  (offline, per group) and stored in `thresholds.json`. The tag is `{c,l}{r,m}r`:
+  `crr`/`cmr` cubic, `lrr`/`lmr` logistic; `*rr` fit to realized outcomes (the true margin), `*mr` fit to
+  `mrkt_home_away_impl_diff` (the market's pricing skeleton). Each splits additively into `..._stgh`
+  (strength, odd in `d`) and `..._lhfa` (league home-field advantage) = `..._diff`, giving
+  `teams_elo_diff_{crr,cmr,lrr,lmr}_impl_{diff,stgh,lhfa}` — all in the same units as
+  `mrkt_home_away_impl_diff`.
+  - **cubic** `g(d) = a0[league] + a1·d + a2·d² + a3·d³`; strength `a1·d + a3·d³`, home field
+    `a0[league] + a2·d²`. `d` is clamped to the cubic's monotone range so extreme mismatches plateau.
+  - **logistic** `margin = 2/(1 + 10^(−(d + hfa[league])/scale)) − 1` (the ClubElo Elo equation): a fixed
+    shape with just a global `scale` and a per-league home shift `hfa` (in elo points) fitted; strength is
+    the same formula at `hfa=0`, home field is the remainder. It saturates toward ±1 (no clamping needed),
+    matches the cubic's accuracy with fewer parameters, and its home-field term shrinks for lopsided
+    matches. The `*rr` vs `*mr` `hfa` gap is the market's per-league home-advantage mispricing (it
+    underprices spain's fortress, overprices italy's/france's weak home edge); the logistic `scale` is
+    near-identical for `rr` and `mr`, so the market reads elo strength at the right steepness and errs
+    only on the home shift.
 
 ### `match_target`
 

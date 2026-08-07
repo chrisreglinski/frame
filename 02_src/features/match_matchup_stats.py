@@ -114,13 +114,14 @@ def build_match_matchup_stats(group: str = "major") -> pd.DataFrame:
     computed["teams_elo_diff"] = src["hmt_elo"] - src["awt_elo"]
     computed["teams_elo_total"] = src["hmt_elo"] + src["awt_elo"]
 
-    # elo-implied margin g(d) = a0[league] + a1*d + a2*d^2 + a3*d^3, split into strength
-    # (odd: a1*d + a3*d^3) and league home-field (even: a0[league] + a2*d^2). Two fits, both
-    # fixed offline coefficients in thresholds.json (see features/thresholds.py):
-    #   rr = g fit to realized outcomes (true margin);  mr = g fit to market price (pricing skeleton)
+    # elo -> home-minus-away margin, split into strength (_stgh, odd in d) + league home-field
+    # (_lhfa) = _diff. 2x2 grid FORM (c=cubic / l=logistic) x FIT (rr=results / mr=market), all
+    # from fixed offline params in thresholds.json (see features/thresholds.py).
     thresholds = json.loads((features_dir / "thresholds.json").read_text())
     d = computed["teams_elo_diff"]
-    for prefix, key in [("rr", "elo_rr"), ("mr", "elo_mr")]:
+
+    # CUBIC g(d) = a0[league] + a1*d + a2*d^2 + a3*d^3; strength = a1*d + a3*d^3, home field = a0 + a2*d^2.
+    for prefix, key in [("crr", "elo_crr"), ("cmr", "elo_cmr")]:
         fit = thresholds[key]
         a1, a2, a3 = fit["a1"], fit["a2"], fit["a3"]
         # clamp d to the cubic's monotone range: g turns over where dg/dd = 3a3*d^2 + 2a2*d + a1 = 0.
@@ -133,11 +134,25 @@ def build_match_matchup_stats(group: str = "major") -> pd.DataFrame:
             dc = d.clip(min(r1, r2), max(r1, r2))
         else:
             dc = d
-        tilt = a1 * dc + a3 * dc ** 3
+        stgh = a1 * dc + a3 * dc ** 3
         lhfa = src["league"].map(fit["a0"]) + a2 * dc ** 2
-        computed[f"teams_elo_diff_{prefix}_impl_tilt"] = tilt
+        computed[f"teams_elo_diff_{prefix}_impl_stgh"] = stgh
         computed[f"teams_elo_diff_{prefix}_impl_lhfa"] = lhfa
-        computed[f"teams_elo_diff_{prefix}_impl_diff"] = tilt + lhfa
+        computed[f"teams_elo_diff_{prefix}_impl_diff"] = stgh + lhfa
+
+    # LOGISTIC margin(x) = 2/(1 + 10^(-x/scale)) - 1 (ClubElo Elo equation). strength = margin at
+    # hfa=0 (venue-free, odd); diff = margin at d + hfa[league]; home field = diff - strength (saturates,
+    # so no clamping needed). Only scale (global) + hfa[league] (elo points) are fitted.
+    def _logistic(x, scale):
+        return 2.0 / (1.0 + 10.0 ** (-x / scale)) - 1.0
+    for prefix, key in [("lrr", "elo_lrr"), ("lmr", "elo_lmr")]:
+        fit = thresholds[key]
+        scale = fit["scale"]
+        stgh = _logistic(d, scale)
+        diff = _logistic(d + src["league"].map(fit["hfa"]), scale)
+        computed[f"teams_elo_diff_{prefix}_impl_stgh"] = stgh
+        computed[f"teams_elo_diff_{prefix}_impl_lhfa"] = diff - stgh
+        computed[f"teams_elo_diff_{prefix}_impl_diff"] = diff
 
     result = round_floats(pd.concat(
         [src[["match_id"]], pd.DataFrame(computed, index=src.index)],

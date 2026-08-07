@@ -715,34 +715,70 @@ columns:
     description: "hmt_elo plus awt_elo; overall rating level of the matchup. NaN if either elo is NaN"
     dtype: float
 
-  teams_elo_diff_rr_impl_diff:
+  # elo -> home-minus-away margin, 2x2 grid: FORM (c=cubic / l=logistic) x FIT (rr=results / mr=market).
+  # Tag {c,l}{r,m}r: crr/cmr = cubic, lrr/lmr = logistic; *rr fit to outcomes, *mr fit to market price.
+  # Each splits additively into _stgh (strength, odd in d) + _lhfa (league home-field advantage) = _diff.
+  # Coefficients: fixed offline population fit per group in thresholds.json (elo_crr/elo_cmr/elo_lrr/elo_lmr),
+  # not refit per build. All in the same units as mrkt_home_away_impl_diff; all NaN if teams_elo_diff is NaN.
+
+  teams_elo_diff_crr_impl_diff:
     table: match_matchup_stats
-    description: "elo-implied home-minus-away win-probability margin, RESULTS regression (rr): expected p_home - p_away reconstructed from teams_elo_diff and league. Cubic g(d) = a0[league] + a1*d + a2*d^2 + a3*d^3 fit to realized outcomes (t_home_flg - t_away_flg); coefficients are a fixed offline population fit per group (stored in thresholds.json as elo_rr, not refit per build). d is clamped to the cubic's monotone range so extreme mismatches plateau instead of hitting the polynomial turnover. Same units as mrkt_home_away_impl_diff. Equals teams_elo_diff_rr_impl_tilt + teams_elo_diff_rr_impl_lhfa. NaN if teams_elo_diff is NaN"
+    description: "elo-implied home-minus-away win-probability margin, CUBIC form fit to RESULTS (crr): expected p_home - p_away from teams_elo_diff and league via g(d) = a0[league] + a1*d + a2*d^2 + a3*d^3 fit to realized outcomes (t_home_flg - t_away_flg); coefficients in thresholds.json as elo_crr. d is clamped to the cubic's monotone range so extreme mismatches plateau instead of hitting the polynomial turnover. Equals teams_elo_diff_crr_impl_stgh + teams_elo_diff_crr_impl_lhfa. NaN if teams_elo_diff is NaN"
     dtype: float
 
-  teams_elo_diff_rr_impl_tilt:
+  teams_elo_diff_crr_impl_stgh:
     table: match_matchup_stats
-    description: "strength component of teams_elo_diff_rr_impl_diff: the antisymmetric (venue-free) part a1*d + a3*d^3, odd in teams_elo_diff so it flips sign when the teams swap. NaN if teams_elo_diff is NaN"
+    description: "strength component of teams_elo_diff_crr_impl_diff: the antisymmetric (venue-free) part a1*d + a3*d^3, odd in teams_elo_diff so it flips sign when the teams swap. NaN if teams_elo_diff is NaN"
     dtype: float
 
-  teams_elo_diff_rr_impl_lhfa:
+  teams_elo_diff_crr_impl_lhfa:
     table: match_matchup_stats
-    description: "league home-field-advantage component of teams_elo_diff_rr_impl_diff: per-league intercept a0[league] plus the symmetric a2*d^2 term. The strength-controlled TRUE home edge for this league (a0 lowest in italy, highest in spain). NaN if teams_elo_diff is NaN"
+    description: "league home-field-advantage component of teams_elo_diff_crr_impl_diff: per-league intercept a0[league] plus the symmetric a2*d^2 term. NaN if teams_elo_diff is NaN"
     dtype: float
 
-  teams_elo_diff_mr_impl_diff:
+  teams_elo_diff_cmr_impl_diff:
     table: match_matchup_stats
-    description: "elo-implied home-minus-away margin, MARKET regression (mr): the same cubic g(d) = a0[league] + a1*d + a2*d^2 + a3*d^3 but fit to the market price mrkt_home_away_impl_diff instead of outcomes (coefficients stored in thresholds.json as elo_mr). d clamped to the monotone range as for rr. Reconstructs the market's elo+league pricing skeleton (~0.95 corr with mrkt_home_away_impl_diff). Equals teams_elo_diff_mr_impl_tilt + teams_elo_diff_mr_impl_lhfa. NaN if teams_elo_diff is NaN"
+    description: "elo-implied home-minus-away margin, CUBIC form fit to MARKET (cmr): the same cubic g(d) = a0[league] + a1*d + a2*d^2 + a3*d^3 but fit to the market price mrkt_home_away_impl_diff instead of outcomes (coefficients in thresholds.json as elo_cmr). d clamped to the monotone range as for crr. Reconstructs the elo+league component of the market price. Equals teams_elo_diff_cmr_impl_stgh + teams_elo_diff_cmr_impl_lhfa. NaN if teams_elo_diff is NaN"
     dtype: float
 
-  teams_elo_diff_mr_impl_tilt:
+  teams_elo_diff_cmr_impl_stgh:
     table: match_matchup_stats
-    description: "strength component of teams_elo_diff_mr_impl_diff: the antisymmetric part a1*d + a3*d^3 of the market-price fit. NaN if teams_elo_diff is NaN"
+    description: "strength component of teams_elo_diff_cmr_impl_diff: the antisymmetric part a1*d + a3*d^3 of the market-price fit. NaN if teams_elo_diff is NaN"
     dtype: float
 
-  teams_elo_diff_mr_impl_lhfa:
+  teams_elo_diff_cmr_impl_lhfa:
     table: match_matchup_stats
-    description: "league home-field-advantage component of teams_elo_diff_mr_impl_diff: per-league intercept a0[league] plus a2*d^2, from the market-price fit — the home edge the market PRICES per league. The difference (rr_impl_lhfa - mr_impl_lhfa) is the market's per-league home-advantage mispricing: the market compresses toward the middle, underpricing spain and overpricing italy. NaN if teams_elo_diff is NaN"
+    description: "league home-field-advantage component of teams_elo_diff_cmr_impl_diff: per-league intercept a0[league] plus a2*d^2, from the market-price fit. NaN if teams_elo_diff is NaN"
+    dtype: float
+
+  teams_elo_diff_lrr_impl_diff:
+    table: match_matchup_stats
+    description: "elo-implied home-minus-away margin, LOGISTIC form fit to RESULTS (lrr): margin = 2/(1 + 10^(-(d + hfa[league])/scale)) - 1 (the ClubElo Elo equation, d = teams_elo_diff), with a global scale and a per-league home-field shift hfa[league] in elo points, fit to realized outcomes (t_flg_diff); parameters in thresholds.json as elo_lrr. Fixed logistic shape (only scale + hfa fitted), saturates smoothly toward +-1 so no clamping is needed. Equals teams_elo_diff_lrr_impl_stgh + teams_elo_diff_lrr_impl_lhfa. NaN if teams_elo_diff is NaN"
+    dtype: float
+
+  teams_elo_diff_lrr_impl_stgh:
+    table: match_matchup_stats
+    description: "strength component of teams_elo_diff_lrr_impl_diff: the venue-free margin 2/(1 + 10^(-d/scale)) - 1 (hfa=0), odd in teams_elo_diff. Fitted scale only; no home-field. NaN if teams_elo_diff is NaN"
+    dtype: float
+
+  teams_elo_diff_lrr_impl_lhfa:
+    table: match_matchup_stats
+    description: "league home-field-advantage component of teams_elo_diff_lrr_impl_diff: the boost the hfa[league] elo-point shift adds to the margin, = diff - stgh. Unlike the cubic's, it saturates toward 0 as |d| grows (home advantage matters less in lopsided matches). NaN if teams_elo_diff is NaN"
+    dtype: float
+
+  teams_elo_diff_lmr_impl_diff:
+    table: match_matchup_stats
+    description: "elo-implied home-minus-away margin, LOGISTIC form fit to MARKET (lmr): the same logistic margin = 2/(1 + 10^(-(d + hfa[league])/scale)) - 1 but with scale + hfa[league] fit to the market price mrkt_home_away_impl_diff instead of outcomes (parameters in thresholds.json as elo_lmr). Reconstructs the elo+league component of the market price. Equals teams_elo_diff_lmr_impl_stgh + teams_elo_diff_lmr_impl_lhfa. NaN if teams_elo_diff is NaN"
+    dtype: float
+
+  teams_elo_diff_lmr_impl_stgh:
+    table: match_matchup_stats
+    description: "strength component of teams_elo_diff_lmr_impl_diff: the venue-free margin 2/(1 + 10^(-d/scale)) - 1 (hfa=0) at the market-fit scale. NaN if teams_elo_diff is NaN"
+    dtype: float
+
+  teams_elo_diff_lmr_impl_lhfa:
+    table: match_matchup_stats
+    description: "league home-field-advantage component of teams_elo_diff_lmr_impl_diff: the market-priced home boost from hfa[league], = diff - stgh, saturating toward 0 as |d| grows. NaN if teams_elo_diff is NaN"
     dtype: float
 
 
@@ -786,7 +822,7 @@ target_columns:
 
   t_flg_diff:
     table: match_target
-    description: "signed match result: 1 home win, 0 draw, -1 away win (= t_home_flg - t_away_flg). Same scale as teams_elo_diff_rr_impl_diff, whose fit targets it"
+    description: "signed match result: 1 home win, 0 draw, -1 away win (= t_home_flg - t_away_flg). Same scale as teams_elo_diff_crr_impl_diff / teams_elo_diff_lrr_impl_diff, whose fits target it"
     inputs: [FTR]
     dtype: int
 
