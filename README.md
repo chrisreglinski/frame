@@ -127,9 +127,11 @@ Statistics per team per window:
 - Goals total / for / against threshold ratios (e.g. over 2.5, clean sheets)
 - Shots on target conversion ratio
 - Red cards average; red card in last match flag
-- Home-only (`hmt_home_*`) and away-only (`awt_away_*`) season splits over that team's home (resp. away) matches only: goals / shots / shots-on-target for & against, points / goals_diff / goals_total, win/draw/loss ratio, and `{mp,mc}_impl_points_avg` (expected points). Plus `points_avg_adv` / `{mp,mc}_impl_points_avg_adv` — venue advantage: the team's form where it plays this match minus its form at the other venue (home team: home − away, positive = better at home; away team: away − home, usually negative = away disadvantage)
+- Home-only (`hmt_home_*`) and away-only (`awt_away_*`) season splits over that team's home (resp. away) matches only: goals / shots / shots-on-target for & against, points / `flg_diff` / goals_diff / goals_total, win/draw/loss ratio, and `{mp,mc}_impl_points_avg` (expected points) / `{mp,mc}_impl_diff_avg` (implied margin). Plus `{points,flg_diff}_avg_adv` / `{mp,mc}_impl_{points,diff}_avg_adv` — venue advantage: the team's form where it plays this match minus its form at the other venue (home team: home − away, positive = better at home; away team: away − home, usually negative = away disadvantage)
 - `{mp,mc}_impl_{win,draw,loss}_avg` — market average implied probability for this team's outcome, on the **mp** (market pre-closing) / **mc** (market closing) line
 - `{mp,mc}_impl_points_avg` — market-expected points per match (`impl_win_avg * 3 + impl_draw_avg`), mp / mc lines
+- `{mp,mc}_impl_diff_avg` — market-implied margin per match (`impl_win_avg − impl_loss_avg`), the team-oriented `mrkt_home_away_impl_diff`, mp / mc lines
+- `flg_diff_avg` — realized signed-result margin per match (`wins_ratio − losses_ratio`, i.e. mean of `win_flg − loss_flg` ∈ {+1,0,−1}, same axis as `t_flg_diff`); realized counterpart of `impl_diff_avg`
 - Season-level categoricals (`season` window only): `*_cat2m` (binary — vs global mean, or sign) and `*_cat3q` (tertiles from `team_season_final`) for goals and shots-on-target total / diff / for / against
 
 ### `match_matchup_stats`

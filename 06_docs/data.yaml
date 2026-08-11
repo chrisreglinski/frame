@@ -329,7 +329,7 @@ columns:
     description: "arithmetic mean of {metric} per home match over {window}, home team only"
     dims:
       window: [season]
-      metric: [points, goals_diff, goals_total]
+      metric: [points, flg_diff, goals_diff, goals_total]
     dtype: float
 
   "awt_away_{window}_{metric}_avg":
@@ -337,7 +337,7 @@ columns:
     description: "arithmetic mean of {metric} per away match over {window}, away team only"
     dims:
       window: [season]
-      metric: [points, goals_diff, goals_total]
+      metric: [points, flg_diff, goals_diff, goals_total]
     dtype: float
 
   "hmt_home_{window}_{result}_ratio":
@@ -358,30 +358,48 @@ columns:
     dtype: float
     range: [0, 1]
 
-  "hmt_home_{window}_{scale}_impl_points_avg":
+  "hmt_home_{window}_{line}_impl_points_avg":
     table: team_stats
-    description: "market-expected points per home match over {window}, home team only, on the {scale} line (mp pre-closing / mc closing): {scale}_impl_win_avg * 3 + {scale}_impl_draw_avg"
+    description: "market-expected points per home match over {window}, home team only, on the {line} line (mp pre-closing / mc closing): {line}_impl_win_avg * 3 + {line}_impl_draw_avg"
     dims:
       window: [season]
-      scale: [mp, mc]
+      line: [mp, mc]
     dtype: float
     range: [0, 3]
 
-  "awt_away_{window}_{scale}_impl_points_avg":
+  "awt_away_{window}_{line}_impl_points_avg":
     table: team_stats
-    description: "market-expected points per away match over {window}, away team only, on the {scale} line (mp pre-closing / mc closing): {scale}_impl_win_avg * 3 + {scale}_impl_draw_avg"
+    description: "market-expected points per away match over {window}, away team only, on the {line} line (mp pre-closing / mc closing): {line}_impl_win_avg * 3 + {line}_impl_draw_avg"
     dims:
       window: [season]
-      scale: [mp, mc]
+      line: [mp, mc]
     dtype: float
     range: [0, 3]
+
+  "hmt_home_{window}_{line}_impl_diff_avg":
+    table: team_stats
+    description: "market-implied margin per home match over {window}, home team only, on the {line} line (mp pre-closing / mc closing): mean of mrkt_home_away_impl_diff (= impl_win - impl_loss) over home matches; positive = market favours this team at home"
+    dims:
+      window: [season]
+      line: [mp, mc]
+    dtype: float
+    range: [-1, 1]
+
+  "awt_away_{window}_{line}_impl_diff_avg":
+    table: team_stats
+    description: "market-implied margin per away match over {window}, away team only, on the {line} line (mp pre-closing / mc closing): mean of the team-oriented margin (impl_win - impl_loss, = -mrkt_home_away_impl_diff) over away matches; positive = market favours this team away"
+    dims:
+      window: [season]
+      line: [mp, mc]
+    dtype: float
+    range: [-1, 1]
 
   "hmt_home_{window}_{metric}_avg_adv":
     table: team_stats
     description: "home-venue advantage of home team: home {metric} avg minus away {metric} avg over {window} (positive = better at home)"
     dims:
       window: [season]
-      metric: [points, mp_impl_points, mc_impl_points]
+      metric: [points, mp_impl_points, mc_impl_points, flg_diff, mp_impl_diff, mc_impl_diff]
     dtype: float
     range: [-3, 3]
 
@@ -390,17 +408,17 @@ columns:
     description: "away-venue advantage of away team: away {metric} avg minus home {metric} avg over {window} (usually negative = disadvantage)"
     dims:
       window: [season]
-      metric: [points, mp_impl_points, mc_impl_points]
+      metric: [points, mp_impl_points, mc_impl_points, flg_diff, mp_impl_diff, mc_impl_diff]
     dtype: float
     range: [-3, 3]
 
   "{side}_{window}_{metric}_avg":
     table: team_stats
-    description: "arithmetic mean of {metric} per match over {window}, {side} team"
+    description: "arithmetic mean of {metric} per match over {window}, {side} team. flg_diff is the per-match signed result win_flg - loss_flg (+1/0/-1, same axis as t_flg_diff); its mean equals wins_ratio - losses_ratio and is the realized counterpart of {line}_impl_diff_avg"
     dims:
       side: [hmt, awt]
       window: [season, rolling6, rolling8]
-      metric: [points, goals_diff, goals_total, shots_on_target_diff, shots_on_target_total, xg_diff, xg_total]
+      metric: [points, flg_diff, goals_diff, goals_total, shots_on_target_diff, shots_on_target_total, xg_diff, xg_total]
     dtype: float
 
   "{side}_{window}_{metric}_std":
@@ -468,26 +486,36 @@ columns:
       side: [hmt, awt]
     dtype: bool
 
-  "{side}_{window}_{scale}_impl_{outcome}_avg":
+  "{side}_{window}_{line}_impl_{outcome}_avg":
     table: team_stats
-    description: "market implied probability of {outcome} for {side} team over {window}, on the {scale} line (mp = market pre-closing, mc = market closing; mc empty where no closing price)"
+    description: "market implied probability of {outcome} for {side} team over {window}, on the {line} line (mp = market pre-closing, mc = market closing; mc empty where no closing price)"
     dims:
       side: [hmt, awt]
       window: [season, rolling6, rolling8]
-      scale: [mp, mc]
+      line: [mp, mc]
       outcome: [win, draw, loss]
     dtype: float
     range: [0, 1]
 
-  "{side}_{window}_{scale}_impl_points_avg":
+  "{side}_{window}_{line}_impl_points_avg":
     table: team_stats
-    description: "market-expected points per match over {window} on the {scale} line (mp pre-closing / mc closing): {scale}_impl_win_avg * 3 + {scale}_impl_draw_avg"
+    description: "market-expected points per match over {window} on the {line} line (mp pre-closing / mc closing): {line}_impl_win_avg * 3 + {line}_impl_draw_avg"
     dims:
       side: [hmt, awt]
       window: [season, rolling6, rolling8]
-      scale: [mp, mc]
+      line: [mp, mc]
     dtype: float
     range: [0, 3]
+
+  "{side}_{window}_{line}_impl_diff_avg":
+    table: team_stats
+    description: "market-implied margin per match over {window} on the {line} line (mp pre-closing / mc closing): {line}_impl_win_avg - {line}_impl_loss_avg. Team-oriented mrkt_home_away_impl_diff (home +, away -; draw cancels, no devig); positive = market favours this team"
+    dims:
+      side: [hmt, awt]
+      window: [season, rolling6, rolling8]
+      line: [mp, mc]
+    dtype: float
+    range: [-1, 1]
 
   "{side}_season_goals_total_cat2m":
     table: team_stats
@@ -661,12 +689,12 @@ columns:
       window: [season, rolling6, rolling8]
     dtype: float
 
-  "teams_{window}_{scale}_impl_points_avg_diff":
+  "teams_{window}_{line}_impl_points_avg_diff":
     table: match_matchup_stats
-    description: "home {window} {scale}_impl_points avg minus away {window} {scale}_impl_points avg on the {scale} line (mp pre-closing / mc closing); positive = market expects the home team to earn more points"
+    description: "home {window} {line}_impl_points avg minus away {window} {line}_impl_points avg on the {line} line (mp pre-closing / mc closing); positive = market expects the home team to earn more points"
     dims:
       window: [season, rolling6, rolling8]
-      scale: [mp, mc]
+      line: [mp, mc]
     dtype: float
 
   "teams_{window}_goals_total_avg_total":
@@ -697,12 +725,12 @@ columns:
       window: [season, rolling6, rolling8]
     dtype: float
 
-  "teams_{window}_{scale}_impl_points_avg_total":
+  "teams_{window}_{line}_impl_points_avg_total":
     table: match_matchup_stats
-    description: "home {window} {scale}_impl_points avg plus away {window} {scale}_impl_points avg on the {scale} line (mp pre-closing / mc closing); combined market-expected quality of the matchup"
+    description: "home {window} {line}_impl_points avg plus away {window} {line}_impl_points avg on the {line} line (mp pre-closing / mc closing); combined market-expected quality of the matchup"
     dims:
       window: [season, rolling6, rolling8]
-      scale: [mp, mc]
+      line: [mp, mc]
     dtype: float
 
   teams_elo_diff:
