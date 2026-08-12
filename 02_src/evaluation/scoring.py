@@ -1,83 +1,84 @@
-"""Scoring a predicted quantity against the realized outcome, over a whole portfolio.
+"""Scoring predicted quantities against realized outcomes, over a whole portfolio.
 
-`score_diff` is the first, cheapest lens: it scores a predicted home-away margin (`h - a`,
-in [-1, 1]) against the realized signed result `t_flg_diff` in {1, 0, -1}. Since
-E[t_flg_diff] = P(home) - P(away) = h - a, the margin *is* the expected signed result, so
-mean squared error is a proper score for it — minimized when the margin equals the true
-h - a. It measures only the home-away axis (strength + home advantage), ignores the draw, and
-needs no de-vigging (the margin cancels most of the vig).
+Every scorer reports a *skill score* — the R^2-style "fraction of variance explained"
+against the trivial constant baseline (predict the mean / the base rate), not the raw error.
+For a margin that is the ordinary R^2 = 1 - MSE/Var; for a probability forecast it is the
+Brier (or ranked-probability) skill score = 1 - score/baseline_score. Higher is better, 0 =
+no better than the constant baseline, negative = worse than it.
 
-Compare two margins by scoring each against the same outcomes: a model margin vs the market's
-`mrkt_home_away_impl_diff`. Lower is better.
+`score_*` scores one predictor; `compare_*` scores a model against a reference (e.g. the
+market) on the same rows and returns both plus their gap. Outcomes: `score_diff` uses
+`t_flg_diff` (the margin's target); `score_hda` uses `t_result` or `t_flg_diff`;
+`score_outcome` uses a 0/1 flag (e.g. `t_draw_flg`). All map cleanly through groupby.
 """
 import numpy as np
 import pandas as pd
 
 
 def score_diff(margin, outcome_diff):
-    """Mean squared error of a predicted home-away margin against `t_flg_diff`.
+    """R^2 of a predicted home-away margin against `t_flg_diff` (1 - MSE / Var(outcome)).
 
     `margin` — predicted h - a per match (e.g. rr_impl_diff, mrkt_home_away_impl_diff).
-    `outcome_diff` — realized `t_flg_diff` in {1, 0, -1}.
-    Rows where either is NaN are dropped. Lower MSE = margin closer to the true h - a.
+    `outcome_diff` — realized `t_flg_diff` in {1, 0, -1}. NaN rows dropped. Baseline =
+    predicting the mean outcome; higher = margin explains more of the signed-result variance.
     """
     df = pd.DataFrame({"margin": np.asarray(margin, dtype=float),
                        "outcome": np.asarray(outcome_diff, dtype=float)}).dropna()
-    return float(((df["margin"] - df["outcome"]) ** 2).mean())
+    mse = ((df["margin"] - df["outcome"]) ** 2).mean()
+    var = ((df["outcome"] - df["outcome"].mean()) ** 2).mean()
+    return float(1 - mse / var)
 
 
 def compare_diff(model_margin, market_margin, outcome_diff):
-    """Score a model margin against the market margin on the same matches.
+    """R^2 of a model margin and a reference (market) margin against `t_flg_diff`, same rows.
 
-    Both margins are scored against `t_flg_diff` by `score_diff`, on the rows where model,
-    market and outcome are all present (so the two MSEs are comparable). Returns a Series with:
+    Scored on rows where model, market and outcome are all present. Returns a Series with:
 
-    - `mse_model`  — MSE of the model margin
-    - `mse_market` — MSE of the market margin
-    - `skill`      — mse_market - mse_model; positive = the model is closer to the truth
-    - `n`          — matches scored
+    - `r2_model` / `r2_market` — R^2 of each margin vs the mean-of-outcome baseline
+    - `skill`                  — r2_model - r2_market; positive = model explains more variance
+    - `n`                      — matches scored
 
     Maps cleanly through groupby for a per-league / per-season breakdown.
     """
     df = pd.DataFrame({"model": np.asarray(model_margin, dtype=float),
                        "market": np.asarray(market_margin, dtype=float),
                        "outcome": np.asarray(outcome_diff, dtype=float)}).dropna()
-    mse_model = score_diff(df["model"], df["outcome"])
-    mse_market = score_diff(df["market"], df["outcome"])
-    return pd.Series({"mse_model": mse_model, "mse_market": mse_market,
-                      "skill": mse_market - mse_model, "n": len(df)})
+    r2_model = score_diff(df["model"], df["outcome"])
+    r2_market = score_diff(df["market"], df["outcome"])
+    return pd.Series({"r2_model": r2_model, "r2_market": r2_market,
+                      "skill": r2_model - r2_market, "n": len(df)})
 
 
 def score_outcome(prob, flag):
-    """Binary Brier score of a single-outcome probability against its realized flag.
+    """Brier skill score (R^2 for a binary probability) of a single-outcome prob vs its flag.
 
-    `prob` — predicted probability of one outcome (e.g. mrkt_draw_impl, or a draw model).
-    `flag` — realized 1/0 indicator for that outcome (e.g. t_draw_flg). Rows with either NaN
-    are dropped. Lower is better; the three atomic Briers (H/D/A) sum to the HDA Brier.
+    `prob` — predicted probability of one outcome (e.g. mrkt_draw_impl). `flag` — realized
+    1/0 indicator (e.g. t_draw_flg). NaN rows dropped. 1 - Brier / Brier_baseline, baseline =
+    the constant base-rate predictor (Brier = ybar*(1-ybar)). Higher = beats the base rate.
     """
     df = pd.DataFrame({"prob": np.asarray(prob, dtype=float),
                        "flag": np.asarray(flag, dtype=float)}).dropna()
-    return float(((df["prob"] - df["flag"]) ** 2).mean())
+    brier = ((df["prob"] - df["flag"]) ** 2).mean()
+    base = df["flag"].mean()
+    return float(1 - brier / (base * (1 - base)))
 
 
 def compare_outcome(model_prob, market_prob, flag):
-    """Score a model's single-outcome probability against the market's on the same matches.
+    """Brier skill score of a model's single-outcome prob and a reference (market) prob vs flag.
 
-    Both are Brier-scored against `flag` by `score_outcome`, on rows where model, market and
-    flag are all present. Returns a Series with:
+    Scored on rows where model, market and flag are all present. Returns a Series with:
 
-    - `brier_model`  — Brier of the model probability
-    - `brier_market` — Brier of the market probability
-    - `skill`        — brier_market - brier_model; positive = the model is closer to the truth
-    - `n`            — matches scored
+    - `r2_model` / `r2_market` — Brier skill score of each probability
+    - `skill`                  — r2_model - r2_market; positive = model beats the reference
+    - `n`                      — matches scored
     """
     df = pd.DataFrame({"model": np.asarray(model_prob, dtype=float),
                        "market": np.asarray(market_prob, dtype=float),
                        "flag": np.asarray(flag, dtype=float)}).dropna()
-    brier_model = score_outcome(df["model"], df["flag"])
-    brier_market = score_outcome(df["market"], df["flag"])
-    return pd.Series({"brier_model": brier_model, "brier_market": brier_market,
-                      "skill": brier_market - brier_model, "n": len(df)})
+    r2_model = score_outcome(df["model"], df["flag"])
+    r2_market = score_outcome(df["market"], df["flag"])
+    return pd.Series({"r2_model": r2_model, "r2_market": r2_market,
+                      "skill": r2_model - r2_market, "n": len(df)})
 
 
 def _onehot_hda(outcome):
@@ -88,51 +89,53 @@ def _onehot_hda(outcome):
     return np.stack(cols, axis=1).astype(float)
 
 
+def _hda_error(p, obs, ranked):
+    """Per-match quadratic error: Brier (raw probs) or RPS (cumulative, respects H>D>A order)."""
+    if ranked:
+        return 0.5 * ((np.cumsum(p[:, :2], axis=1) - np.cumsum(obs[:, :2], axis=1)) ** 2).sum(axis=1)
+    return ((p - obs) ** 2).sum(axis=1)
+
+
 def score_hda(hda, outcome, ranked=False):
-    """Mean quadratic score of an HDA probability triple against the realized result.
+    """Skill score (R^2 for the H/D/A distribution) against the constant base-rate baseline.
 
     `hda` columns are taken in home, draw, away order (e.g. impl_h/impl_d/impl_a from
     hda_from_margin, or devigged mrkt_home/draw/away_impl); each row is normalized to sum 1.
-    `outcome` is the realized result as `t_result` ('H'/'D'/'A') or `t_flg_diff` (1/0/-1).
-    Rows with any NaN are dropped.
+    `outcome` is `t_result` ('H'/'D'/'A') or `t_flg_diff` (1/0/-1). NaN rows dropped.
 
-    Default is the non-ranked Brier score, sum_k (p_k - o_k)^2 over the raw H/D/A probs — a
-    wrong class is a wrong class, as for a settled bet. `ranked=True` gives RPS instead,
-    scoring cumulative probabilities so a miss to an adjacent outcome costs less. Lower is better.
+    Default is the Brier skill score (non-ranked — a wrong class is a wrong class, as for a
+    settled bet); `ranked=True` gives the ranked-probability skill score (RPSS), which credits
+    a miss to an adjacent outcome. 1 - score / baseline_score; higher = beats the base rate.
     """
     p = pd.DataFrame(hda).to_numpy(dtype=float)
     o = np.asarray(outcome)
     keep = ~(np.isnan(p).any(axis=1) | pd.isna(o))
     p, o = p[keep], o[keep]
     p = p / p.sum(axis=1, keepdims=True)                       # normalize to sum 1
-    obs = _onehot_hda(o)                                       # one-hot H, D, A
-    if ranked:
-        per = 0.5 * ((np.cumsum(p[:, :2], axis=1) - np.cumsum(obs[:, :2], axis=1)) ** 2).sum(axis=1)
-    else:
-        per = ((p - obs) ** 2).sum(axis=1)
-    return float(per.mean())
+    obs = _onehot_hda(o)
+    model = _hda_error(p, obs, ranked).mean()
+    baseline = _hda_error(np.broadcast_to(obs.mean(axis=0), p.shape), obs, ranked).mean()
+    return float(1 - model / baseline)
 
 
 def compare_hda(model_hda, market_hda, outcome, ranked=False):
-    """Score a model HDA against the market HDA on the same matches, same metric.
+    """Skill score of a model HDA and a reference (market) HDA against the realized result.
 
-    Both are scored against the realized result by `score_hda`, on rows where model, market
-    and outcome are all present. `outcome` is `t_result` ('H'/'D'/'A') or `t_flg_diff` (1/0/-1).
-    Returns a Series with:
+    Scored on rows where model, market and outcome are all present. `outcome` is `t_result`
+    ('H'/'D'/'A') or `t_flg_diff` (1/0/-1). Returns a Series with:
 
-    - `score_model`  — score of the model HDA
-    - `score_market` — score of the market HDA
-    - `skill`        — score_market - score_model; positive = the model is closer to the truth
-    - `n`            — matches scored
+    - `r2_model` / `r2_market` — skill score of each HDA (Brier, or RPSS if ranked)
+    - `skill`                  — r2_model - r2_market; positive = model beats the reference
+    - `n`                      — matches scored
 
-    `ranked` toggles Brier (default) vs RPS, as in `score_hda`.
+    `ranked` toggles Brier skill score (default) vs RPSS, as in `score_hda`.
     """
     m = pd.DataFrame(model_hda).to_numpy(dtype=float)
     k = pd.DataFrame(market_hda).to_numpy(dtype=float)
     o = np.asarray(outcome)
     keep = ~(np.isnan(m).any(axis=1) | np.isnan(k).any(axis=1) | pd.isna(o))
     m, k, o = m[keep], k[keep], o[keep]
-    s_model = score_hda(m, o, ranked=ranked)
-    s_market = score_hda(k, o, ranked=ranked)
-    return pd.Series({"score_model": s_model, "score_market": s_market,
-                      "skill": s_market - s_model, "n": int(keep.sum())})
+    r2_model = score_hda(m, o, ranked=ranked)
+    r2_market = score_hda(k, o, ranked=ranked)
+    return pd.Series({"r2_model": r2_model, "r2_market": r2_market,
+                      "skill": r2_model - r2_market, "n": int(keep.sum())})
