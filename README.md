@@ -32,7 +32,7 @@ Source: [football-data.co.uk](https://www.football-data.co.uk)
     02_attributes/     # per-team attributes: venue coordinates + promoted / reigning-top3 flags
                        # (minor/other groups: promotee + island flags only, coordinates
                        #  empty -> travel_distance stays NaN there)
-    03_dates/          # season phase boundary dates (shared, global)
+    03_dates/          # season phase boundaries + international-break windows (shared, global)
     04_elo/            # Club Elo history (clubelo.com, shared) + per-group team-name maps
     05_xg/             # Understat match xG per league-season + per-group team-name map
     06_europe/         # UEFA club competitions per season (FBref): CL / EL / Conference
@@ -99,6 +99,10 @@ One row per match. Context and market features:
 - `season_4phase` — `summer / fall / winter / spring` based on hand-coded boundary dates in `01_raw/03_dates/season_limit_dates.csv`
 - `season_3phase` — `start / mid / end` (fall+winter merged into mid)
 - `day_of_week_cat` — `weekend` (sat/sun) / `shoulder` (fri/mon) / `midweek` (tue/wed/thu)
+- `match_after_intl_break` — first gameweek the league played after a break in which every
+  league stopped (a FIFA window, or the 2022 World Cup); windows hand-recorded in
+  `01_raw/03_dates/break_dates.csv`. The winter break is not one — England plays through it —
+  and neither is the gap between seasons
 - `time_uk_num` — kick-off time (UK) as a number (`hour + minute/60`); `time_uk_cat` — bucketed by floor(hour): `early` (11–13) / `early_afternoon` (14–15) / `late_afternoon` (16–17) / `evening` (18+)
 - `hmt_is_promoted`, `awt_is_promoted`, `travel_distance_km`
 - `hmt_is_top3_last`, `awt_is_top3_last` — team finished top 3 in this league last season (reigning top-3; top-tier groups `major`/`other` only). Earliest season seeded from external final tables; later seasons match `team_season_final` rankings. The `minor` group carries the second-tier analogue `hmt_is_relegated` / `awt_is_relegated` (relegated from the tier above) instead — both are group-scoped in `data.yaml` via `groups:`

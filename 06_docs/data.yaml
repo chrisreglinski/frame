@@ -141,6 +141,11 @@ columns:
     dtype: string
     categories: [start, mid, end]
 
+  match_after_intl_break:
+    table: match_info
+    description: "this match belongs to the first gameweek its league played after a break in which every league of the group stopped — a FIFA window, or the 2022 world cup. Break windows are hand-recorded in 01_data/01_raw/03_dates/break_dates.csv. A league-specific pause (the winter break, which england plays through) is not one, and neither is the gap between seasons"
+    dtype: bool
+
   hmt_is_promoted:
     table: match_info
     description: "home team promoted to the league this season"

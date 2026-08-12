@@ -16,6 +16,7 @@ _DATA = _ROOT / "01_data"
 _ATTR_DIR = _DATA / "01_raw" / "02_attributes"
 _YAML_PATH = _ROOT / "06_docs" / "data.yaml"
 _DATES_PATH = _DATA / "01_raw" / "03_dates" / "season_limit_dates.csv"
+_BREAKS_PATH = _DATA / "01_raw" / "03_dates" / "break_dates.csv"
 _ELO_DIR = _DATA / "01_raw" / "04_elo"
 
 
@@ -304,6 +305,36 @@ def _load_file(path: Path, attrs: dict[str, dict], limits: dict, group: str) -> 
     return out
 
 
+def _load_break_dates() -> pd.DataFrame:
+    """Breaks in which every league of the group stopped: the FIFA windows and the 2022
+    world cup. Hand-recorded, like the season phase boundaries next to them."""
+    if not _BREAKS_PATH.exists():
+        return pd.DataFrame(columns=["season", "last_match_before", "first_match_after", "type"])
+    return pd.read_csv(_BREAKS_PATH, dtype={"season": str}, parse_dates=["last_match_before", "first_match_after"])
+
+
+def _attach_break_flag(df: pd.DataFrame, breaks: pd.DataFrame) -> pd.DataFrame:
+    """Flag the first gameweek each league played after each break.
+
+    The restart date is shared by the leagues for a FIFA window but not for the world cup —
+    england came back on boxing day, germany three weeks later — so the gameweek is resolved
+    per league as the first one starting on or after the break ends, rather than by date.
+    """
+    df = df.copy()
+    df["match_after_intl_break"] = False
+    date = pd.to_datetime(df["date"])
+
+    for row in breaks.itertuples():
+        for league in df.loc[df["season"] == row.season, "league"].unique():
+            side = (df["league"] == league) & (df["season"] == row.season)
+            after = side & (date >= row.first_match_after)
+            if not after.any():
+                continue
+            first_gw = df.loc[after, "gameweek"].loc[date[after].idxmin()]
+            df.loc[side & (df["gameweek"] == first_gw), "match_after_intl_break"] = True
+    return df
+
+
 def _attach_elo(df: pd.DataFrame, group: str) -> pd.DataFrame:
     """Add hmt_elo / awt_elo: the Club Elo rating of each team as of the match date.
 
@@ -387,6 +418,7 @@ def build_match_info(group: str = "major") -> pd.DataFrame:
 
     base = _attach_elo(pd.concat(frames, ignore_index=True), group)
     base = _attach_elo_cats(base, group)
+    base = _attach_break_flag(base, _load_break_dates())
     df = round_floats(base[cols])
 
     features_dir.mkdir(parents=True, exist_ok=True)
