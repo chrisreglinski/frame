@@ -22,12 +22,14 @@ def build_abt(group: str = "major") -> pd.DataFrame:
     match_info = pd.read_parquet(features_dir / "match_info.parquet")
     match_team_stats = pd.read_parquet(features_dir / "match_team_stats.parquet")
     match_matchup_stats = pd.read_parquet(features_dir / "match_matchup_stats.parquet")
+    match_team_fatigue = pd.read_parquet(features_dir / "match_team_fatigue.parquet")
     match_target = pd.read_parquet(features_dir / "match_target.parquet")
 
     abt = round_floats(
         match_info
         .merge(match_team_stats, on="match_id")
         .merge(match_matchup_stats, on="match_id")
+        .merge(match_team_fatigue, on="match_id")
         .merge(match_target, on="match_id")
     )
 

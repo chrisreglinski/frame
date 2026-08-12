@@ -35,6 +35,11 @@ Source: [football-data.co.uk](https://www.football-data.co.uk)
     03_dates/          # season phase boundary dates (shared, global)
     04_elo/            # Club Elo history (clubelo.com, shared) + per-group team-name maps
     05_xg/             # Understat match xG per league-season + per-group team-name map
+    06_europe/         # UEFA club competitions per season (FBref): CL / EL / Conference
+                       # + qualifying, UEFA Super Cup, and a team-name map
+    07_domestic/       # domestic cups and super cups per league-season (FBref)
+                       # + a team-name map (only the names that differ from football-data)
+    08_intl/           # FIFA club competitions (Club World Cup, Intercontinental Cup)
   02_features/         # generated feature tables (gitignored, rebuild locally)
   03_abt/              # final wide ABT (gitignored, rebuild locally)
 02_src/
@@ -168,6 +173,31 @@ Derived from `match_team_stats`. Comparative features per window:
     near-identical for `rr` and `mr`, so the market reads elo strength at the right steepness and errs
     only on the home shift.
 
+### `match_team_fatigue`
+
+One row per match, wide format. Schedule density for both teams, computed on each team's
+**full fixture calendar** — the domestic league plus every cup it played: domestic cups
+(`07_domestic`), European cups incl. qualifying (`06_europe`), domestic and UEFA super cups,
+and the FIFA club competitions (`08_intl`). Non-league fixtures enter the calendar as history
+only; they are never rows of the table.
+
+Fixtures are split into four **streams**: `league`, `cup` (domestic cups), `europe`
+(CL / EL / Conference incl. qualifying), `other` (super cups + FIFA competitions). No
+competition is weighted — the streams are counted separately so their relative cost is
+estimated downstream instead of asserted here.
+
+- `{side}_rest_hours` — hours since that team's previous fixture in any competition, capped at
+  200. Kick-offs are normalised to CET first (football-data prints UK times, FBref prints
+  venue-local with CET in brackets)
+- `{side}_games_in_{x}d` and `{side}_{stream}_games_in_{x}d` — fixtures in the `x` days before
+  kick-off, in total and per stream; windows `6, 8, 11, 15, 22, 30, 45` days
+- `{side}_away_games_in_{x}d` / `{side}_away_{stream}_games_in_{x}d` — the same, away fixtures
+  only (neutral venues excluded); `{side}_awayn_games_in_{x}d` — away **or** neutral
+- `{side}_last_match_is_away`, `{side}_last_match_is_europe` — attributes of the previous fixture
+
+Every backward window is half-open (`[kick-off − x days, kick-off)`), so the current match is
+never counted, and is truncated at the season start.
+
 ### `match_target`
 
 Targets prefixed `t_`:
@@ -179,7 +209,7 @@ Targets prefixed `t_`:
 
 ### ABT (`01_data/03_abt/abt.parquet`)
 
-Wide join of all four tables on `match_id`. ~7 000 rows, ~380 columns.
+Wide join of all five tables on `match_id`. ~7 000 rows, ~700 columns.
 Full table always generated; filter by league/season/phase/game_number downstream.
 
 ---

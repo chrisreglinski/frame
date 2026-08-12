@@ -34,6 +34,15 @@ tables:
     note: "one row per match; comparative features derived from team_stats
            home_/away_ columns. windowing follows team_stats."
 
+  match_team_fatigue:
+    id: match_id
+    source: [raw/matches, raw/domestic, raw/europe, raw/intl]
+    note: "one row per match; schedule-density features for both teams, computed on each
+           team's full fixture calendar: domestic league, domestic cups, european cups and
+           super / intercontinental cups. non-league fixtures enter the calendar as history
+           only and are never rows of this table. every backward window excludes the current
+           match and is truncated at the season start."
+
 columns:
 
   league:
@@ -808,6 +817,76 @@ columns:
     table: match_matchup_stats
     description: "league home-field-advantage component of teams_elo_diff_lmr_impl_diff: the market-priced home boost from hfa[league], = diff - stgh, saturating toward 0 as |d| grows. NaN if teams_elo_diff is NaN"
     dtype: float
+
+
+  # match_team_fatigue — schedule density on the team's full fixture calendar.
+  # streams: league = domestic league, cup = domestic cups, europe = champions / europa /
+  # conference league including qualifying, other = super cups (domestic and uefa) and
+  # fifa club competitions. away counts exclude neutral-venue fixtures; awayn includes them.
+
+  "{side}_rest_hours":
+    table: match_team_fatigue
+    description: "hours between the kick-off of this match and the kick-off of the {side} team's previous fixture in any competition, capped at 200. kick-offs are normalised to central european time before subtracting (football-data league times are uk, fbref times are venue-local with cet in brackets). NaN if the team has no earlier fixture in the season"
+    dims:
+      side: [hmt, awt]
+    dtype: float
+    range: [0, 200]
+
+  "{side}_games_in_{x}d":
+    table: match_team_fatigue
+    description: "number of fixtures in any competition played by the {side} team in the {x} days before this match's kick-off"
+    dims:
+      side: [hmt, awt]
+      x: [6, 8, 11, 15, 22, 30, 45]
+    dtype: int
+
+  "{side}_{stream}_games_in_{x}d":
+    table: match_team_fatigue
+    description: "number of {stream} fixtures played by the {side} team in the {x} days before this match's kick-off. the four streams sum to {side}_games_in_{x}d"
+    dims:
+      side: [hmt, awt]
+      stream: [league, cup, europe, other]
+      x: [6, 8, 11, 15, 22, 30, 45]
+    dtype: int
+
+  "{side}_away_games_in_{x}d":
+    table: match_team_fatigue
+    description: "number of fixtures in any competition played away by the {side} team in the {x} days before this match's kick-off; neutral-venue fixtures are not counted"
+    dims:
+      side: [hmt, awt]
+      x: [6, 8, 11, 15, 22, 30, 45]
+    dtype: int
+
+  "{side}_away_{stream}_games_in_{x}d":
+    table: match_team_fatigue
+    description: "number of {stream} fixtures played away by the {side} team in the {x} days before this match's kick-off; neutral-venue fixtures are not counted"
+    dims:
+      side: [hmt, awt]
+      stream: [league, cup, europe, other]
+      x: [6, 8, 11, 15, 22, 30, 45]
+    dtype: int
+
+  "{side}_awayn_games_in_{x}d":
+    table: match_team_fatigue
+    description: "number of fixtures in any competition played away or at a neutral venue by the {side} team in the {x} days before this match's kick-off; the difference from {side}_away_games_in_{x}d is the number of neutral-venue fixtures"
+    dims:
+      side: [hmt, awt]
+      x: [6, 8, 11, 15, 22, 30, 45]
+    dtype: int
+
+  "{side}_last_match_is_away":
+    table: match_team_fatigue
+    description: "the {side} team's previous fixture in any competition was played away; false at a neutral venue. NaN if the team has no earlier fixture in the season"
+    dims:
+      side: [hmt, awt]
+    dtype: bool
+
+  "{side}_last_match_is_europe":
+    table: match_team_fatigue
+    description: "the {side} team's previous fixture in any competition was a champions / europa / conference league match, including qualifying. NaN if the team has no earlier fixture in the season"
+    dims:
+      side: [hmt, awt]
+    dtype: bool
 
 
 target_columns:

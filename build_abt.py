@@ -16,6 +16,7 @@ from features.thresholds import build_thresholds
 from features.match_info import build_match_info
 from features.match_team_stats import build_match_team_stats
 from features.match_matchup_stats import build_match_matchup_stats
+from features.match_team_fatigue import build_match_team_fatigue
 from features.match_target import build_match_target
 from features.abt import build_abt
 
@@ -51,6 +52,7 @@ def main():
         ("match_info",         build_match_info),
         ("match_team_stats",   build_match_team_stats),
         ("match_matchup_stats", build_match_matchup_stats),
+        ("match_team_fatigue", build_match_team_fatigue),
         ("match_target",       build_match_target),
         ("abt",                build_abt),
     ]
