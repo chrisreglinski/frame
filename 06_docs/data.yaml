@@ -820,11 +820,19 @@ columns:
 
 
   # match_team_fatigue — schedule density on the team's full fixture calendar.
-  # streams: league = domestic league, cup = domestic cups, europe = champions / europa /
-  # conference league including qualifying, other = super cups (domestic and uefa) and
-  # fifa club competitions. away counts exclude neutral-venue fixtures; awayn includes them.
+  # Fixtures are described on two orthogonal axes, each of which partitions the calendar,
+  # so either family sums to the {side}_games_* total.
+  #   venue  — where the fixture was played: home / domestic (away in the team's own
+  #            country, or a neutral venue inside it) / abroad (a trip out of the country).
+  #   stream — which competition: league / europe (champions, europa and conference league
+  #            including qualifying) / other (domestic cups, domestic and uefa super cups,
+  #            fifa club competitions).
+  # Roughly nine in ten `abroad` fixtures are european away legs; the rest are super cups
+  # and fifa competitions, so the column reads as "played a serious match out of the country".
+  # The full venue x stream grid is not carried here — several of its cells hold a few dozen
+  # rows — but the calendar written alongside the table keeps it in a `cell` column.
 
-  "{side}_rest_hours":
+  "{side}_hours_since_last_match":
     table: match_team_fatigue
     description: "hours between the kick-off of this match and the kick-off of the {side} team's previous fixture in any competition, capped at 200. kick-offs are normalised to central european time before subtracting (football-data league times are uk, fbref times are venue-local with cet in brackets). NaN if the team has no earlier fixture in the season"
     dims:
@@ -832,47 +840,91 @@ columns:
     dtype: float
     range: [0, 200]
 
+  "{side}_hours_since_2nd_last_match":
+    table: match_team_fatigue
+    description: "hours between the kick-off of this match and the kick-off of the fixture two back in the {side} team's calendar, capped at 500. same time normalisation as {side}_hours_since_last_match; the two caps bite independently, so this is not their sum. NaN if the team has fewer than two earlier fixtures in the season"
+    dims:
+      side: [hmt, awt]
+    dtype: float
+    range: [0, 500]
+
   "{side}_games_in_{x}d":
     table: match_team_fatigue
     description: "number of fixtures in any competition played by the {side} team in the {x} days before this match's kick-off"
     dims:
       side: [hmt, awt]
-      x: [6, 8, 11, 15, 22, 30, 45]
+      x: [8, 15, 45]
+    dtype: int
+
+  "{side}_{venue}_games_in_{x}d":
+    table: match_team_fatigue
+    description: "number of fixtures played {venue} by the {side} team in the {x} days before this match's kick-off. the three venues sum to {side}_games_in_{x}d"
+    dims:
+      side: [hmt, awt]
+      venue: [home, domestic, abroad]
+      x: [8, 15, 45]
     dtype: int
 
   "{side}_{stream}_games_in_{x}d":
     table: match_team_fatigue
-    description: "number of {stream} fixtures played by the {side} team in the {x} days before this match's kick-off. the four streams sum to {side}_games_in_{x}d"
+    description: "number of {stream} fixtures played by the {side} team in the {x} days before this match's kick-off. the three streams sum to {side}_games_in_{x}d"
     dims:
       side: [hmt, awt]
-      stream: [league, cup, europe, other]
-      x: [6, 8, 11, 15, 22, 30, 45]
+      stream: [league, europe, other]
+      x: [8, 15, 45]
     dtype: int
 
-  "{side}_away_games_in_{x}d":
+  "{side}_games_load_{tau}d":
     table: match_team_fatigue
-    description: "number of fixtures in any competition played away by the {side} team in the {x} days before this match's kick-off; neutral-venue fixtures are not counted"
+    description: "decayed fixture load for the {side} team: sum over all earlier fixtures of the season of exp(-age_in_days / {tau}), age measured from this match's kick-off. a fixture played {tau} days ago contributes 1/e, one played 2*{tau} days ago 1/e^2. unlike the {x}d windows it has no cut-off, so no fixture is dropped and none counts in full"
     dims:
       side: [hmt, awt]
-      x: [6, 8, 11, 15, 22, 30, 45]
-    dtype: int
+      tau: [7, 14]
+    dtype: float
 
-  "{side}_away_{stream}_games_in_{x}d":
+  "{side}_{venue}_games_load_{tau}d":
     table: match_team_fatigue
-    description: "number of {stream} fixtures played away by the {side} team in the {x} days before this match's kick-off; neutral-venue fixtures are not counted"
+    description: "decayed load over fixtures played {venue} only, same kernel as {side}_games_load_{tau}d. the three venues sum to it"
     dims:
       side: [hmt, awt]
-      stream: [league, cup, europe, other]
-      x: [6, 8, 11, 15, 22, 30, 45]
-    dtype: int
+      venue: [home, domestic, abroad]
+      tau: [7, 14]
+    dtype: float
 
-  "{side}_awayn_games_in_{x}d":
+  "{side}_{stream}_games_load_{tau}d":
     table: match_team_fatigue
-    description: "number of fixtures in any competition played away or at a neutral venue by the {side} team in the {x} days before this match's kick-off; the difference from {side}_away_games_in_{x}d is the number of neutral-venue fixtures"
+    description: "decayed load over {stream} fixtures only, same kernel as {side}_games_load_{tau}d. the three streams sum to it"
     dims:
       side: [hmt, awt]
-      x: [6, 8, 11, 15, 22, 30, 45]
-    dtype: int
+      stream: [league, europe, other]
+      tau: [7, 14]
+    dtype: float
+
+  "{side}_games_load_gauss_{tau}d":
+    table: match_team_fatigue
+    description: "decayed fixture load for the {side} team under a gaussian kernel: sum over all earlier fixtures of the season of exp(-(age_in_days / {tau})^2). compared with {side}_games_load_{tau}d the weight is flat for the first days and the tail dies far faster — a fixture {tau} days old still contributes 1/e, one 2*{tau} days old only 1/e^4"
+    dims:
+      side: [hmt, awt]
+      tau: [4, 7]
+    dtype: float
+
+  "{side}_{venue}_games_load_gauss_{tau}d":
+    table: match_team_fatigue
+    description: "gaussian-kernel load over fixtures played {venue} only, same kernel as {side}_games_load_gauss_{tau}d. the three venues sum to it"
+    dims:
+      side: [hmt, awt]
+      venue: [home, domestic, abroad]
+      tau: [4, 7]
+    dtype: float
+
+  "{side}_{stream}_games_load_gauss_{tau}d":
+    table: match_team_fatigue
+    description: "gaussian-kernel load over {stream} fixtures only, same kernel as {side}_games_load_gauss_{tau}d. the three streams sum to it"
+    dims:
+      side: [hmt, awt]
+      stream: [league, europe, other]
+      tau: [4, 7]
+    dtype: float
 
   "{side}_last_match_is_away":
     table: match_team_fatigue

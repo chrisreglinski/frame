@@ -181,18 +181,35 @@ One row per match, wide format. Schedule density for both teams, computed on eac
 and the FIFA club competitions (`08_intl`). Non-league fixtures enter the calendar as history
 only; they are never rows of the table.
 
-Fixtures are split into four **streams**: `league`, `cup` (domestic cups), `europe`
-(CL / EL / Conference incl. qualifying), `other` (super cups + FIFA competitions). No
-competition is weighted — the streams are counted separately so their relative cost is
-estimated downstream instead of asserted here.
+Fixtures are described on two orthogonal axes, each of which partitions the calendar, so
+either family sums to the total:
 
-- `{side}_rest_hours` — hours since that team's previous fixture in any competition, capped at
-  200. Kick-offs are normalised to CET first (football-data prints UK times, FBref prints
-  venue-local with CET in brackets)
-- `{side}_games_in_{x}d` and `{side}_{stream}_games_in_{x}d` — fixtures in the `x` days before
-  kick-off, in total and per stream; windows `6, 8, 11, 15, 22, 30, 45` days
-- `{side}_away_games_in_{x}d` / `{side}_away_{stream}_games_in_{x}d` — the same, away fixtures
-  only (neutral venues excluded); `{side}_awayn_games_in_{x}d` — away **or** neutral
+- **venue** — `home` / `domestic` (away in the team's own country, or a neutral venue inside
+  it: Wembley, La Cartuja, the Olimpico, Berlin, the Stade de France) / `abroad` (a trip out
+  of the country). Roughly nine in ten `abroad` fixtures are European away legs; the rest are
+  super cups and FIFA competitions, so the column reads as "played a serious match out of the
+  country".
+- **stream** — `league` / `europe` (CL / EL / Conference incl. qualifying) / `other`
+  (domestic cups, domestic and UEFA super cups, FIFA club competitions).
+
+The full venue × stream grid is *not* carried as features — several of its cells hold a few
+dozen rows across four seasons — but `team_calendar.parquet`, written alongside the table,
+keeps it in a `cell` column. No competition carries a weight: the parts are counted separately
+so their relative cost is estimated downstream instead of asserted here.
+
+- `{side}_hours_since_last_match` (capped at 200) and `{side}_hours_since_2nd_last_match`
+  (capped at 500) — hours since that team's previous fixture in any competition, and since the
+  one before it. Kick-offs are normalised to CET first (football-data prints UK times, FBref
+  prints venue-local with CET in brackets)
+- `{side}_games_in_{x}d`, `{side}_{venue}_games_in_{x}d`, `{side}_{stream}_games_in_{x}d` —
+  fixtures in the `x` days before kick-off, in total and split along each axis; windows
+  `8, 15, 45` days
+- `{side}_games_load_{tau}d` / `{side}_games_load_gauss_{tau}d` (and their per-axis versions) —
+  the same fixtures under a smooth kernel instead of a hard window. Each earlier fixture of the
+  season contributes `exp(−(age_in_days / tau)^k)`, so nothing is dropped and nothing counts in
+  full. `k = 1` (exponential) at `tau = 7, 14` — recent congestion and a chronic season load;
+  `k = 2` (gaussian) at `tau = 4, 7` — flat for the first days then falling away sharply, which
+  separates 3 / 4 / 5 days of rest where the exponential barely does
 - `{side}_last_match_is_away`, `{side}_last_match_is_europe` — attributes of the previous fixture
 
 Every backward window is half-open (`[kick-off − x days, kick-off)`), so the current match is

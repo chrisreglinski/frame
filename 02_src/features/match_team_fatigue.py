@@ -1,9 +1,13 @@
 """match_team_fatigue — schedule-density features on each team's full fixture calendar.
 
-The calendar unions four streams: the domestic league (01_matches), domestic cups and
-domestic super cups (07_domestic), european cups (06_europe) and the fifa club
-competitions (08_intl). Non-league fixtures exist only as history — the windows count
-them, but they never become rows of the output table, which stays on match_id grain.
+The calendar unions the domestic league (01_matches), domestic cups and super cups
+(07_domestic), the UEFA club competitions (06_europe) and the FIFA club competitions
+(08_intl). Non-league fixtures exist only as history — the windows count them, but they
+never become rows of the output table, which stays on match_id grain.
+
+Fixtures are described on two orthogonal axes — where they were played and which
+competition they belong to (see _VENUES / _COMPETITIONS) — each of which partitions the
+calendar, so either family sums to the total.
 
 The layout mirrors match_team_stats: a long frame with one row per (team, fixture),
 statistics computed within (league, season, team) ordered by kick-off, then a pivot back
@@ -26,31 +30,48 @@ _DATA = _ROOT / "01_data"
 _RAW = _DATA / "01_raw"
 _YAML_PATH = _ROOT / "06_docs" / "data.yaml"
 
-# rest_hours is capped: past a week the gap is a winter/international break or a
-# postponement, and the number stops describing recovery.
-_REST_CAP_HOURS = 200
+# The gap columns are capped: past a point the gap is a winter/international break or a
+# postponement, and the number stops describing recovery. The second gap spans two
+# fixtures, so its cap sits proportionally higher.
+_LAST_CAP_HOURS = 200
+_2ND_LAST_CAP_HOURS = 500
 
-# competition stream per file-name prefix. domestic and european super cups sit together
-# in `other` with the fifa competitions; european qualifying counts as `europe`.
+# Competition stream per file-name prefix. "other" is everything that is neither the
+# domestic league nor a UEFA club competition: domestic cups, domestic and european super
+# cups, and the FIFA club competitions. Splitting it further gave cells of a few dozen rows.
 _STREAMS = {
-    "fa": "cup",  "efl": "cup",  "cdr": "cup", "ci": "cup",  "dfb": "cup", "cdf": "cup",
-    "cs": "other", "sce": "other", "sci": "other", "dfl": "other", "tdc": "other",
-    "usc": "other", "cwc": "other", "ic": "other",
+    "fa": "other", "efl": "other", "cdr": "other", "ci": "other", "dfb": "other",
+    "cdf": "other", "cs": "other", "sce": "other", "sci": "other", "dfl": "other",
+    "tdc": "other", "usc": "other", "cwc": "other", "ic": "other",
     "cl": "europe", "clq": "europe", "el": "europe", "elq": "europe",
     "cfl": "europe", "cflq": "europe",
 }
 
-_FBREF_DIRS = ["06_europe", "07_domestic", "08_intl"]
-_STREAM_ORDER = ["league", "cup", "europe", "other"]
+# Domestic competitions stay inside the country, with these exceptions: the spanish and
+# italian super cups are played in saudi arabia and the french one tours (tel aviv, doha,
+# kuwait city). Everything else on 07_domestic — including the neutral-venue finals at
+# Wembley, La Cartuja, the Olimpico, Berlin and the Stade de France — is home soil.
+_ABROAD_VENUES = {
+    "King Fahd International Stadium", "Al Awwal Park Stadium",
+    "Alinma Stadium", "Al Inma Stadium",
+    "Bloomfield Stadium", "Stadium 974", "Jaber Al-Ahmad International Stadium",
+}
 
-# indicator columns summed over every window; the names double as the column stems
-_IND_COLS = (
-    ["games"]
-    + [f"{s}_games" for s in _STREAM_ORDER]
-    + ["away_games"]
-    + [f"away_{s}_games" for s in _STREAM_ORDER]
-    + ["awayn_games"]
-)
+_FBREF_DIRS = ["06_europe", "07_domestic", "08_intl"]
+
+# Fixtures are described on two orthogonal axes, each partitioning the calendar, so either
+# family sums to the total. `domestic` is an away fixture in the team's own country or a
+# neutral venue inside it; `abroad` is a trip out of it — nine in ten of those are european
+# away legs and the rest are super cups and fifa competitions, so the column reads as
+# "played a serious match out of the country". The full venue x stream grid is not carried
+# as features (several cells hold a few dozen rows) but the calendar keeps it in `cell`.
+_VENUES = ["home", "domestic", "abroad"]
+_COMPETITIONS = ["league", "europe", "other"]
+
+# indicator columns aggregated over every window and every decay; the names are the stems
+_IND_COLS = (["games"]
+             + [f"{venue}_games" for venue in _VENUES]
+             + [f"{comp}_games" for comp in _COMPETITIONS])
 
 
 def _matches_dir(group: str) -> Path:
@@ -66,9 +87,10 @@ def _schema() -> dict:
         return yaml.safe_load(f)
 
 
-def _windows(schema: dict) -> list[int]:
-    """Window widths come from the contract, so pruning them there prunes the builder."""
-    return schema["columns"]["{side}_games_in_{x}d"]["dims"]["x"]
+def _dim(schema: dict, column: str, dim: str) -> list:
+    """Window widths and decay constants come from the contract, so changing them there
+    changes the builder."""
+    return schema["columns"][column]["dims"][dim]
 
 
 def _columns(schema: dict) -> list[str]:
@@ -95,8 +117,9 @@ def _parse_dates(series: pd.Series) -> pd.Series:
 
 
 _PAREN_TIME = re.compile(r"\((\d{1,2}:\d{2})\)")
-_COUNTRY_PREFIX = re.compile(r"^[a-z]{2,3} ")
-_COUNTRY_SUFFIX = re.compile(r" [a-z]{2,3}$")
+_COUNTRY_PREFIX = re.compile(r"^([a-z]{2,3}) ")
+_COUNTRY_SUFFIX = re.compile(r" ([a-z]{2,3})$")
+_NEUTRAL = " (Neutral Site)"
 
 
 def _strip_country(name: str) -> str:
@@ -153,7 +176,7 @@ def _league_rows(group: str) -> pd.DataFrame:
               + pd.Timedelta(hours=1))
         ids = [_match_id(league, season, h, a) for h, a in zip(raw["HomeTeam"], raw["AwayTeam"])]
         base = dict(match_id=ids, league=league, season=season, ts=ts.values,
-                    stream="league", is_neutral=False)
+                    stream="league", is_neutral=False, is_abroad=False)
         frames.append(pd.DataFrame({**base, "team": raw["HomeTeam"].values, "is_home": True}))
         frames.append(pd.DataFrame({**base, "team": raw["AwayTeam"].values, "is_home": False}))
     return pd.concat(frames, ignore_index=True)
@@ -161,7 +184,14 @@ def _league_rows(group: str) -> pd.DataFrame:
 
 def _fbref_rows(membership: dict) -> pd.DataFrame:
     """Cup, european and intercontinental fixtures. Rows carry no match_id — they are
-    history for the windows only. Teams outside the group's leagues drop out here."""
+    history for the windows only. Teams outside the group's leagues drop out here.
+
+    Whether a fixture was played abroad comes from two sources. On 06_europe / 08_intl the
+    team names carry country codes, so an away leg is abroad unless both clubs share a
+    country; a neutral venue is treated as abroad for both sides (the alternative would be
+    a european final on a finalist's home soil, which does not occur in this data). On
+    07_domestic there are no codes, so the venue name decides.
+    """
     europe_map, domestic_map = _name_maps()
     frames = []
 
@@ -175,19 +205,29 @@ def _fbref_rows(membership: dict) -> pd.DataFrame:
             if raw.empty:
                 continue
 
+            venue = raw["Venue"].astype(str)
+            neutral = venue.str.endswith(_NEUTRAL)
+
             if folder == "07_domestic":
                 home = raw["Home"].map(lambda t: domestic_map.get(t, t))
                 away = raw["Away"].map(lambda t: domestic_map.get(t, t))
+                abroad_home = venue.str.removesuffix(_NEUTRAL).isin(_ABROAD_VENUES)
+                abroad_away = abroad_home
             else:
                 home = raw["Home"].map(lambda t: europe_map.get(_strip_country(t)))
                 away = raw["Away"].map(lambda t: europe_map.get(_strip_country(t)))
+                home_country = raw["Home"].astype(str).str.extract(_COUNTRY_SUFFIX)[0]
+                away_country = raw["Away"].astype(str).str.extract(_COUNTRY_PREFIX)[0]
+                abroad_home = neutral
+                abroad_away = neutral | (home_country != away_country)
 
             ts = _fbref_timestamp(raw["Date"], raw["Time"])
-            neutral = raw["Venue"].astype(str).str.contains("Neutral Site")
             base = dict(match_id=None, season=season, stream=_STREAMS[prefix],
                         ts=ts.values, is_neutral=neutral.values)
-            frames.append(pd.DataFrame({**base, "team": home.values, "is_home": True}))
-            frames.append(pd.DataFrame({**base, "team": away.values, "is_home": False}))
+            frames.append(pd.DataFrame({**base, "team": home.values, "is_home": True,
+                                        "is_abroad": abroad_home.values}))
+            frames.append(pd.DataFrame({**base, "team": away.values, "is_home": False,
+                                        "is_abroad": abroad_away.values}))
 
     rows = pd.concat(frames, ignore_index=True)
     rows["league"] = [membership.get((s, t)) for s, t in zip(rows["season"], rows["team"])]
@@ -195,13 +235,16 @@ def _fbref_rows(membership: dict) -> pd.DataFrame:
 
 
 def _derive_flags(calendar: pd.DataFrame) -> pd.DataFrame:
-    """A neutral-venue fixture is nobody's home match: it counts as away for `awayn`
-    but not for `away`."""
+    """A neutral-venue fixture is nobody's home match."""
     calendar = calendar.copy()
     calendar["ts"] = pd.to_datetime(calendar["ts"])
     calendar.loc[calendar["is_neutral"], "is_home"] = False
     calendar["is_away"] = ~calendar["is_home"] & ~calendar["is_neutral"]
     calendar["is_europe"] = calendar["stream"] == "europe"
+    calendar["venue"] = np.where(calendar["is_home"], "home",
+                                 np.where(calendar["is_abroad"], "abroad", "domestic"))
+    # the full grid is not a feature, but it is the natural thing to look at in the calendar
+    calendar["cell"] = calendar["stream"] + "_" + calendar["venue"]
     return calendar
 
 
@@ -216,12 +259,10 @@ def _build_calendar(group: str) -> pd.DataFrame:
 def _add_indicators(calendar: pd.DataFrame) -> pd.DataFrame:
     calendar = calendar.copy()
     calendar["games"] = 1.0
-    calendar["away_games"] = calendar["is_away"].astype(float)
-    calendar["awayn_games"] = (~calendar["is_home"]).astype(float)
-    for stream in _STREAM_ORDER:
-        in_stream = calendar["stream"] == stream
-        calendar[f"{stream}_games"] = in_stream.astype(float)
-        calendar[f"away_{stream}_games"] = (in_stream & calendar["is_away"]).astype(float)
+    for venue in _VENUES:
+        calendar[f"{venue}_games"] = (calendar["venue"] == venue).astype(float)
+    for comp in _COMPETITIONS:
+        calendar[f"{comp}_games"] = (calendar["stream"] == comp).astype(float)
     return calendar
 
 
@@ -246,32 +287,87 @@ def _window_sums(calendar: pd.DataFrame, groups: dict, x: int) -> np.ndarray:
     return out
 
 
-def _add_stats(calendar: pd.DataFrame, windows: list[int]) -> pd.DataFrame:
+def _decayed_loads(calendar: pd.DataFrame, groups: dict, tau: float) -> np.ndarray:
+    """Sum every indicator over all earlier fixtures of the season, each weighted by
+    exp(-age_in_days / tau).
+
+    An exponential kernel is memoryless, so the load only needs the previous value and the
+    gap: load_i = (load_{i-1} + value_{i-1}) * exp(-gap / tau). No window, no cut-off.
+    """
+    values = calendar[_IND_COLS].to_numpy(dtype=float)
+    ts = calendar["ts"].to_numpy()
+    out = np.zeros_like(values)
+
+    for idx in groups.values():
+        idx = np.sort(idx)
+        decay = np.exp(-(np.diff(ts[idx]) / np.timedelta64(1, "D")) / tau)
+        carried = np.zeros(values.shape[1])
+        for k in range(1, len(idx)):
+            carried = (carried + values[idx[k - 1]]) * decay[k - 1]
+            out[idx[k]] = carried
+    return out
+
+
+def _gaussian_loads(calendar: pd.DataFrame, groups: dict, tau: float) -> np.ndarray:
+    """Same as _decayed_loads but with a gaussian kernel, exp(-(age / tau)**2).
+
+    Squaring the age costs the memorylessness the exponential has, so there is no
+    recursion to lean on and every earlier fixture is weighted explicitly. Teams have a
+    few dozen fixtures a season, so the quadratic work is irrelevant.
+    """
+    values = calendar[_IND_COLS].to_numpy(dtype=float)
+    ts = calendar["ts"].to_numpy()
+    out = np.zeros_like(values)
+
+    for idx in groups.values():
+        idx = np.sort(idx)
+        ages = (ts[idx][:, None] - ts[idx][None, :]) / np.timedelta64(1, "D")
+        weights = np.where(ages > 0, np.exp(-((ages / tau) ** 2)), 0.0)
+        out[idx] = weights @ values[idx]
+    return out
+
+
+def _add_stats(calendar: pd.DataFrame, windows: list[int],
+               taus_exp: list[float], taus_gauss: list[float]) -> pd.DataFrame:
     calendar = _add_indicators(calendar)
     keys = ["league", "season", "team"]
     g = calendar.groupby(keys, sort=False)
 
-    gap = g["ts"].diff().dt.total_seconds() / 3600.0
-    calendar["rest_hours"] = gap.clip(upper=_REST_CAP_HOURS)
+    hours = lambda delta: delta.dt.total_seconds() / 3600.0
+    calendar["hours_since_last_match"] = hours(g["ts"].diff()).clip(upper=_LAST_CAP_HOURS)
+    calendar["hours_since_2nd_last_match"] = (
+        hours(calendar["ts"] - g["ts"].shift(2)).clip(upper=_2ND_LAST_CAP_HOURS)
+    )
     calendar["last_match_is_away"] = g["is_away"].shift(1)
     calendar["last_match_is_europe"] = g["is_europe"].shift(1)
 
     groups = g.indices
+    new = {}
     for x in windows:
         sums = _window_sums(calendar, groups, x)
-        for i, col in enumerate(_IND_COLS):
-            calendar[f"{col}_in_{x}d"] = sums[:, i]
+        new |= {f"{c}_in_{x}d": sums[:, i] for i, c in enumerate(_IND_COLS)}
+    for tau in taus_exp:
+        loads = _decayed_loads(calendar, groups, tau)
+        new |= {f"{c}_load_{tau}d": loads[:, i] for i, c in enumerate(_IND_COLS)}
+    for tau in taus_gauss:
+        gauss = _gaussian_loads(calendar, groups, tau)
+        new |= {f"{c}_load_gauss_{tau}d": gauss[:, i] for i, c in enumerate(_IND_COLS)}
 
-    return calendar
+    return pd.concat([calendar, pd.DataFrame(new, index=calendar.index)], axis=1)
 
 
 def build_match_team_fatigue(group: str = "major") -> pd.DataFrame:
     schema = _schema()
-    windows = _windows(schema)
-    calendar = _add_stats(_build_calendar(group), windows)
+    windows = _dim(schema, "{side}_games_in_{x}d", "x")
+    taus_exp = _dim(schema, "{side}_games_load_{tau}d", "tau")
+    taus_gauss = _dim(schema, "{side}_games_load_gauss_{tau}d", "tau")
+    calendar = _add_stats(_build_calendar(group), windows, taus_exp, taus_gauss)
 
-    stat_cols = (["rest_hours", "last_match_is_away", "last_match_is_europe"]
-                 + [f"{c}_in_{x}d" for x in windows for c in _IND_COLS])
+    stat_cols = (["hours_since_last_match", "hours_since_2nd_last_match",
+                  "last_match_is_away", "last_match_is_europe"]
+                 + [f"{c}_in_{x}d" for x in windows for c in _IND_COLS]
+                 + [f"{c}_load_{t}d" for t in taus_exp for c in _IND_COLS]
+                 + [f"{c}_load_gauss_{t}d" for t in taus_gauss for c in _IND_COLS])
     played = calendar[calendar["match_id"].notna()]
 
     home = (played[played["is_home"]][["match_id"] + stat_cols]
