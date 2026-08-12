@@ -141,10 +141,19 @@ columns:
     dtype: string
     categories: [start, mid, end]
 
-  match_after_intl_break:
+  "{side}_game_number_after_break":
     table: match_info
-    description: "this match belongs to the first gameweek its league played after a break in which every league of the group stopped — a FIFA window, or the 2022 world cup. Break windows are hand-recorded in 01_data/01_raw/03_dates/break_dates.csv. A league-specific pause (the winter break, which england plays through) is not one, and neither is the gap between seasons"
-    dtype: bool
+    description: "the {side} team's league matches counted from the last break in which every league of the group stopped: 1 = the first match after it. Break windows are hand-recorded in 01_data/01_raw/03_dates/break_dates.csv. Counted per team, not per gameweek, because a rescheduled fixture can leave two teams in one gameweek with different counts. Empty before the season's first break. A league-specific pause (the winter break, which england plays through) is not a break here, and neither is the gap between seasons"
+    dims:
+      side: [hmt, awt]
+    dtype: int
+
+  "{side}_game_number_before_break":
+    table: match_info
+    description: "the same count taken backwards to the next break: -1 = the {side} team's last league match before it, -2 the one before that. Empty after the season's last break"
+    dims:
+      side: [hmt, awt]
+    dtype: int
 
   hmt_is_promoted:
     table: match_info

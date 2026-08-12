@@ -313,25 +313,46 @@ def _load_break_dates() -> pd.DataFrame:
     return pd.read_csv(_BREAKS_PATH, dtype={"season": str}, parse_dates=["last_match_before", "first_match_after"])
 
 
-def _attach_break_flag(df: pd.DataFrame, breaks: pd.DataFrame) -> pd.DataFrame:
-    """Flag the first gameweek each league played after each break.
+def _attach_break_counters(df: pd.DataFrame, breaks: pd.DataFrame) -> pd.DataFrame:
+    """Count each team's league matches from the last break and to the next one.
 
-    The restart date is shared by the leagues for a FIFA window but not for the world cup —
-    england came back on boxing day, germany three weeks later — so the gameweek is resolved
-    per league as the first one starting on or after the break ends, rather than by date.
+    A team's season is cut into segments by the breaks; within a segment the matches are
+    numbered 1, 2, 3 ... from the restart and -1, -2, -3 ... back from the last one before
+    the next break. Matches before the season's first break have no count from a break, and
+    matches after its last one have none to a break.
+
+    Counted per team rather than per gameweek: `gameweek` is only the sequential match
+    number bucketed by half the team count, so a rescheduled fixture can leave two teams in
+    one bucket with different numbers of matches played since the break. The restart date is
+    league-specific for the world cup — england came back on boxing day, germany three weeks
+    later — which the per-team rule handles by itself.
     """
     df = df.copy()
-    df["match_after_intl_break"] = False
     date = pd.to_datetime(df["date"])
+    long = pd.concat([
+        pd.DataFrame({"row": df.index, "side": side, "league": df["league"],
+                      "season": df["season"], "team": df[f"{side}_name"], "date": date})
+        for side in ("hmt", "awt")
+    ], ignore_index=True).sort_values("date")
 
-    for row in breaks.itertuples():
-        for league in df.loc[df["season"] == row.season, "league"].unique():
-            side = (df["league"] == league) & (df["season"] == row.season)
-            after = side & (date >= row.first_match_after)
-            if not after.any():
-                continue
-            first_gw = df.loc[after, "gameweek"].loc[date[after].idxmin()]
-            df.loc[side & (df["gameweek"] == first_gw), "match_after_intl_break"] = True
+    after = pd.Series(np.nan, index=long.index)
+    before = pd.Series(np.nan, index=long.index)
+    for (season, league, team), grp in long.groupby(["season", "league", "team"], sort=False):
+        edges = breaks.loc[breaks["season"] == season, "first_match_after"].sort_values()
+        seg = np.searchsorted(edges.to_numpy(), grp["date"].to_numpy(), side="right")
+        for s_id, idx in pd.Series(grp.index).groupby(seg):
+            n = len(idx)
+            if s_id > 0:                       # something to count from
+                after.loc[idx.to_numpy()] = np.arange(1, n + 1)
+            if s_id < len(edges):              # something to count to
+                before.loc[idx.to_numpy()] = np.arange(-n, 0)
+
+    for side in ("hmt", "awt"):
+        m = long["side"] == side
+        for name, values in (("game_number_after_break", after), ("game_number_before_break", before)):
+            col = pd.Series(np.nan, index=df.index)
+            col.loc[long.loc[m, "row"].to_numpy()] = values[m].to_numpy()
+            df[f"{side}_{name}"] = col.astype("Int64")
     return df
 
 
@@ -418,7 +439,7 @@ def build_match_info(group: str = "major") -> pd.DataFrame:
 
     base = _attach_elo(pd.concat(frames, ignore_index=True), group)
     base = _attach_elo_cats(base, group)
-    base = _attach_break_flag(base, _load_break_dates())
+    base = _attach_break_counters(base, _load_break_dates())
     df = round_floats(base[cols])
 
     features_dir.mkdir(parents=True, exist_ok=True)

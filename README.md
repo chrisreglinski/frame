@@ -99,10 +99,14 @@ One row per match. Context and market features:
 - `season_4phase` — `summer / fall / winter / spring` based on hand-coded boundary dates in `01_raw/03_dates/season_limit_dates.csv`
 - `season_3phase` — `start / mid / end` (fall+winter merged into mid)
 - `day_of_week_cat` — `weekend` (sat/sun) / `shoulder` (fri/mon) / `midweek` (tue/wed/thu)
-- `match_after_intl_break` — first gameweek the league played after a break in which every
-  league stopped (a FIFA window, or the 2022 World Cup); windows hand-recorded in
-  `01_raw/03_dates/break_dates.csv`. The winter break is not one — England plays through it —
-  and neither is the gap between seasons
+- `hmt_game_number_after_break` / `awt_game_number_after_break` — that team's league matches
+  counted from the last break in which every league stopped (a FIFA window, or the 2022 World
+  Cup): `1` = its first match back. `*_game_number_before_break` counts the other way, `-1`
+  being its last match before the next one. Windows hand-recorded in
+  `01_raw/03_dates/break_dates.csv`. Counted **per team**, not per gameweek — `gameweek` is
+  only the sequential match number bucketed by half the team count, so a rescheduled fixture
+  leaves two teams in one bucket with different counts (10% of matches). The winter break is
+  not a break here — England plays through it — and neither is the gap between seasons
 - `time_uk_num` — kick-off time (UK) as a number (`hour + minute/60`); `time_uk_cat` — bucketed by floor(hour): `early` (11–13) / `early_afternoon` (14–15) / `late_afternoon` (16–17) / `evening` (18+)
 - `hmt_is_promoted`, `awt_is_promoted`, `travel_distance_km`
 - `hmt_is_top3_last`, `awt_is_top3_last` — team finished top 3 in this league last season (reigning top-3; top-tier groups `major`/`other` only). Earliest season seeded from external final tables; later seasons match `team_season_final` rankings. The `minor` group carries the second-tier analogue `hmt_is_relegated` / `awt_is_relegated` (relegated from the tier above) instead — both are group-scoped in `data.yaml` via `groups:`
