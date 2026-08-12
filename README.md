@@ -210,7 +210,8 @@ so their relative cost is estimated downstream instead of asserted here.
   full. `k = 1` (exponential) at `tau = 7, 14` — recent congestion and a chronic season load;
   `k = 2` (gaussian) at `tau = 4, 7` — flat for the first days then falling away sharply, which
   separates 3 / 4 / 5 days of rest where the exponential barely does
-- `{side}_last_match_is_away`, `{side}_last_match_is_europe` — attributes of the previous fixture
+- `{side}_last_match_is_away`, `{side}_last_match_is_europe`, `{side}_last_match_is_abroad` —
+  attributes of the previous fixture, whatever competition it was
 
 Every backward window is half-open (`[kick-off − x days, kick-off)`), so the current match is
 never counted, and is truncated at the season start.

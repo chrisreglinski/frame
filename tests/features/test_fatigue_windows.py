@@ -149,6 +149,9 @@ def test_last_match_flags(calendar):
     assert list(calendar["last_match_is_away"][1:]) == [False, True, True, False, False]
     assert list(calendar["last_match_is_europe"][1:]) == [False, False, True, False, False]
 
+    # Only d2 was played out of the country; d4 is a neutral venue on home soil.
+    assert list(calendar["last_match_is_abroad"][1:]) == [False, False, True, False, False]
+
 
 def test_decayed_load_matches_its_definition(calendar):
     """The builder uses an O(n) recursion; here the load is summed directly instead."""

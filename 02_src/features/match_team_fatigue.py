@@ -340,6 +340,7 @@ def _add_stats(calendar: pd.DataFrame, windows: list[int],
     )
     calendar["last_match_is_away"] = g["is_away"].shift(1)
     calendar["last_match_is_europe"] = g["is_europe"].shift(1)
+    calendar["last_match_is_abroad"] = g["is_abroad"].shift(1)
 
     groups = g.indices
     new = {}
@@ -364,7 +365,8 @@ def build_match_team_fatigue(group: str = "major") -> pd.DataFrame:
     calendar = _add_stats(_build_calendar(group), windows, taus_exp, taus_gauss)
 
     stat_cols = (["hours_since_last_match", "hours_since_2nd_last_match",
-                  "last_match_is_away", "last_match_is_europe"]
+                  "last_match_is_away", "last_match_is_europe",
+                  "last_match_is_abroad"]
                  + [f"{c}_in_{x}d" for x in windows for c in _IND_COLS]
                  + [f"{c}_load_{t}d" for t in taus_exp for c in _IND_COLS]
                  + [f"{c}_load_gauss_{t}d" for t in taus_gauss for c in _IND_COLS])

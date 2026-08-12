@@ -933,6 +933,13 @@ columns:
       side: [hmt, awt]
     dtype: bool
 
+  "{side}_last_match_is_abroad":
+    table: match_team_fatigue
+    description: "the {side} team's previous fixture in any competition was played out of the country — a european away leg, or a super cup or fifa competition staged abroad. NaN if the team has no earlier fixture in the season"
+    dims:
+      side: [hmt, awt]
+    dtype: bool
+
   "{side}_last_match_is_europe":
     table: match_team_fatigue
     description: "the {side} team's previous fixture in any competition was a champions / europa / conference league match, including qualifying. NaN if the team has no earlier fixture in the season"
