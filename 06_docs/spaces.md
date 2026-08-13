@@ -28,6 +28,13 @@ Model runs are logged in [`03_notebooks/model_checks/results.md`](../03_notebook
 which **replaces the old `results.txt`**. One row per run, keyed by `source` (the notebook), so re-runs update
 in place. Notebooks write their row via `evaluation.results_registry.upsert(...)` (one market per notebook).
 
+The file is split into one table per gate score — `## 3xPASS`, `## 2xPASS`, `## 1xPASS`, `## 0xPASS`, each
+heading carrying its row count — so how many gates a run cleared is visible before reading any of its
+numbers. The split is **derived from the G1/G2/G3 columns on every write, never stored**: a re-run whose
+verdict changed moves to the right table by itself, and a row can only ever be in one of them. All four
+headings are always written, an empty one as `_none_`. The preamble above the first heading is preserved;
+everything from there down is regenerated.
+
 The validation protocol behind each run (folds, the three gates) lives in the model-check framework —
 [`model_check.md`](model_check.md) / [`02_src/evaluation/model_check.py`](../02_src/evaluation/model_check.py)
 — and is **space-independent**: a run may use a registered space or any mixed set of ABT input columns, in
