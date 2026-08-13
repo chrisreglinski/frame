@@ -374,8 +374,10 @@ def _attach_break_counters(df: pd.DataFrame, breaks: pd.DataFrame) -> pd.DataFra
 
     # bucketed into rounds exactly as gameweek buckets season_game_number: ceil over half
     # the team count. Rescheduling means a bucket is not always a real round, here as there.
-    per_round = df.groupby(["league", "season"])[["hmt_name", "awt_name"]].transform(
-        lambda c: c.nunique()).max(axis=1) // 2
+    n_teams = df.groupby(["league", "season"]).apply(
+        lambda g: len(set(g["hmt_name"]) | set(g["awt_name"])), include_groups=False)
+    per_round = (df.set_index(["league", "season"]).index.map(n_teams) // 2).to_series(index=df.index)
+    per_round = per_round.where(per_round > 0)
     df["gameweek_after_break"] = np.ceil(lg_after / per_round).astype("Int64")
     df["gameweek_before_break"] = -np.ceil(-lg_before / per_round).astype("Int64")
     return df

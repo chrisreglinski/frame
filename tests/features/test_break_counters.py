@@ -14,10 +14,16 @@ from features.match_info import _attach_break_counters
 
 
 def _matches(rows):
-    return pd.DataFrame(
+    """season_game_number is the order the league-season's matches are numbered in; the
+    league-level counters follow it so that matches sharing a date keep one sequence."""
+    df = pd.DataFrame(
         [{"league": lg, "season": s, "hmt_name": h, "awt_name": a, "date": pd.Timestamp(d)}
          for lg, s, h, a, d in rows]
     )
+    df["season_game_number"] = (
+        df.sort_values("date").groupby(["league", "season"]).cumcount() + 1
+    )
+    return df
 
 
 @pytest.fixture
