@@ -111,9 +111,9 @@ columns:
     dtype: int
     range: [1, 552]
 
-  season_game_number_inv:
+  season_game_number_before_end:
     table: match_info
-    description: "season_game_number counted from the end: -1 = last match of the season, down to -N for the first (N = full-season match count = n_teams*(n_teams-1)); a skipped match leaves the last match at -2 (e.g. france 2526, 305/306)"
+    description: "season_game_number counted backwards to the end of the season, the same way season_game_number_before_break counts back to the next break: -1 = last match of the season, down to -N for the first (N = full-season match count = n_teams*(n_teams-1)); a skipped match leaves the last match at -2 (e.g. france 2526, 305/306)"
     dtype: int
     range: [-552, -1]
 
@@ -123,9 +123,9 @@ columns:
     dtype: int
     range: [1, 46]
 
-  gameweek_inv:
+  gameweek_before_end:
     table: match_info
-    description: "gameweek counted from the end: -1 = last gameweek, down to -G for the first (G = full-season gameweek count = 2*(n_teams-1))"
+    description: "gameweek counted backwards to the end of the season: -1 = last gameweek, down to -G for the first (G = full-season gameweek count = 2*(n_teams-1))"
     dtype: int
     range: [-46, -1]
 
@@ -140,6 +140,16 @@ columns:
     description: "season phase (3 levels): start=summer, mid=fall+winter, end=spring"
     dtype: string
     categories: [start, mid, end]
+
+  season_game_number_after_break:
+    table: match_info
+    description: "the league-season's matches counted from the last break in which every league of the group stopped: 1 = the first match the league played after it. The league-season counterpart of {side}_game_number_after_break, in the same relation as season_game_number to {side}_game_number. Unlike gameweek it does not give a whole round one value, so the friday match of a restart round is 1 and the monday one is 10. Empty before the season's first break"
+    dtype: int
+
+  season_game_number_before_break:
+    table: match_info
+    description: "the same league-season count taken backwards to the next break: -1 = the last match the league played before it. Empty after the season's last break"
+    dtype: int
 
   "{side}_game_number_after_break":
     table: match_info

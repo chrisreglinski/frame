@@ -94,19 +94,20 @@ price. It is never a model input.
 One row per match. Context and market features:
 
 - `league`, `season`, `date`, `time`, `day_of_week`, `hmt_name`, `awt_name`
-- `season_game_number` — sequential match number in the league-season; `season_game_number_inv` — the same counted from the end (`-1` = last match, `-N` = first, `N` = full-season match count from team count; a skipped match leaves the last at `-2`)
-- `gameweek` — derived as `ceil(season_game_number / (n_teams / 2))`; `n_teams` computed dynamically per league-season (handles France's drop from 20 to 18 teams after 2223); `gameweek_inv` — same counted from the end (`-1` = last gameweek)
+- `season_game_number` — sequential match number in the league-season; `season_game_number_before_end` — the same counted from the end (`-1` = last match, `-N` = first, `N` = full-season match count from team count; a skipped match leaves the last at `-2`)
+- `gameweek` — derived as `ceil(season_game_number / (n_teams / 2))`; `n_teams` computed dynamically per league-season (handles France's drop from 20 to 18 teams after 2223); `gameweek_before_end` — same counted from the end (`-1` = last gameweek)
 - `season_4phase` — `summer / fall / winter / spring` based on hand-coded boundary dates in `01_raw/03_dates/season_limit_dates.csv`
 - `season_3phase` — `start / mid / end` (fall+winter merged into mid)
 - `day_of_week_cat` — `weekend` (sat/sun) / `shoulder` (fri/mon) / `midweek` (tue/wed/thu)
-- `hmt_game_number_after_break` / `awt_game_number_after_break` — that team's league matches
-  counted from the last break in which every league stopped (a FIFA window, or the 2022 World
-  Cup): `1` = its first match back. `*_game_number_before_break` counts the other way, `-1`
-  being its last match before the next one. Windows hand-recorded in
-  `01_raw/03_dates/break_dates.csv`. Counted **per team**, not per gameweek — `gameweek` is
-  only the sequential match number bucketed by half the team count, so a rescheduled fixture
-  leaves two teams in one bucket with different counts (10% of matches). The winter break is
-  not a break here — England plays through it — and neither is the gap between seasons
+- Break counters, anchored on the breaks in which **every** league stopped (a FIFA window, or
+  the 2022 World Cup); windows hand-recorded in `01_raw/03_dates/break_dates.csv`. The winter
+  break is not one — England plays through it — and neither is the gap between seasons.
+  `season_game_number_after_break` / `_before_break` count the league-season's matches from the
+  last break and back to the next; `hmt_`/`awt_game_number_after_break` / `_before_break` do the
+  same for each team. The pair mirrors `season_game_number` vs `{side}_game_number`, and the
+  backward ones read like `season_game_number_before_end`: `-1` is the last match before the
+  anchor. The team-level counters are **not** derivable from the league-level ones — a
+  rescheduled fixture leaves two teams in one round with different counts, in 10% of matches
 - `time_uk_num` — kick-off time (UK) as a number (`hour + minute/60`); `time_uk_cat` — bucketed by floor(hour): `early` (11–13) / `early_afternoon` (14–15) / `late_afternoon` (16–17) / `evening` (18+)
 - `hmt_is_promoted`, `awt_is_promoted`, `travel_distance_km`
 - `hmt_is_top3_last`, `awt_is_top3_last` — team finished top 3 in this league last season (reigning top-3; top-tier groups `major`/`other` only). Earliest season seeded from external final tables; later seasons match `team_season_final` rankings. The `minor` group carries the second-tier analogue `hmt_is_relegated` / `awt_is_relegated` (relegated from the tier above) instead — both are group-scoped in `data.yaml` via `groups:`

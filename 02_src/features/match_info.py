@@ -171,8 +171,8 @@ def _load_file(path: Path, attrs: dict[str, dict], limits: dict, group: str) -> 
     # counted from the end, anchored to the FULL-season counts (from team count), not the rows
     # present — so a skipped/abandoned match leaves the last match at -2 rather than -1.
     n_expected = n_teams * (n_teams - 1)                      # full-season match count
-    season_game_number_inv = (season_game_number - n_expected - 1).rename("season_game_number_inv")
-    gameweek_inv = (gameweek - 2 * (n_teams - 1) - 1).rename("gameweek_inv")
+    season_game_number_before_end = (season_game_number - n_expected - 1).rename("season_game_number_before_end")
+    gameweek_before_end = (gameweek - 2 * (n_teams - 1) - 1).rename("gameweek_before_end")
 
     date = _parse_dates(raw["Date"])
     odds, impl, margins, hadiffs = {}, {}, {}, {}
@@ -271,9 +271,9 @@ def _load_file(path: Path, attrs: dict[str, dict], limits: dict, group: str) -> 
         date.dt.day_name().rename("day_of_week"),
         date.dt.day_name().map(_DOW_CAT).rename("day_of_week_cat"),
         season_game_number.rename("season_game_number"),
-        season_game_number_inv,
+        season_game_number_before_end,
         gameweek,
-        gameweek_inv,
+        gameweek_before_end,
         phase4.rename("season_4phase"),
         phase3.rename("season_3phase"),
         raw["HomeTeam"].rename("hmt_name"),
@@ -353,6 +353,24 @@ def _attach_break_counters(df: pd.DataFrame, breaks: pd.DataFrame) -> pd.DataFra
             col = pd.Series(np.nan, index=df.index)
             col.loc[long.loc[m, "row"].to_numpy()] = values[m].to_numpy()
             df[f"{side}_{name}"] = col.astype("Int64")
+
+    # the same counters one level up: the league-season's own matches rather than a team's,
+    # so a whole round no longer shares one value the way it does under `gameweek`
+    lg_after = pd.Series(np.nan, index=df.index)
+    lg_before = pd.Series(np.nan, index=df.index)
+    # ordered like season_game_number, so matches sharing a date keep one agreed sequence
+    order = df.assign(_d=date).sort_values(["league", "season", "season_game_number"])
+    for (season, league), grp in order.groupby(["season", "league"], sort=False):
+        edges = breaks.loc[breaks["season"] == season, "first_match_after"].sort_values()
+        seg = np.searchsorted(edges.to_numpy(), grp["_d"].to_numpy(), side="right")
+        for s_id, idx in pd.Series(grp.index).groupby(seg):
+            n = len(idx)
+            if s_id > 0:
+                lg_after.loc[idx.to_numpy()] = np.arange(1, n + 1)
+            if s_id < len(edges):
+                lg_before.loc[idx.to_numpy()] = np.arange(-n, 0)
+    df["season_game_number_after_break"] = lg_after.astype("Int64")
+    df["season_game_number_before_break"] = lg_before.astype("Int64")
     return df
 
 
