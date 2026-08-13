@@ -882,6 +882,14 @@ columns:
     dtype: float
     range: [0, 500]
 
+  "{side}_hours_since_3rd_last_match":
+    table: match_team_fatigue
+    description: "hours between the kick-off of this match and the kick-off of the fixture three back in the {side} team's calendar, capped at 700. same time normalisation as {side}_hours_since_last_match; the caps bite independently, so this is not the sum of the shorter gaps. NaN if the team has fewer than three earlier fixtures in the season"
+    dims:
+      side: [hmt, awt]
+    dtype: float
+    range: [0, 700]
+
   # cat2q splits at the median, cat3q at the tertiles. The suffix follows the elo and
   # season-stat categories, with q rather than m because the two-way split here is a
   # quantile, not the mean. Thresholds come from the pooled hmt + awt values over all
@@ -914,6 +922,22 @@ columns:
   "{side}_hours_since_2nd_last_match_cat3q":
     table: match_team_fatigue
     description: "tertile of the pooled {side}_hours_since_2nd_last_match distribution (thresholds.json hours_since_2nd_last_match_p33/p67); low is the shortest gap. None where the gap is NaN"
+    dims:
+      side: [hmt, awt]
+    dtype: string
+    categories: [low, medium, high]
+
+  "{side}_hours_since_3rd_last_match_cat2q":
+    table: match_team_fatigue
+    description: "half of the pooled {side}_hours_since_3rd_last_match distribution the value falls in (thresholds.json hours_since_3rd_last_match_p50); low is the shorter gap. None where the gap is NaN"
+    dims:
+      side: [hmt, awt]
+    dtype: string
+    categories: [low, high]
+
+  "{side}_hours_since_3rd_last_match_cat3q":
+    table: match_team_fatigue
+    description: "tertile of the pooled {side}_hours_since_3rd_last_match distribution (thresholds.json hours_since_3rd_last_match_p33/p67); low is the shortest gap. None where the gap is NaN"
     dims:
       side: [hmt, awt]
     dtype: string

@@ -207,12 +207,14 @@ dozen rows across four seasons — but `team_calendar.parquet`, written alongsid
 keeps it in a `cell` column. No competition carries a weight: the parts are counted separately
 so their relative cost is estimated downstream instead of asserted here.
 
-- `{side}_hours_since_last_match` (capped at 200) and `{side}_hours_since_2nd_last_match`
-  (capped at 500) — hours since that team's previous fixture in any competition, and since the
-  one before it. Kick-offs are normalised to CET first (football-data prints UK times, FBref
-  prints venue-local with CET in brackets)
+- `{side}_hours_since_last_match` (capped at 200), `{side}_hours_since_2nd_last_match`
+  (capped at 500) and `{side}_hours_since_3rd_last_match` (capped at 700) — hours since that
+  team's previous fixture in any competition, since the one before it, and since the one before
+  that. Kick-offs are normalised to CET first (football-data prints UK times, FBref prints
+  venue-local with CET in brackets). The caps bite on 15% / 13% / 6% of the values
 - `{side}_hours_since_last_match_cat2q` / `_cat3q` and the same pair on
-  `_hours_since_2nd_last_match` — median split and tertiles of each gap, cut on the pooled
+  `_hours_since_2nd_last_match` and `_hours_since_3rd_last_match` — median split and
+  tertiles of each gap, cut on the pooled
   hmt + awt values across all seasons (thresholds in `thresholds.json`), same convention as
   `elo_cat3q`. `q` rather than the `m` of `cat2m` because the two-way split is the median, not
   the mean. Both caps sit above p67, so the capped tail is all `high`

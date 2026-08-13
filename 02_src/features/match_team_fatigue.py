@@ -31,13 +31,16 @@ _DATA = _ROOT / "01_data"
 _RAW = _DATA / "01_raw"
 _YAML_PATH = _ROOT / "06_docs" / "data.yaml"
 
-# The gap columns are capped: past a point the gap is a winter/international break or a
-# postponement, and the number stops describing recovery. The second gap spans two
-# fixtures, so its cap sits proportionally higher.
-_LAST_CAP_HOURS = 200
-_2ND_LAST_CAP_HOURS = 500
-
-_GAP_COLS = ["hours_since_last_match", "hours_since_2nd_last_match"]
+# Gap to the fixture n back, and the cap on it: past a point the gap is a winter/
+# international break or a postponement, and the number stops describing recovery. Each
+# gap spans one more fixture than the last, so the caps rise with it. They bite on
+# 15% / 13% / 6% of the values respectively, so the third is the mildest of the three.
+_GAP_CAP_HOURS = {
+    "hours_since_last_match": 200,
+    "hours_since_2nd_last_match": 500,
+    "hours_since_3rd_last_match": 700,
+}
+_GAP_COLS = list(_GAP_CAP_HOURS)
 
 # Competition stream per file-name prefix. "other" is everything that is neither the
 # domestic league nor a UEFA club competition: domestic cups, domestic and european super
@@ -337,10 +340,8 @@ def _add_stats(calendar: pd.DataFrame, windows: list[int],
     g = calendar.groupby(keys, sort=False)
 
     hours = lambda delta: delta.dt.total_seconds() / 3600.0
-    calendar["hours_since_last_match"] = hours(g["ts"].diff()).clip(upper=_LAST_CAP_HOURS)
-    calendar["hours_since_2nd_last_match"] = (
-        hours(calendar["ts"] - g["ts"].shift(2)).clip(upper=_2ND_LAST_CAP_HOURS)
-    )
+    for n, (col, cap) in enumerate(_GAP_CAP_HOURS.items(), start=1):
+        calendar[col] = hours(calendar["ts"] - g["ts"].shift(n)).clip(upper=cap)
     calendar["last_match_is_away"] = g["is_away"].shift(1)
     calendar["last_match_is_europe"] = g["is_europe"].shift(1)
     calendar["last_match_is_abroad"] = g["is_abroad"].shift(1)
@@ -406,9 +407,9 @@ def build_match_team_fatigue(group: str = "major") -> pd.DataFrame:
     taus_gauss = _dim(schema, "{side}_games_load_gauss_{tau}d", "tau")
     calendar = _add_stats(_build_calendar(group), windows, taus_exp, taus_gauss)
 
-    stat_cols = (["hours_since_last_match", "hours_since_2nd_last_match",
-                  "last_match_is_away", "last_match_is_europe",
-                  "last_match_is_abroad"]
+    stat_cols = (_GAP_COLS
+                 + ["last_match_is_away", "last_match_is_europe",
+                    "last_match_is_abroad"]
                  + [f"{c}_in_{x}d" for x in windows for c in _IND_COLS]
                  + [f"{c}_load_{t}d" for t in taus_exp for c in _IND_COLS]
                  + [f"{c}_load_gauss_{t}d" for t in taus_gauss for c in _IND_COLS])
