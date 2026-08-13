@@ -158,7 +158,28 @@ def _check_missing(teams: set[str], attrs: dict, league: str, season: str) -> No
         raise ValueError("missing team-attribute entries:\n" + "\n".join(lines))
 
 
-def _load_file(path: Path, attrs: dict[str, dict], limits: dict, group: str) -> pd.DataFrame:
+def _break_segments(date: pd.Series, edges: pd.Series) -> tuple[np.ndarray, np.ndarray]:
+    """Number a chronological run of matches from the last break and back to the next one.
+
+    The breaks cut the run into segments; inside a segment the matches are 1, 2, 3 ... from
+    the restart and -1, -2, -3 ... back from the last one before the next break. Matches
+    before the season's first break have nothing to count from, and matches after its last
+    one nothing to count to, so those stay NaN.
+    """
+    after = np.full(len(date), np.nan)
+    before = np.full(len(date), np.nan)
+    seg = np.searchsorted(edges.to_numpy(), date.to_numpy(), side="right")
+    for s_id in np.unique(seg):
+        idx = np.flatnonzero(seg == s_id)
+        if s_id > 0:
+            after[idx] = np.arange(1, len(idx) + 1)
+        if s_id < len(edges):
+            before[idx] = np.arange(-len(idx), 0)
+    return after, before
+
+
+def _load_file(path: Path, attrs: dict[str, dict], limits: dict, group: str,
+               breaks: pd.DataFrame) -> pd.DataFrame:
     league, season = path.stem.removesuffix("_matches").rsplit("_", 1)
     raw = pd.read_csv(path)
 
@@ -175,6 +196,17 @@ def _load_file(path: Path, attrs: dict[str, dict], limits: dict, group: str) -> 
     gameweek_before_end = (gameweek - 2 * (n_teams - 1) - 1).rename("gameweek_before_end")
 
     date = _parse_dates(raw["Date"])
+
+    # the same pair of counters anchored on the breaks instead of the season's ends. Bucketed
+    # into rounds the same way gameweek buckets season_game_number; a bucket is not guaranteed
+    # to be a real round there either, because rescheduling moves matches between them.
+    edges = breaks.loc[breaks["season"] == season, "first_match_after"].sort_values()
+    sgn_after, sgn_before = _break_segments(date, edges)
+    _int = lambda v, name: pd.Series(v, name=name).astype("Int64")
+    season_game_number_after_break = _int(sgn_after, "season_game_number_after_break")
+    season_game_number_before_break = _int(sgn_before, "season_game_number_before_break")
+    gameweek_after_break = _int(np.ceil(sgn_after / matches_per_gw), "gameweek_after_break")
+    gameweek_before_break = _int(-np.ceil(-sgn_before / matches_per_gw), "gameweek_before_break")
     odds, impl, margins, hadiffs = {}, {}, {}, {}
 
     for bk, mapping in _RAW_ODDS.items():
@@ -272,6 +304,10 @@ def _load_file(path: Path, attrs: dict[str, dict], limits: dict, group: str) -> 
         date.dt.day_name().map(_DOW_CAT).rename("day_of_week_cat"),
         season_game_number.rename("season_game_number"),
         season_game_number_before_end,
+        season_game_number_after_break,
+        season_game_number_before_break,
+        gameweek_after_break,
+        gameweek_before_break,
         gameweek,
         gameweek_before_end,
         phase4.rename("season_4phase"),
@@ -313,7 +349,7 @@ def _load_break_dates() -> pd.DataFrame:
     return pd.read_csv(_BREAKS_PATH, dtype={"season": str}, parse_dates=["last_match_before", "first_match_after"])
 
 
-def _attach_break_counters(df: pd.DataFrame, breaks: pd.DataFrame) -> pd.DataFrame:
+def _attach_team_break_counters(df: pd.DataFrame, breaks: pd.DataFrame) -> pd.DataFrame:
     """Count each team's league matches from the last break and to the next one.
 
     A team's season is cut into segments by the breaks; within a segment the matches are
@@ -337,15 +373,11 @@ def _attach_break_counters(df: pd.DataFrame, breaks: pd.DataFrame) -> pd.DataFra
 
     after = pd.Series(np.nan, index=long.index)
     before = pd.Series(np.nan, index=long.index)
-    for (season, league, team), grp in long.groupby(["season", "league", "team"], sort=False):
+    for (season, _league, _team), grp in long.groupby(["season", "league", "team"], sort=False):
         edges = breaks.loc[breaks["season"] == season, "first_match_after"].sort_values()
-        seg = np.searchsorted(edges.to_numpy(), grp["date"].to_numpy(), side="right")
-        for s_id, idx in pd.Series(grp.index).groupby(seg):
-            n = len(idx)
-            if s_id > 0:                       # something to count from
-                after.loc[idx.to_numpy()] = np.arange(1, n + 1)
-            if s_id < len(edges):              # something to count to
-                before.loc[idx.to_numpy()] = np.arange(-n, 0)
+        a, b = _break_segments(grp["date"], edges)
+        after.loc[grp.index] = a
+        before.loc[grp.index] = b
 
     for side in ("hmt", "awt"):
         m = long["side"] == side
@@ -354,32 +386,6 @@ def _attach_break_counters(df: pd.DataFrame, breaks: pd.DataFrame) -> pd.DataFra
             col.loc[long.loc[m, "row"].to_numpy()] = values[m].to_numpy()
             df[f"{side}_{name}"] = col.astype("Int64")
 
-    # the same counters one level up: the league-season's own matches rather than a team's,
-    # so a whole round no longer shares one value the way it does under `gameweek`
-    lg_after = pd.Series(np.nan, index=df.index)
-    lg_before = pd.Series(np.nan, index=df.index)
-    # ordered like season_game_number, so matches sharing a date keep one agreed sequence
-    order = df.assign(_d=date).sort_values(["league", "season", "season_game_number"])
-    for (season, league), grp in order.groupby(["season", "league"], sort=False):
-        edges = breaks.loc[breaks["season"] == season, "first_match_after"].sort_values()
-        seg = np.searchsorted(edges.to_numpy(), grp["_d"].to_numpy(), side="right")
-        for s_id, idx in pd.Series(grp.index).groupby(seg):
-            n = len(idx)
-            if s_id > 0:
-                lg_after.loc[idx.to_numpy()] = np.arange(1, n + 1)
-            if s_id < len(edges):
-                lg_before.loc[idx.to_numpy()] = np.arange(-n, 0)
-    df["season_game_number_after_break"] = lg_after.astype("Int64")
-    df["season_game_number_before_break"] = lg_before.astype("Int64")
-
-    # bucketed into rounds exactly as gameweek buckets season_game_number: ceil over half
-    # the team count. Rescheduling means a bucket is not always a real round, here as there.
-    n_teams = df.groupby(["league", "season"]).apply(
-        lambda g: len(set(g["hmt_name"]) | set(g["awt_name"])), include_groups=False)
-    per_round = (df.set_index(["league", "season"]).index.map(n_teams) // 2).to_series(index=df.index)
-    per_round = per_round.where(per_round > 0)
-    df["gameweek_after_break"] = np.ceil(lg_after / per_round).astype("Int64")
-    df["gameweek_before_break"] = -np.ceil(-lg_before / per_round).astype("Int64")
     return df
 
 
@@ -457,16 +463,17 @@ def _attach_elo_cats(df: pd.DataFrame, group: str) -> pd.DataFrame:
 def build_match_info(group: str = "major") -> pd.DataFrame:
     cols = ["match_id"] + _columns(group)
     limits = _load_phase_limits()
+    breaks = _load_break_dates()
     features_dir = _features_dir(group)
     frames = []
     for path in sorted(_matches_dir(group).glob("*.csv")):
         league, season = path.stem.removesuffix("_matches").rsplit("_", 1)
         attrs = _load_attributes(league, season, group)
-        frames.append(_load_file(path, attrs, limits, group))
+        frames.append(_load_file(path, attrs, limits, group, breaks))
 
     base = _attach_elo(pd.concat(frames, ignore_index=True), group)
     base = _attach_elo_cats(base, group)
-    base = _attach_break_counters(base, _load_break_dates())
+    base = _attach_team_break_counters(base, breaks)
     df = round_floats(base[cols])
 
     features_dir.mkdir(parents=True, exist_ok=True)

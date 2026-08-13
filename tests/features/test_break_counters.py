@@ -1,5 +1,8 @@
-"""game_number_after_break / _before_break: each team's league matches counted from the
-last break in which every league stopped, and back to the next one.
+"""{side}_game_number_after_break / _before_break: each team's league matches counted from
+the last break in which every league stopped, and back to the next one.
+
+The league-season counters of the same name live in _load_file next to season_game_number
+and are a different quantity — these are per team, which is what the fixtures below turn on.
 
 The counters are resolved per team on purpose. `gameweek` is only the sequential match
 number bucketed by half the team count, so a rescheduled fixture leaves two teams in one
@@ -10,7 +13,7 @@ leagues resume weeks apart.
 import pandas as pd
 import pytest
 
-from features.match_info import _attach_break_counters
+from features.match_info import _attach_team_break_counters
 
 
 def _matches(rows):
@@ -37,7 +40,7 @@ def breaks():
 
 
 def test_counts_run_forward_from_each_break(breaks):
-    out = _attach_break_counters(_matches([
+    out = _attach_team_break_counters(_matches([
         ("england", "2425", "alfa", "bravo", "2024-10-19"),   # 1st after break 1
         ("england", "2425", "alfa", "charlie", "2024-10-26"),  # 2nd
         ("england", "2425", "alfa", "delta", "2024-11-02"),    # 3rd
@@ -47,7 +50,7 @@ def test_counts_run_forward_from_each_break(breaks):
 
 
 def test_counts_run_backward_to_the_next_break(breaks):
-    out = _attach_break_counters(_matches([
+    out = _attach_team_break_counters(_matches([
         ("england", "2425", "alfa", "bravo", "2024-10-19"),
         ("england", "2425", "alfa", "charlie", "2024-10-26"),
         ("england", "2425", "alfa", "delta", "2024-11-02"),    # last before break 2
@@ -56,7 +59,7 @@ def test_counts_run_backward_to_the_next_break(breaks):
 
 
 def test_edges_of_the_season_are_empty(breaks):
-    out = _attach_break_counters(_matches([
+    out = _attach_team_break_counters(_matches([
         ("england", "2425", "alfa", "bravo", "2024-09-28"),   # before the first break
         ("england", "2425", "alfa", "charlie", "2024-11-30"),  # after the last one
     ]), breaks)
@@ -67,7 +70,7 @@ def test_edges_of_the_season_are_empty(breaks):
 def test_the_two_sides_can_disagree(breaks):
     """alfa had a fixture rescheduled into the restart week, so by the time the two meet
     it is alfa's second match after the break and bravo's first."""
-    out = _attach_break_counters(_matches([
+    out = _attach_team_break_counters(_matches([
         ("england", "2425", "alfa", "charlie", "2024-10-19"),  # alfa plays early
         ("england", "2425", "alfa", "bravo", "2024-10-26"),    # alfa 2nd, bravo 1st
     ]), breaks)
@@ -78,7 +81,7 @@ def test_the_two_sides_can_disagree(breaks):
 def test_leagues_resume_independently(breaks):
     """The world cup case: one league comes back weeks after another, and each counts
     from its own first match."""
-    out = _attach_break_counters(_matches([
+    out = _attach_team_break_counters(_matches([
         ("england", "2425", "alfa", "bravo", "2024-10-19"),
         ("germany", "2425", "gamma", "delta", "2024-11-09"),   # still its 1st after break 1
     ]), breaks)
@@ -87,7 +90,7 @@ def test_leagues_resume_independently(breaks):
 
 def test_no_break_file_leaves_both_counters_empty():
     empty = pd.DataFrame(columns=["season", "last_match_before", "first_match_after", "type"])
-    out = _attach_break_counters(_matches([
+    out = _attach_team_break_counters(_matches([
         ("england", "2425", "alfa", "bravo", "2024-10-19"),
     ]), empty)
     assert out["hmt_game_number_after_break"].isna().all()
