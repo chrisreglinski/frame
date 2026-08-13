@@ -211,6 +211,11 @@ so their relative cost is estimated downstream instead of asserted here.
   (capped at 500) — hours since that team's previous fixture in any competition, and since the
   one before it. Kick-offs are normalised to CET first (football-data prints UK times, FBref
   prints venue-local with CET in brackets)
+- `{side}_hours_since_last_match_cat2q` / `_cat3q` and the same pair on
+  `_hours_since_2nd_last_match` — median split and tertiles of each gap, cut on the pooled
+  hmt + awt values across all seasons (thresholds in `thresholds.json`), same convention as
+  `elo_cat3q`. `q` rather than the `m` of `cat2m` because the two-way split is the median, not
+  the mean. Both caps sit above p67, so the capped tail is all `high`
 - `{side}_games_in_{x}d`, `{side}_{venue}_games_in_{x}d`, `{side}_{stream}_games_in_{x}d` —
   fixtures in the `x` days before kick-off, in total and split along each axis; windows
   `8, 15, 45` days

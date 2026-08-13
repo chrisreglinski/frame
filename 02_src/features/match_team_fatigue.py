@@ -15,6 +15,7 @@ to match grain via is_home.
 """
 
 import itertools
+import json
 import re
 from pathlib import Path
 
@@ -35,6 +36,8 @@ _YAML_PATH = _ROOT / "06_docs" / "data.yaml"
 # fixtures, so its cap sits proportionally higher.
 _LAST_CAP_HOURS = 200
 _2ND_LAST_CAP_HOURS = 500
+
+_GAP_COLS = ["hours_since_last_match", "hours_since_2nd_last_match"]
 
 # Competition stream per file-name prefix. "other" is everything that is neither the
 # domestic league nor a UEFA club competition: domestic cups, domestic and european super
@@ -357,6 +360,45 @@ def _add_stats(calendar: pd.DataFrame, windows: list[int],
     return pd.concat([calendar, pd.DataFrame(new, index=calendar.index)], axis=1)
 
 
+def _attach_gap_cats(df: pd.DataFrame, group: str) -> pd.DataFrame:
+    """Categorize the two gap columns against their pooled per-match distribution.
+
+    cat2q: low/high either side of the median. cat3q: low/medium/high tertiles (p33/p67).
+    The gaps are per-match quantities, so the boundaries follow {side}_elo_cat3q rather
+    than the season-stat categories: they come from all hmt + awt values in the group
+    (global, all seasons) and are recorded in thresholds.json. Both caps sit above p67, so
+    the capped tail lands wholly in `high`. None where the gap is NaN."""
+    df = df.copy()
+    thresholds_path = _features_dir(group) / "thresholds.json"
+    thresholds = json.loads(thresholds_path.read_text()) if thresholds_path.exists() else {}
+
+    for stem in _GAP_COLS:
+        pooled = pd.concat([df[f"hmt_{stem}"], df[f"awt_{stem}"]]).dropna()
+
+        if pooled.empty:
+            for side in ("hmt", "awt"):
+                df[f"{side}_{stem}_cat2q"] = None
+                df[f"{side}_{stem}_cat3q"] = None
+            continue
+
+        p50 = round(float(pooled.quantile(1 / 2)), 3)
+        p33 = round(float(pooled.quantile(1 / 3)), 3)
+        p67 = round(float(pooled.quantile(2 / 3)), 3)
+        thresholds.update({f"{stem}_p50": p50, f"{stem}_p33": p33, f"{stem}_p67": p67})
+
+        for side in ("hmt", "awt"):
+            gap = df[f"{side}_{stem}"]
+            df[f"{side}_{stem}_cat2q"] = np.where(
+                gap.isna(), None, np.where(gap <= p50, "low", "high"))
+            df[f"{side}_{stem}_cat3q"] = np.where(
+                gap.isna(), None,
+                np.where(gap <= p33, "low", np.where(gap <= p67, "medium", "high")))
+
+    thresholds_path.parent.mkdir(parents=True, exist_ok=True)
+    thresholds_path.write_text(json.dumps(thresholds, indent=2))
+    return df
+
+
 def build_match_team_fatigue(group: str = "major") -> pd.DataFrame:
     schema = _schema()
     windows = _dim(schema, "{side}_games_in_{x}d", "x")
@@ -376,7 +418,7 @@ def build_match_team_fatigue(group: str = "major") -> pd.DataFrame:
             .rename(columns={c: f"hmt_{c}" for c in stat_cols}))
     away = (played[~played["is_home"]][["match_id"] + stat_cols]
             .rename(columns={c: f"awt_{c}" for c in stat_cols}))
-    df = home.merge(away, on="match_id")
+    df = _attach_gap_cats(home.merge(away, on="match_id"), group)
     df = round_floats(df[["match_id"] + _columns(schema)])
 
     features_dir = _features_dir(group)

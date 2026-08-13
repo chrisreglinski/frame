@@ -882,6 +882,43 @@ columns:
     dtype: float
     range: [0, 500]
 
+  # cat2q splits at the median, cat3q at the tertiles. The suffix follows the elo and
+  # season-stat categories, with q rather than m because the two-way split here is a
+  # quantile, not the mean. Thresholds come from the pooled hmt + awt values over all
+  # seasons — boundaries only, the same global convention as {side}_elo_cat3q — and both
+  # caps sit above the p67 boundary, so the capped tail lands wholly in `high`.
+  "{side}_hours_since_last_match_cat2q":
+    table: match_team_fatigue
+    description: "half of the pooled {side}_hours_since_last_match distribution the value falls in (thresholds.json hours_since_last_match_p50); low is the shorter gap. None where the gap is NaN"
+    dims:
+      side: [hmt, awt]
+    dtype: string
+    categories: [low, high]
+
+  "{side}_hours_since_last_match_cat3q":
+    table: match_team_fatigue
+    description: "tertile of the pooled {side}_hours_since_last_match distribution (thresholds.json hours_since_last_match_p33/p67); low is the shortest gap. None where the gap is NaN"
+    dims:
+      side: [hmt, awt]
+    dtype: string
+    categories: [low, medium, high]
+
+  "{side}_hours_since_2nd_last_match_cat2q":
+    table: match_team_fatigue
+    description: "half of the pooled {side}_hours_since_2nd_last_match distribution the value falls in (thresholds.json hours_since_2nd_last_match_p50); low is the shorter gap. None where the gap is NaN"
+    dims:
+      side: [hmt, awt]
+    dtype: string
+    categories: [low, high]
+
+  "{side}_hours_since_2nd_last_match_cat3q":
+    table: match_team_fatigue
+    description: "tertile of the pooled {side}_hours_since_2nd_last_match distribution (thresholds.json hours_since_2nd_last_match_p33/p67); low is the shortest gap. None where the gap is NaN"
+    dims:
+      side: [hmt, awt]
+    dtype: string
+    categories: [low, medium, high]
+
   "{side}_games_in_{x}d":
     table: match_team_fatigue
     description: "number of fixtures in any competition played by the {side} team in the {x} days before this match's kick-off"
