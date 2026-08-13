@@ -852,6 +852,164 @@ columns:
     description: "league home-field-advantage component of teams_elo_diff_lmr_impl_diff: the market-priced home boost from hfa[league], = diff - stgh, saturating toward 0 as |d| grows. NaN if teams_elo_diff is NaN"
     dtype: float
 
+  # Match-level combinations of the two sides of match_team_fatigue, on the same teams_
+  # convention as the block above: _total is home plus away, _diff is home minus away.
+  # _total reads as "how congested is this fixture's slot in the calendar", a property the
+  # two teams share; _diff reads as "which side comes in fresher", the fatigue asymmetry.
+  # Neither is derivable from the other, and they answer different questions.
+
+  "teams_hours_since_{n}_match_total":
+    table: match_matchup_stats
+    description: "hmt_hours_since_{n}_match plus awt_hours_since_{n}_match, the per-side column being the hours since the fixture {n} in the team's calendar; combined schedule load carried into the fixture by the two teams. NaN if either side's gap is NaN"
+    dims:
+      n: [last, 2nd_last, 3rd_last]
+    dtype: float
+
+  "teams_hours_since_{n}_match_diff":
+    table: match_matchup_stats
+    description: "hmt_hours_since_{n}_match minus awt_hours_since_{n}_match, the per-side column being the hours since the fixture {n} in the team's calendar; positive = the home team carried more of it. NaN if either side's gap is NaN"
+    dims:
+      n: [last, 2nd_last, 3rd_last]
+    dtype: float
+
+  "teams_games_in_{x}d_total":
+    table: match_matchup_stats
+    description: "hmt_games_in_{x}d plus awt_games_in_{x}d, the per-side column being the fixtures in any competition in the {x} days before kick-off; combined schedule load carried into the fixture by the two teams. never NaN — a team with no earlier fixture counts zero"
+    dims:
+      x: [8, 15, 45]
+    dtype: int
+
+  "teams_games_in_{x}d_diff":
+    table: match_matchup_stats
+    description: "hmt_games_in_{x}d minus awt_games_in_{x}d, the per-side column being the fixtures in any competition in the {x} days before kick-off; positive = the home team carried more of it. never NaN — a team with no earlier fixture counts zero"
+    dims:
+      x: [8, 15, 45]
+    dtype: int
+
+  "teams_{venue}_games_in_{x}d_total":
+    table: match_matchup_stats
+    description: "hmt_{venue}_games_in_{x}d plus awt_{venue}_games_in_{x}d, the per-side column being the fixtures played {venue} in the {x} days before kick-off; combined schedule load carried into the fixture by the two teams. never NaN — a team with no earlier fixture counts zero"
+    dims:
+      venue: [home, domestic, abroad]
+      x: [8, 15, 45]
+    dtype: int
+
+  "teams_{venue}_games_in_{x}d_diff":
+    table: match_matchup_stats
+    description: "hmt_{venue}_games_in_{x}d minus awt_{venue}_games_in_{x}d, the per-side column being the fixtures played {venue} in the {x} days before kick-off; positive = the home team carried more of it. never NaN — a team with no earlier fixture counts zero"
+    dims:
+      venue: [home, domestic, abroad]
+      x: [8, 15, 45]
+    dtype: int
+
+  "teams_{stream}_games_in_{x}d_total":
+    table: match_matchup_stats
+    description: "hmt_{stream}_games_in_{x}d plus awt_{stream}_games_in_{x}d, the per-side column being the {stream} fixtures in the {x} days before kick-off; combined schedule load carried into the fixture by the two teams. never NaN — a team with no earlier fixture counts zero"
+    dims:
+      stream: [league, europe, other]
+      x: [8, 15, 45]
+    dtype: int
+
+  "teams_{stream}_games_in_{x}d_diff":
+    table: match_matchup_stats
+    description: "hmt_{stream}_games_in_{x}d minus awt_{stream}_games_in_{x}d, the per-side column being the {stream} fixtures in the {x} days before kick-off; positive = the home team carried more of it. never NaN — a team with no earlier fixture counts zero"
+    dims:
+      stream: [league, europe, other]
+      x: [8, 15, 45]
+    dtype: int
+
+  "teams_games_load_{tau}d_total":
+    table: match_matchup_stats
+    description: "hmt_games_load_{tau}d plus awt_games_load_{tau}d, the per-side column being the exponentially decayed fixture load at tau = {tau} days; combined schedule load carried into the fixture by the two teams. never NaN — a team with no earlier fixture counts zero"
+    dims:
+      tau: [7, 14]
+    dtype: float
+
+  "teams_games_load_{tau}d_diff":
+    table: match_matchup_stats
+    description: "hmt_games_load_{tau}d minus awt_games_load_{tau}d, the per-side column being the exponentially decayed fixture load at tau = {tau} days; positive = the home team carried more of it. never NaN — a team with no earlier fixture counts zero"
+    dims:
+      tau: [7, 14]
+    dtype: float
+
+  "teams_{venue}_games_load_{tau}d_total":
+    table: match_matchup_stats
+    description: "hmt_{venue}_games_load_{tau}d plus awt_{venue}_games_load_{tau}d, the per-side column being the exponentially decayed load over fixtures played {venue}, tau = {tau} days; combined schedule load carried into the fixture by the two teams. never NaN — a team with no earlier fixture counts zero"
+    dims:
+      venue: [home, domestic, abroad]
+      tau: [7, 14]
+    dtype: float
+
+  "teams_{venue}_games_load_{tau}d_diff":
+    table: match_matchup_stats
+    description: "hmt_{venue}_games_load_{tau}d minus awt_{venue}_games_load_{tau}d, the per-side column being the exponentially decayed load over fixtures played {venue}, tau = {tau} days; positive = the home team carried more of it. never NaN — a team with no earlier fixture counts zero"
+    dims:
+      venue: [home, domestic, abroad]
+      tau: [7, 14]
+    dtype: float
+
+  "teams_{stream}_games_load_{tau}d_total":
+    table: match_matchup_stats
+    description: "hmt_{stream}_games_load_{tau}d plus awt_{stream}_games_load_{tau}d, the per-side column being the exponentially decayed load over {stream} fixtures, tau = {tau} days; combined schedule load carried into the fixture by the two teams. never NaN — a team with no earlier fixture counts zero"
+    dims:
+      stream: [league, europe, other]
+      tau: [7, 14]
+    dtype: float
+
+  "teams_{stream}_games_load_{tau}d_diff":
+    table: match_matchup_stats
+    description: "hmt_{stream}_games_load_{tau}d minus awt_{stream}_games_load_{tau}d, the per-side column being the exponentially decayed load over {stream} fixtures, tau = {tau} days; positive = the home team carried more of it. never NaN — a team with no earlier fixture counts zero"
+    dims:
+      stream: [league, europe, other]
+      tau: [7, 14]
+    dtype: float
+
+  "teams_games_load_gauss_{tau}d_total":
+    table: match_matchup_stats
+    description: "hmt_games_load_gauss_{tau}d plus awt_games_load_gauss_{tau}d, the per-side column being the gaussian-kernel fixture load at tau = {tau} days; combined schedule load carried into the fixture by the two teams. never NaN — a team with no earlier fixture counts zero"
+    dims:
+      tau: [4, 7]
+    dtype: float
+
+  "teams_games_load_gauss_{tau}d_diff":
+    table: match_matchup_stats
+    description: "hmt_games_load_gauss_{tau}d minus awt_games_load_gauss_{tau}d, the per-side column being the gaussian-kernel fixture load at tau = {tau} days; positive = the home team carried more of it. never NaN — a team with no earlier fixture counts zero"
+    dims:
+      tau: [4, 7]
+    dtype: float
+
+  "teams_{venue}_games_load_gauss_{tau}d_total":
+    table: match_matchup_stats
+    description: "hmt_{venue}_games_load_gauss_{tau}d plus awt_{venue}_games_load_gauss_{tau}d, the per-side column being the gaussian-kernel load over fixtures played {venue}, tau = {tau} days; combined schedule load carried into the fixture by the two teams. never NaN — a team with no earlier fixture counts zero"
+    dims:
+      venue: [home, domestic, abroad]
+      tau: [4, 7]
+    dtype: float
+
+  "teams_{venue}_games_load_gauss_{tau}d_diff":
+    table: match_matchup_stats
+    description: "hmt_{venue}_games_load_gauss_{tau}d minus awt_{venue}_games_load_gauss_{tau}d, the per-side column being the gaussian-kernel load over fixtures played {venue}, tau = {tau} days; positive = the home team carried more of it. never NaN — a team with no earlier fixture counts zero"
+    dims:
+      venue: [home, domestic, abroad]
+      tau: [4, 7]
+    dtype: float
+
+  "teams_{stream}_games_load_gauss_{tau}d_total":
+    table: match_matchup_stats
+    description: "hmt_{stream}_games_load_gauss_{tau}d plus awt_{stream}_games_load_gauss_{tau}d, the per-side column being the gaussian-kernel load over {stream} fixtures, tau = {tau} days; combined schedule load carried into the fixture by the two teams. never NaN — a team with no earlier fixture counts zero"
+    dims:
+      stream: [league, europe, other]
+      tau: [4, 7]
+    dtype: float
+
+  "teams_{stream}_games_load_gauss_{tau}d_diff":
+    table: match_matchup_stats
+    description: "hmt_{stream}_games_load_gauss_{tau}d minus awt_{stream}_games_load_gauss_{tau}d, the per-side column being the gaussian-kernel load over {stream} fixtures, tau = {tau} days; positive = the home team carried more of it. never NaN — a team with no earlier fixture counts zero"
+    dims:
+      stream: [league, europe, other]
+      tau: [4, 7]
+    dtype: float
+
 
   # match_team_fatigue — schedule density on the team's full fixture calendar.
   # Fixtures are described on two orthogonal axes, each of which partitions the calendar,
@@ -866,82 +1024,37 @@ columns:
   # The full venue x stream grid is not carried here — several of its cells hold a few dozen
   # rows — but the calendar written alongside the table keeps it in a `cell` column.
 
-  "{side}_hours_since_last_match":
+  "{side}_hours_since_{n}_match":
     table: match_team_fatigue
-    description: "hours between the kick-off of this match and the kick-off of the {side} team's previous fixture in any competition, capped at 200. kick-offs are normalised to central european time before subtracting (football-data league times are uk, fbref times are venue-local with cet in brackets). NaN if the team has no earlier fixture in the season"
+    description: "hours between the kick-off of this match and the kick-off of the fixture {n} in the {side} team's calendar, counting fixtures in any competition. kick-offs are normalised to central european time before subtracting (football-data league times are uk, fbref times are venue-local with cet in brackets). capped at the 95th percentile of its own distribution over the group (thresholds.json hours_since_{n}_match_cap): past that the gap is a winter/international break or a postponement and the number stops describing recovery. each depth is capped separately, so this is not the sum of the shorter gaps. NaN if the team has fewer earlier fixtures in the season than {n} requires"
     dims:
       side: [hmt, awt]
+      n: [last, 2nd_last, 3rd_last]
     dtype: float
-    range: [0, 200]
-
-  "{side}_hours_since_2nd_last_match":
-    table: match_team_fatigue
-    description: "hours between the kick-off of this match and the kick-off of the fixture two back in the {side} team's calendar, capped at 500. same time normalisation as {side}_hours_since_last_match; the two caps bite independently, so this is not their sum. NaN if the team has fewer than two earlier fixtures in the season"
-    dims:
-      side: [hmt, awt]
-    dtype: float
-    range: [0, 500]
-
-  "{side}_hours_since_3rd_last_match":
-    table: match_team_fatigue
-    description: "hours between the kick-off of this match and the kick-off of the fixture three back in the {side} team's calendar, capped at 700. same time normalisation as {side}_hours_since_last_match; the caps bite independently, so this is not the sum of the shorter gaps. NaN if the team has fewer than three earlier fixtures in the season"
-    dims:
-      side: [hmt, awt]
-    dtype: float
-    range: [0, 700]
 
   # cat2q splits at the median, cat3q at the tertiles. The suffix follows the elo and
   # season-stat categories, with q rather than m because the two-way split here is a
   # quantile, not the mean. Thresholds come from the pooled hmt + awt values over all
-  # seasons — boundaries only, the same global convention as {side}_elo_cat3q — and both
-  # caps sit above the p67 boundary, so the capped tail lands wholly in `high`.
-  "{side}_hours_since_last_match_cat2q":
+  # seasons — boundaries only, the same global convention as {side}_elo_cat3q — and the
+  # p95 cap sits above the p67 boundary, so the capped tail lands wholly in `high`.
+  "{side}_hours_since_{n}_match_cat2q":
     table: match_team_fatigue
-    description: "half of the pooled {side}_hours_since_last_match distribution the value falls in (thresholds.json hours_since_last_match_p50); low is the shorter gap. None where the gap is NaN"
+    description: "half of the pooled {side}_hours_since_{n}_match distribution the value falls in (thresholds.json hours_since_{n}_match_p50); low is the shorter gap. None where the gap is NaN"
     dims:
       side: [hmt, awt]
+      n: [last, 2nd_last, 3rd_last]
     dtype: string
     categories: [low, high]
 
-  "{side}_hours_since_last_match_cat3q":
+  "{side}_hours_since_{n}_match_cat3q":
     table: match_team_fatigue
-    description: "tertile of the pooled {side}_hours_since_last_match distribution (thresholds.json hours_since_last_match_p33/p67); low is the shortest gap. None where the gap is NaN"
+    description: "tertile of the pooled {side}_hours_since_{n}_match distribution (thresholds.json hours_since_{n}_match_p33/p67); low is the shortest gap. None where the gap is NaN"
     dims:
       side: [hmt, awt]
+      n: [last, 2nd_last, 3rd_last]
     dtype: string
     categories: [low, medium, high]
 
-  "{side}_hours_since_2nd_last_match_cat2q":
-    table: match_team_fatigue
-    description: "half of the pooled {side}_hours_since_2nd_last_match distribution the value falls in (thresholds.json hours_since_2nd_last_match_p50); low is the shorter gap. None where the gap is NaN"
-    dims:
-      side: [hmt, awt]
-    dtype: string
-    categories: [low, high]
-
-  "{side}_hours_since_2nd_last_match_cat3q":
-    table: match_team_fatigue
-    description: "tertile of the pooled {side}_hours_since_2nd_last_match distribution (thresholds.json hours_since_2nd_last_match_p33/p67); low is the shortest gap. None where the gap is NaN"
-    dims:
-      side: [hmt, awt]
-    dtype: string
-    categories: [low, medium, high]
-
-  "{side}_hours_since_3rd_last_match_cat2q":
-    table: match_team_fatigue
-    description: "half of the pooled {side}_hours_since_3rd_last_match distribution the value falls in (thresholds.json hours_since_3rd_last_match_p50); low is the shorter gap. None where the gap is NaN"
-    dims:
-      side: [hmt, awt]
-    dtype: string
-    categories: [low, high]
-
-  "{side}_hours_since_3rd_last_match_cat3q":
-    table: match_team_fatigue
-    description: "tertile of the pooled {side}_hours_since_3rd_last_match distribution (thresholds.json hours_since_3rd_last_match_p33/p67); low is the shortest gap. None where the gap is NaN"
-    dims:
-      side: [hmt, awt]
-    dtype: string
-    categories: [low, medium, high]
 
   "{side}_games_in_{x}d":
     table: match_team_fatigue

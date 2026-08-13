@@ -59,6 +59,10 @@ def build_match_matchup_stats(group: str = "major") -> pd.DataFrame:
     # elo features (league is needed for the per-league home-field intercept)
     info = pd.read_parquet(features_dir / "match_info.parquet")[["match_id", "hmt_elo", "awt_elo", "league"]]
     src = src.merge(info, on="match_id", how="left")
+    # the schedule-density columns live in their own table; the teams_ combinations of them
+    # belong here with the rest of the matchup features, so pull the whole table in
+    fatigue = pd.read_parquet(features_dir / "match_team_fatigue.parquet")
+    src = src.merge(fatigue, on="match_id", how="left")
 
     computed = {}
     for window in _windows():
@@ -153,6 +157,17 @@ def build_match_matchup_stats(group: str = "major") -> pd.DataFrame:
         computed[f"teams_elo_diff_{prefix}_impl_stgh"] = stgh
         computed[f"teams_elo_diff_{prefix}_impl_lhfa"] = diff - stgh
         computed[f"teams_elo_diff_{prefix}_impl_diff"] = diff
+
+    # teams_ combinations of match_team_fatigue: every contract column of the form
+    # teams_<stem>_total / _diff whose per-side halves exist in that table. Reading the
+    # names off the contract rather than listing them keeps the two in step — a stem added
+    # there appears here, and one asked for but not produced fails the selection below.
+    for name in _columns():
+        stem, _, form = name.removeprefix("teams_").rpartition("_")
+        if form not in ("total", "diff") or f"hmt_{stem}" not in fatigue.columns:
+            continue
+        home_side, away_side = src[f"hmt_{stem}"], src[f"awt_{stem}"]
+        computed[name] = home_side + away_side if form == "total" else home_side - away_side
 
     result = round_floats(pd.concat(
         [src[["match_id"]], pd.DataFrame(computed, index=src.index)],

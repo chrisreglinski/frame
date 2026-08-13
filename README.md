@@ -161,6 +161,12 @@ Derived from `match_team_stats`. Comparative features per window:
   - **total** (home + away, combined intensity / level): `teams_{window}_goals_total_avg_total`,
     `teams_{window}_shots_on_target_total_avg_total`, `teams_{window}_xg_total_avg_total`,
     `teams_{window}_points_avg_total`, `teams_{window}_{mp,mc}_impl_points_avg_total`, `teams_elo_total`.
+- **Schedule density** (`teams_…_total` / `_diff` over every `match_team_fatigue` per-side column —
+  the three rest gaps, the count windows and the decayed loads, each also split by venue and stream).
+  `_total` reads as "how congested is this fixture's slot in the calendar", a property the two teams
+  share; `_diff` reads as "which side comes in fresher", the fatigue asymmetry. Built here rather than
+  in `match_team_fatigue` because the `teams_` prefix marks matchup features — which is why
+  `match_team_fatigue` runs before this step in `build_abt.py`
 - Naming: a for/agst quantity carries an inner for−agst / for+agst term (`goals_diff`, `goals_total`),
   so its matchup feature is `_diff_avg_diff` / `_total_avg_total`; a per-side average (points, impl_points)
   gives `_avg_diff` / `_avg_total`. Elo is a raw rating, so `teams_elo_diff` / `teams_elo_total` (no window).
@@ -207,17 +213,19 @@ dozen rows across four seasons — but `team_calendar.parquet`, written alongsid
 keeps it in a `cell` column. No competition carries a weight: the parts are counted separately
 so their relative cost is estimated downstream instead of asserted here.
 
-- `{side}_hours_since_last_match` (capped at 200), `{side}_hours_since_2nd_last_match`
-  (capped at 500) and `{side}_hours_since_3rd_last_match` (capped at 700) — hours since that
-  team's previous fixture in any competition, since the one before it, and since the one before
-  that. Kick-offs are normalised to CET first (football-data prints UK times, FBref prints
-  venue-local with CET in brackets). The caps bite on 15% / 13% / 6% of the values
-- `{side}_hours_since_last_match_cat2q` / `_cat3q` and the same pair on
-  `_hours_since_2nd_last_match` and `_hours_since_3rd_last_match` — median split and
-  tertiles of each gap, cut on the pooled
-  hmt + awt values across all seasons (thresholds in `thresholds.json`), same convention as
-  `elo_cat3q`. `q` rather than the `m` of `cat2m` because the two-way split is the median, not
-  the mean. Both caps sit above p67, so the capped tail is all `high`
+- `{side}_hours_since_{n}_match` for `n` in `last, 2nd_last, 3rd_last` — hours since that
+  team's previous fixture in any competition, since the one before it, and since the one
+  before that. Kick-offs are normalised to CET first (football-data prints UK times, FBref
+  prints venue-local with CET in brackets). Each depth is capped at the 95th percentile of
+  its own distribution rather than a hand-set hour count, because each spans one more fixture
+  than the last and so lives on its own scale — 340 / 530 / 714 hours on the current data,
+  recorded in `thresholds.json`. Past the cap the gap is a break or a postponement and the
+  number stops describing recovery
+- `{side}_hours_since_{n}_match_cat2q` / `_cat3q` — median split and tertiles of each gap,
+  cut on the pooled hmt + awt values across all seasons (thresholds in `thresholds.json`),
+  same convention as `elo_cat3q`. `q` rather than the `m` of `cat2m` because the two-way
+  split is the median, not the mean. The p95 cap sits above p67 at every depth, so the
+  capped tail is all `high` and the boundaries below it are untouched
 - `{side}_games_in_{x}d`, `{side}_{venue}_games_in_{x}d`, `{side}_{stream}_games_in_{x}d` —
   fixtures in the `x` days before kick-off, in total and split along each axis; windows
   `8, 15, 45` days

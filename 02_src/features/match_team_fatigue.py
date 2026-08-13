@@ -31,16 +31,12 @@ _DATA = _ROOT / "01_data"
 _RAW = _DATA / "01_raw"
 _YAML_PATH = _ROOT / "06_docs" / "data.yaml"
 
-# Gap to the fixture n back, and the cap on it: past a point the gap is a winter/
-# international break or a postponement, and the number stops describing recovery. Each
-# gap spans one more fixture than the last, so the caps rise with it. They bite on
-# 15% / 13% / 6% of the values respectively, so the third is the mildest of the three.
-_GAP_CAP_HOURS = {
-    "hours_since_last_match": 200,
-    "hours_since_2nd_last_match": 500,
-    "hours_since_3rd_last_match": 700,
-}
-_GAP_COLS = list(_GAP_CAP_HOURS)
+# The gap columns are capped at this quantile of their own distribution: past it the gap
+# is a winter/international break or a postponement, and the number stops describing
+# recovery. One quantile rather than one hour count per depth, because each gap spans one
+# more fixture than the last and so lives on its own scale. The cut lands above the p67
+# category boundary at every depth, so the capped tail is wholly inside `high`.
+_GAP_CAP_QUANTILE = 0.95
 
 # Competition stream per file-name prefix. "other" is everything that is neither the
 # domestic league nor a UEFA club competition: domestic cups, domestic and european super
@@ -97,6 +93,13 @@ def _dim(schema: dict, column: str, dim: str) -> list:
     """Window widths and decay constants come from the contract, so changing them there
     changes the builder."""
     return schema["columns"][column]["dims"][dim]
+
+
+def _gap_cols(schema: dict) -> list[str]:
+    """Gap column stems, shallowest first — the order is the shift depth, so `last` must
+    stay in front. Driven off the contract like the windows and decay constants."""
+    return [f"hours_since_{n}_match"
+            for n in _dim(schema, "{side}_hours_since_{n}_match", "n")]
 
 
 def _columns(schema: dict) -> list[str]:
@@ -333,15 +336,17 @@ def _gaussian_loads(calendar: pd.DataFrame, groups: dict, tau: float) -> np.ndar
     return out
 
 
-def _add_stats(calendar: pd.DataFrame, windows: list[int],
+def _add_stats(calendar: pd.DataFrame, gap_cols: list[str], windows: list[int],
                taus_exp: list[float], taus_gauss: list[float]) -> pd.DataFrame:
     calendar = _add_indicators(calendar)
     keys = ["league", "season", "team"]
     g = calendar.groupby(keys, sort=False)
 
+    # left uncapped here; the cap is a quantile of the finished distribution, so it can
+    # only be taken once the frame is on match grain (see _cap_and_categorize_gaps)
     hours = lambda delta: delta.dt.total_seconds() / 3600.0
-    for n, (col, cap) in enumerate(_GAP_CAP_HOURS.items(), start=1):
-        calendar[col] = hours(calendar["ts"] - g["ts"].shift(n)).clip(upper=cap)
+    for depth, col in enumerate(gap_cols, start=1):
+        calendar[col] = hours(calendar["ts"] - g["ts"].shift(depth))
     calendar["last_match_is_away"] = g["is_away"].shift(1)
     calendar["last_match_is_europe"] = g["is_europe"].shift(1)
     calendar["last_match_is_abroad"] = g["is_abroad"].shift(1)
@@ -361,20 +366,25 @@ def _add_stats(calendar: pd.DataFrame, windows: list[int],
     return pd.concat([calendar, pd.DataFrame(new, index=calendar.index)], axis=1)
 
 
-def _attach_gap_cats(df: pd.DataFrame, group: str) -> pd.DataFrame:
-    """Categorize the two gap columns against their pooled per-match distribution.
+def _cap_and_categorize_gaps(df: pd.DataFrame, group: str, gap_cols: list[str]) -> pd.DataFrame:
+    """Cap each gap column, then categorize it against its own pooled distribution.
 
-    cat2q: low/high either side of the median. cat3q: low/medium/high tertiles (p33/p67).
-    The gaps are per-match quantities, so the boundaries follow {side}_elo_cat3q rather
-    than the season-stat categories: they come from all hmt + awt values in the group
-    (global, all seasons) and are recorded in thresholds.json. Both caps sit above p67, so
-    the capped tail lands wholly in `high`. None where the gap is NaN."""
+    The cap is _GAP_CAP_QUANTILE of the pooled hmt + awt values, so each depth finds its
+    own ceiling instead of carrying a hand-set hour count. Categories are cut on the capped
+    values: cat2q low/high either side of the median, cat3q low/medium/high tertiles
+    (p33/p67). The gaps are per-match quantities, so the boundaries follow {side}_elo_cat3q
+    rather than the season-stat categories — all hmt + awt values in the group, global
+    across seasons. Cap and boundaries are recorded in thresholds.json, which is read
+    before it is written because earlier steps of the build own the other keys.
+
+    None where the gap is NaN."""
     df = df.copy()
     thresholds_path = _features_dir(group) / "thresholds.json"
     thresholds = json.loads(thresholds_path.read_text()) if thresholds_path.exists() else {}
 
-    for stem in _GAP_COLS:
-        pooled = pd.concat([df[f"hmt_{stem}"], df[f"awt_{stem}"]]).dropna()
+    for stem in gap_cols:
+        sides = [f"{side}_{stem}" for side in ("hmt", "awt")]
+        pooled = pd.concat([df[c] for c in sides]).dropna()
 
         if pooled.empty:
             for side in ("hmt", "awt"):
@@ -382,10 +392,15 @@ def _attach_gap_cats(df: pd.DataFrame, group: str) -> pd.DataFrame:
                 df[f"{side}_{stem}_cat3q"] = None
             continue
 
+        cap = round(float(pooled.quantile(_GAP_CAP_QUANTILE)), 3)
+        df[sides] = df[sides].clip(upper=cap)
+        pooled = pooled.clip(upper=cap)
+
         p50 = round(float(pooled.quantile(1 / 2)), 3)
         p33 = round(float(pooled.quantile(1 / 3)), 3)
         p67 = round(float(pooled.quantile(2 / 3)), 3)
-        thresholds.update({f"{stem}_p50": p50, f"{stem}_p33": p33, f"{stem}_p67": p67})
+        thresholds.update({f"{stem}_cap": cap,
+                           f"{stem}_p50": p50, f"{stem}_p33": p33, f"{stem}_p67": p67})
 
         for side in ("hmt", "awt"):
             gap = df[f"{side}_{stem}"]
@@ -402,12 +417,13 @@ def _attach_gap_cats(df: pd.DataFrame, group: str) -> pd.DataFrame:
 
 def build_match_team_fatigue(group: str = "major") -> pd.DataFrame:
     schema = _schema()
+    gap_cols = _gap_cols(schema)
     windows = _dim(schema, "{side}_games_in_{x}d", "x")
     taus_exp = _dim(schema, "{side}_games_load_{tau}d", "tau")
     taus_gauss = _dim(schema, "{side}_games_load_gauss_{tau}d", "tau")
-    calendar = _add_stats(_build_calendar(group), windows, taus_exp, taus_gauss)
+    calendar = _add_stats(_build_calendar(group), gap_cols, windows, taus_exp, taus_gauss)
 
-    stat_cols = (_GAP_COLS
+    stat_cols = (gap_cols
                  + ["last_match_is_away", "last_match_is_europe",
                     "last_match_is_abroad"]
                  + [f"{c}_in_{x}d" for x in windows for c in _IND_COLS]
@@ -419,7 +435,7 @@ def build_match_team_fatigue(group: str = "major") -> pd.DataFrame:
             .rename(columns={c: f"hmt_{c}" for c in stat_cols}))
     away = (played[~played["is_home"]][["match_id"] + stat_cols]
             .rename(columns={c: f"awt_{c}" for c in stat_cols}))
-    df = _attach_gap_cats(home.merge(away, on="match_id"), group)
+    df = _cap_and_categorize_gaps(home.merge(away, on="match_id"), group, gap_cols)
     df = round_floats(df[["match_id"] + _columns(schema)])
 
     features_dir = _features_dir(group)

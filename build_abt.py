@@ -51,8 +51,10 @@ def main():
     steps += [
         ("match_info",         build_match_info),
         ("match_team_stats",   build_match_team_stats),
-        ("match_matchup_stats", build_match_matchup_stats),
+        # fatigue before matchup: the teams_ combinations of the fatigue columns are
+        # matchup features, so match_matchup_stats reads that table
         ("match_team_fatigue", build_match_team_fatigue),
+        ("match_matchup_stats", build_match_matchup_stats),
         ("match_target",       build_match_target),
         ("abt",                build_abt),
     ]

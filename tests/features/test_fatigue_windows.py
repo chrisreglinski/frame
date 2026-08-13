@@ -15,8 +15,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from features.match_team_fatigue import _add_stats, _derive_flags
+from features.match_team_fatigue import _add_stats, _derive_flags, _gap_cols, _schema
 
+_GAPS = _gap_cols(_schema())
 _WINDOWS = [6, 15, 45]
 _TAUS_EXP = [7]
 _TAUS_GAUSS = [4]
@@ -56,7 +57,7 @@ def _frame(rows_by_team: dict[str, list]) -> pd.DataFrame:
 def calendar():
     frame = _frame({"alfa": _ALFA, "bravo": _BRAVO})
     built = _add_stats(frame.sort_values(["team", "ts"]).reset_index(drop=True),
-                       _WINDOWS, _TAUS_EXP, _TAUS_GAUSS)
+                       _GAPS, _WINDOWS, _TAUS_EXP, _TAUS_GAUSS)
     return built[built["team"] == "alfa"].reset_index(drop=True)
 
 
@@ -133,15 +134,20 @@ def test_neutral_home_country_fixture_is_domestic(calendar):
     assert calendar.loc[5, "home_games_in_45d"] == 1
 
 
-def test_gaps_to_the_two_previous_fixtures(calendar):
-    # Gaps of 3, 4, 3, 5 days, then 35 days which the 200h cap flattens.
+def test_gaps_to_the_previous_fixtures(calendar):
+    """Raw, uncapped: the cap is a quantile of the finished distribution, so it is applied
+    later, once the frame is on match grain (test_gap_cats covers it)."""
+    # Gaps of 3, 4, 3, 5 days, then 35 days.
     assert np.isnan(calendar.loc[0, "hours_since_last_match"])
-    assert list(calendar["hours_since_last_match"][1:]) == [72.0, 96.0, 72.0, 120.0, 200.0]
+    assert list(calendar["hours_since_last_match"][1:]) == [72.0, 96.0, 72.0, 120.0, 840.0]
 
-    # Two fixtures back: 7d, 7d, 8d, then 40d flattened by the higher 500h cap.
-    # d1 has only one earlier fixture, so it has no second gap.
+    # Two fixtures back: 7d, 7d, 8d, 40d. d1 has one earlier fixture, so no second gap.
     assert calendar["hours_since_2nd_last_match"][:2].isna().all()
-    assert list(calendar["hours_since_2nd_last_match"][2:]) == [168.0, 168.0, 192.0, 500.0]
+    assert list(calendar["hours_since_2nd_last_match"][2:]) == [168.0, 168.0, 192.0, 960.0]
+
+    # Three back: 10d, 12d, 43d. Needs three earlier fixtures, so it starts at d3.
+    assert calendar["hours_since_3rd_last_match"][:3].isna().all()
+    assert list(calendar["hours_since_3rd_last_match"][3:]) == [240.0, 288.0, 1032.0]
 
 
 def test_last_match_flags(calendar):
@@ -192,7 +198,7 @@ def test_values_do_not_depend_on_row_order(calendar):
     """Same fixtures, teams interleaved by kick-off instead of blocked by team."""
     frame = _frame({"alfa": _ALFA, "bravo": _BRAVO})
     interleaved = _add_stats(frame.sort_values("ts").reset_index(drop=True),
-                             _WINDOWS, _TAUS_EXP, _TAUS_GAUSS)
+                             _GAPS, _WINDOWS, _TAUS_EXP, _TAUS_GAUSS)
 
     other = (interleaved[interleaved["team"] == "alfa"]
              .sort_values("ts").reset_index(drop=True))
