@@ -154,13 +154,14 @@ Statistics per team per window:
 Derived from `match_team_stats`. Comparative features per window:
 - `teams_{window}_goals_foragst_avg_max` — max of the four goals averages (home for, home agst, away for, away agst)
 - `homet/awt_{window}_goals_foragst_avg_max` — per-team max(goals_for_avg, goals_agst_avg) for the home (`hmt_`) and away (`awt_`) side
-- Matchup pairs, per axis (goals, shots_on_target, xg, points, impl_points, elo):
-  - **tilt** (home − away, positive = home stronger): `teams_{window}_goals_diff_avg_diff`,
-    `teams_{window}_shots_on_target_diff_avg_diff`, `teams_{window}_xg_diff_avg_diff`,
-    `teams_{window}_points_avg_diff`, `teams_{window}_{mp,mc}_impl_points_avg_diff`, `teams_elo_diff`.
-  - **total** (home + away, combined intensity / level): `teams_{window}_goals_total_avg_total`,
-    `teams_{window}_shots_on_target_total_avg_total`, `teams_{window}_xg_total_avg_total`,
-    `teams_{window}_points_avg_total`, `teams_{window}_{mp,mc}_impl_points_avg_total`, `teams_elo_total`.
+- Matchup pairs — `teams_{window}_{metric}_avg_diff` (home − away, positive = home stronger)
+  and `teams_{window}_{metric}_avg_total` (home + away, the combined level of the matchup),
+  for every `metric` in `points, flg_diff, goals_diff, goals_total, shots_on_target_diff,
+  shots_on_target_total, xg_diff, xg_total, mp_impl_points, mc_impl_points`. Both forms exist
+  for all of them: on a `*_total` metric the sum reads as combined intensity, on a `*_diff` or
+  scalar metric as combined quality. Elo has the same pair without a window
+  (`teams_elo_diff` / `teams_elo_total`). The metric list is a contract dim — widening it there
+  widens the table
 - **Schedule density** (`teams_…_total` / `_diff` over every `match_team_fatigue` per-side column —
   the three rest gaps, the count windows and the decayed loads, each also split by venue and stream).
   `_total` reads as "how congested is this fixture's slot in the calendar", a property the two teams
@@ -168,8 +169,8 @@ Derived from `match_team_stats`. Comparative features per window:
   in `match_team_fatigue` because the `teams_` prefix marks matchup features — which is why
   `match_team_fatigue` runs before this step in `build_abt.py`
 - Naming: a for/agst quantity carries an inner for−agst / for+agst term (`goals_diff`, `goals_total`),
-  so its matchup feature is `_diff_avg_diff` / `_total_avg_total`; a per-side average (points, impl_points)
-  gives `_avg_diff` / `_avg_total`. Elo is a raw rating, so `teams_elo_diff` / `teams_elo_total` (no window).
+  so its matchup feature reads `_diff_avg_diff` / `_total_avg_total`; a per-side average (points,
+  impl_points, flg_diff) gives `_avg_diff` / `_avg_total`. Elo is a raw rating, so no window.
 - **Elo → probability margin**: the expected `p_home − p_away` implied by `teams_elo_diff`, mapped four
   ways on a 2×2 grid — **form** (cubic / logistic) × **fit** (to results / to market) — each fit once
   (offline, per group) and stored in `thresholds.json`. The tag is `{c,l}{r,m}r`:

@@ -37,6 +37,14 @@ def _columns() -> list[str]:
     return result
 
 
+def _matchup_metrics() -> list[str]:
+    """Metrics combined between the two sides. Read off the contract so that widening the
+    dim there widens the table, the way the window list already works."""
+    with open(_YAML_PATH) as f:
+        schema = yaml.safe_load(f)
+    return schema["columns"]["teams_{window}_{metric}_avg_diff"]["dims"]["metric"]
+
+
 def _windows() -> list[str]:
     with open(_YAML_PATH) as f:
         schema = yaml.safe_load(f)
@@ -65,6 +73,7 @@ def build_match_matchup_stats(group: str = "major") -> pd.DataFrame:
     src = src.merge(fatigue, on="match_id", how="left")
 
     computed = {}
+    metrics = _matchup_metrics()
     for window in _windows():
         computed[f"teams_{window}_goals_foragst_avg_max"] = src[[
             f"hmt_{window}_goals_for_avg",
@@ -77,42 +86,15 @@ def build_match_matchup_stats(group: str = "major") -> pd.DataFrame:
                 f"{side}_{window}_goals_for_avg",
                 f"{side}_{window}_goals_agst_avg",
             ]].max(axis=1)
-        # matchup "tilt" diffs: home per-team quantity minus away per-team quantity.
-        # for/agst quantities carry an inner for-agst diff already (goals_diff, shots_on_target_diff),
-        # so between-teams gives *_diff_avg_diff; the per-side scalars (points, impl_points) give *_avg_diff.
-        computed[f"teams_{window}_goals_diff_avg_diff"] = (
-            src[f"hmt_{window}_goals_diff_avg"] - src[f"awt_{window}_goals_diff_avg"]
-        )
-        computed[f"teams_{window}_shots_on_target_diff_avg_diff"] = (
-            src[f"hmt_{window}_shots_on_target_diff_avg"] - src[f"awt_{window}_shots_on_target_diff_avg"]
-        )
-        computed[f"teams_{window}_xg_diff_avg_diff"] = (
-            src[f"hmt_{window}_xg_diff_avg"] - src[f"awt_{window}_xg_diff_avg"]
-        )
-        computed[f"teams_{window}_points_avg_diff"] = (
-            src[f"hmt_{window}_points_avg"] - src[f"awt_{window}_points_avg"]
-        )
-        for line in ["mp", "mc"]:
-            computed[f"teams_{window}_{line}_impl_points_avg_diff"] = (
-                src[f"hmt_{window}_{line}_impl_points_avg"] - src[f"awt_{window}_{line}_impl_points_avg"]
-            )
-        # matchup "total": home per-team quantity plus away — combined intensity / level of the match.
-        computed[f"teams_{window}_goals_total_avg_total"] = (
-            src[f"hmt_{window}_goals_total_avg"] + src[f"awt_{window}_goals_total_avg"]
-        )
-        computed[f"teams_{window}_shots_on_target_total_avg_total"] = (
-            src[f"hmt_{window}_shots_on_target_total_avg"] + src[f"awt_{window}_shots_on_target_total_avg"]
-        )
-        computed[f"teams_{window}_xg_total_avg_total"] = (
-            src[f"hmt_{window}_xg_total_avg"] + src[f"awt_{window}_xg_total_avg"]
-        )
-        computed[f"teams_{window}_points_avg_total"] = (
-            src[f"hmt_{window}_points_avg"] + src[f"awt_{window}_points_avg"]
-        )
-        for line in ["mp", "mc"]:
-            computed[f"teams_{window}_{line}_impl_points_avg_total"] = (
-                src[f"hmt_{window}_{line}_impl_points_avg"] + src[f"awt_{window}_{line}_impl_points_avg"]
-            )
+        # matchup pairs: home per-team quantity minus away (tilt, positive = home stronger)
+        # and plus away (combined level of the match). Both forms for every metric — a
+        # metric that already carries an inner for-agst term (goals_diff, xg_diff, ...)
+        # gives a difference of differences one way and a combined quality the other.
+        for metric in metrics:
+            home_side = src[f"hmt_{window}_{metric}_avg"]
+            away_side = src[f"awt_{window}_{metric}_avg"]
+            computed[f"teams_{window}_{metric}_avg_diff"] = home_side - away_side
+            computed[f"teams_{window}_{metric}_avg_total"] = home_side + away_side
 
     # matchup elo (not windowed — elo is a raw pre-match rating)
     computed["teams_elo_diff"] = src["hmt_elo"] - src["awt_elo"]

@@ -689,6 +689,22 @@ columns:
     categories: [low, medium, high]
 
 
+  "teams_{window}_{metric}_avg_diff":
+    table: match_matchup_stats
+    description: "home {window} {metric} avg minus away {window} {metric} avg; positive = the home team is the stronger / higher-volume side on that metric. metrics that already carry an inner for-agst difference (goals_diff, shots_on_target_diff, xg_diff, flg_diff) give a difference of differences; the per-side scalars (points, impl_points) give a plain one. xg is NaN outside the major group"
+    dims:
+      window: [season, rolling6, rolling8]
+      metric: [points, flg_diff, goals_diff, goals_total, shots_on_target_diff, shots_on_target_total, xg_diff, xg_total, mp_impl_points, mc_impl_points]
+    dtype: float
+
+  "teams_{window}_{metric}_avg_total":
+    table: match_matchup_stats
+    description: "home {window} {metric} avg plus away {window} {metric} avg; the combined level of the matchup on that metric. on the *_total metrics it reads as combined intensity, on the *_diff and scalar ones as combined quality. xg is NaN outside the major group"
+    dims:
+      window: [season, rolling6, rolling8]
+      metric: [points, flg_diff, goals_diff, goals_total, shots_on_target_diff, shots_on_target_total, xg_diff, xg_total, mp_impl_points, mc_impl_points]
+    dtype: float
+
   "teams_{window}_goals_foragst_avg_max":
     table: match_matchup_stats
     description: "max over the four values: home/away {window} goals for/agst avg; low value = both teams score little and concede little"
@@ -702,78 +718,6 @@ columns:
     dims:
       side: [hmt, awt]
       window: [season, rolling6, rolling8]
-    dtype: float
-
-  "teams_{window}_goals_diff_avg_diff":
-    table: match_matchup_stats
-    description: "home {window} goals_diff avg minus away {window} goals_diff avg; positive = home team stronger on goal balance"
-    dims:
-      window: [season, rolling6, rolling8]
-    dtype: float
-
-  "teams_{window}_shots_on_target_diff_avg_diff":
-    table: match_matchup_stats
-    description: "home {window} shots_on_target_diff avg minus away {window} shots_on_target_diff avg; positive = home team stronger on shots-on-target balance"
-    dims:
-      window: [season, rolling6, rolling8]
-    dtype: float
-
-  "teams_{window}_xg_diff_avg_diff":
-    table: match_matchup_stats
-    description: "home {window} xg_diff avg minus away {window} xg_diff avg; positive = home team stronger on xG balance. NaN outside the major group (Understat coverage)"
-    dims:
-      window: [season, rolling6, rolling8]
-    dtype: float
-
-  "teams_{window}_points_avg_diff":
-    table: match_matchup_stats
-    description: "home {window} points avg minus away {window} points avg; positive = home team stronger on form/points"
-    dims:
-      window: [season, rolling6, rolling8]
-    dtype: float
-
-  "teams_{window}_{line}_impl_points_avg_diff":
-    table: match_matchup_stats
-    description: "home {window} {line}_impl_points avg minus away {window} {line}_impl_points avg on the {line} line (mp pre-closing / mc closing); positive = market expects the home team to earn more points"
-    dims:
-      window: [season, rolling6, rolling8]
-      line: [mp, mc]
-    dtype: float
-
-  "teams_{window}_goals_total_avg_total":
-    table: match_matchup_stats
-    description: "home {window} goals_total avg plus away {window} goals_total avg; combined scoring intensity of the matchup"
-    dims:
-      window: [season, rolling6, rolling8]
-    dtype: float
-
-  "teams_{window}_shots_on_target_total_avg_total":
-    table: match_matchup_stats
-    description: "home {window} shots_on_target_total avg plus away {window} shots_on_target_total avg; combined shooting intensity of the matchup"
-    dims:
-      window: [season, rolling6, rolling8]
-    dtype: float
-
-  "teams_{window}_xg_total_avg_total":
-    table: match_matchup_stats
-    description: "home {window} xg_total avg plus away {window} xg_total avg; combined xG intensity of the matchup. NaN outside the major group (Understat coverage)"
-    dims:
-      window: [season, rolling6, rolling8]
-    dtype: float
-
-  "teams_{window}_points_avg_total":
-    table: match_matchup_stats
-    description: "home {window} points avg plus away {window} points avg; combined quality level of the matchup"
-    dims:
-      window: [season, rolling6, rolling8]
-    dtype: float
-
-  "teams_{window}_{line}_impl_points_avg_total":
-    table: match_matchup_stats
-    description: "home {window} {line}_impl_points avg plus away {window} {line}_impl_points avg on the {line} line (mp pre-closing / mc closing); combined market-expected quality of the matchup"
-    dims:
-      window: [season, rolling6, rolling8]
-      line: [mp, mc]
     dtype: float
 
   teams_elo_diff:
