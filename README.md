@@ -103,8 +103,9 @@ One row per match. Context and market features:
   the 2022 World Cup); windows hand-recorded in `01_raw/03_dates/break_dates.csv`. The winter
   break is not one — England plays through it — and neither is the gap between seasons.
   `season_game_number_after_break` / `_before_break` count the league-season's matches from the
-  last break and back to the next; `hmt_`/`awt_game_number_after_break` / `_before_break` do the
-  same for each team. The pair mirrors `season_game_number` vs `{side}_game_number`, and the
+  last break and back to the next; `gameweek_after_break` / `_before_break` bucket those into
+  rounds the way `gameweek` buckets `season_game_number`; `hmt_`/`awt_game_number_after_break` /
+  `_before_break` do the same count for each team. The pair mirrors `season_game_number` vs `{side}_game_number`, and the
   backward ones read like `season_game_number_before_end`: `-1` is the last match before the
   anchor. The team-level counters are **not** derivable from the league-level ones — a
   rescheduled fixture leaves two teams in one round with different counts, in 10% of matches

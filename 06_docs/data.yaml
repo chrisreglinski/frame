@@ -151,6 +151,16 @@ columns:
     description: "the same league-season count taken backwards to the next break: -1 = the last match the league played before it. Empty after the season's last break"
     dtype: int
 
+  gameweek_after_break:
+    table: match_info
+    description: "season_game_number_after_break bucketed into rounds the same way gameweek buckets season_game_number: ceil over half the team count. 1 = the league's first round back after the break. As with gameweek a bucket is not guaranteed to be a real round, because rescheduling moves matches between them. Empty before the season's first break"
+    dtype: int
+
+  gameweek_before_break:
+    table: match_info
+    description: "the same bucketing taken backwards to the next break: -1 = the league's last round before it. Empty after the season's last break"
+    dtype: int
+
   "{side}_game_number_after_break":
     table: match_info
     description: "the {side} team's league matches counted from the last break in which every league of the group stopped: 1 = the first match after it. Break windows are hand-recorded in 01_data/01_raw/03_dates/break_dates.csv. Counted per team, not per gameweek, because a rescheduled fixture can leave two teams in one gameweek with different counts. Empty before the season's first break. A league-specific pause (the winter break, which england plays through) is not a break here, and neither is the gap between seasons"
