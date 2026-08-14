@@ -10,6 +10,10 @@
 04_models/*
 !04_models/.gitkeep
 
+# Exploration bookkeeping — local only. model_check.py imports this, so a fresh clone
+# needs it copied in before run_check() works.
+02_src/evaluation/results_registry.py
+
 # Python
 __pycache__/
 *.py[cod]
