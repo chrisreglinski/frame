@@ -33,7 +33,9 @@ heading carrying its row count — so how many gates a run cleared is visible be
 numbers. The split is **derived from the G1/G2/G3 columns on every write, never stored**: a re-run whose
 verdict changed moves to the right table by itself, and a row can only ever be in one of them. All four
 headings are always written, an empty one as `_none_`. The preamble above the first heading is preserved;
-everything from there down is regenerated.
+everything from there down is regenerated. Inside a section rows run by pooled ROI descending (read out
+of the `result` cell, notebook name as the tie-break) — the gate count is what the sections answer, so
+the open question within one is which of the survivors earns most.
 
 The validation protocol behind each run (folds, the three gates) lives in the model-check framework —
 [`model_check.md`](model_check.md) / [`02_src/evaluation/model_check.py`](../02_src/evaluation/model_check.py)
