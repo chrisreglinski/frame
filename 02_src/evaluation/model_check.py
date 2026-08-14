@@ -29,9 +29,16 @@ spec. The prose companion (pipeline, gate roles, why season folds not random CV)
 import numpy as np
 import pandas as pd
 
-from evaluation.results_registry import upsert
 # Fold generators moved to evaluation/folds.py; re-exported here so existing imports keep working.
 from evaluation.folds import season_folds, expanding_folds
+
+# The registry is bookkeeping for the exploration, a layer above the framework itself, and is
+# not tracked with it. The protocol below has to stand on its own without it: evaluate() never
+# touched it, and run_check() prints the same gates either way — only the logging is skipped.
+try:
+    from evaluation.results_registry import upsert
+except ImportError:  # pragma: no cover - depends on whether the local checkout carries it
+    upsert = None
 
 
 # --- Scoring -----------------------------------------------------------------
@@ -192,8 +199,12 @@ def run_check(matches, *, features, outcome, implied, segmenter, make_model, buf
     print(f"\nGATE 3  walk-forward — ROI by test season    {_paint(r['g3'])}")
     print("    no bets" if r["walk"].empty else row(r["wf"].items()))
 
-    upsert(source=source, space=space, target=target, abt_filter=abt_filter,
-           segmentation=segmentation, segment_filter=segment_filter,
-           g1=_verdict(r["g1"]), g2=_verdict(r["g2"]), g3=_verdict(r["g3"]),
-           result=f"pooled {r['pooled']:+.3f} ({len(bets)} bets)", roi_std=f"{r['spread']:.3f}")
+    if upsert is None:
+        print("\n(no results registry in this checkout — run not logged)")
+    else:
+        upsert(source=source, space=space, target=target, abt_filter=abt_filter,
+               segmentation=segmentation, segment_filter=segment_filter,
+               g1=_verdict(r["g1"]), g2=_verdict(r["g2"]), g3=_verdict(r["g3"]),
+               result=f"pooled {r['pooled']:+.3f} ({len(bets)} bets)",
+               roi_std=f"{r['spread']:.3f}")
     return r

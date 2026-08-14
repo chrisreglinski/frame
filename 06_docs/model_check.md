@@ -88,6 +88,11 @@ GATE 3 does not veto; knob-robustness and low concentration as support. The numb
   [`03_notebooks/model_checks/results.md`](../03_notebooks/model_checks/results.md). Call it once per
   notebook, on the config you are logging.
 
+The registry is exploration bookkeeping — a layer above the framework — and is not tracked with it
+(`evaluation/results_registry.py` is gitignored). The protocol stands on its own without it:
+`evaluate()` never touched it, and `run_check()` prints the same three gates either way, saying
+`(no results registry in this checkout — run not logged)` in place of writing the row.
+
 Registry columns and conventions: [`06_docs/spaces.md`](spaces.md).
 
 ## Notebook naming
