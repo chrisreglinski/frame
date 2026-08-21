@@ -23,23 +23,26 @@ def _features_dir(group: str) -> Path:
 #   rr = fit to realized outcomes (t_flg_diff): the TRUE margin;  mr = fit to mrkt_home_away_impl_diff.
 # The logistic scale is near-identical for rr and mr (market reads elo strength at the same steepness);
 # its whole rr/mr gap lives in hfa — the market's per-league home-advantage mispricing.
+# major was refitted 2026-08-21 on the rebuilt clubelo ratings (see 04_elo/README.md);
+# minor and other still carry the pre-rebuild fit and are stale until those leagues have
+# elo again - clubelo publishes no club page for most second-tier sides.
 _ELO_FIT = {
     "major": {
-        "crr": {"a1": 0.0024872069, "a2": -3.266003e-07, "a3": -4.2390319e-09, "a0": {
-            "england": 0.138645, "france": 0.117272, "germany": 0.127646,
-            "italy": 0.099054, "spain": 0.188116,
+        "crr": {"a1": 0.00256255742, "a2": -3.595862165e-07, "a3": -4.063522616e-09, "a0": {
+            "england": 0.13519, "france": 0.110752, "germany": 0.145344,
+            "italy": 0.090711, "spain": 0.188013,
         }},
-        "cmr": {"a1": 0.002333523, "a2": -4.2150299e-07, "a3": -3.0138405e-09, "a0": {
-            "england": 0.136515, "france": 0.136017, "germany": 0.150326,
-            "italy": 0.129036, "spain": 0.16567,
+        "cmr": {"a1": 0.002570338656, "a2": -4.951720004e-07, "a3": -4.069333592e-09, "a0": {
+            "england": 0.136694, "france": 0.137842, "germany": 0.152485,
+            "italy": 0.128159, "spain": 0.166964,
         }},
-        "lrr": {"scale": 474.5185, "hfa": {
-            "england": 59.713, "france": 47.2109, "germany": 64.5713,
-            "italy": 37.68, "spain": 81.5589,
+        "lrr": {"scale": 435.8108, "hfa": {
+            "england": 54.9124, "france": 44.066, "germany": 58.347,
+            "italy": 36.1294, "spain": 74.7871,
         }},
-        "lmr": {"scale": 478.4904, "hfa": {
-            "england": 58.5409, "france": 59.2285, "germany": 66.8138,
-            "italy": 56.0349, "spain": 73.7742,
+        "lmr": {"scale": 432.3724, "hfa": {
+            "england": 53.1328, "france": 53.6351, "germany": 60.1008,
+            "italy": 50.6978, "spain": 66.5676,
         }},
     },
     "minor": {

@@ -23,7 +23,7 @@ import numpy as np
 import pandas as pd
 import yaml
 
-from features.utils import round_floats
+from features.utils import match_files, round_floats
 
 
 _ROOT = Path(__file__).parents[2]
@@ -74,10 +74,6 @@ _COMPETITIONS = ["league", "europe", "other"]
 _IND_COLS = (["games"]
              + [f"{venue}_games" for venue in _VENUES]
              + [f"{comp}_games" for comp in _COMPETITIONS])
-
-
-def _matches_dir(group: str) -> Path:
-    return _RAW / "01_matches" / group
 
 
 def _features_dir(group: str) -> Path:
@@ -153,7 +149,7 @@ def _league_membership(group: str) -> dict[tuple[str, str], str]:
     """(season, team) -> league. A cup or european fixture is filed under the league its
     team plays in that season, which is what the calendar groups by."""
     membership = {}
-    for path in sorted(_matches_dir(group).glob("*.csv")):
+    for path in match_files(group):
         league, season = path.stem.removesuffix("_matches").rsplit("_", 1)
         raw = pd.read_csv(path, usecols=["HomeTeam", "AwayTeam"])
         for team in set(raw["HomeTeam"]) | set(raw["AwayTeam"]):
@@ -177,7 +173,7 @@ def _league_rows(group: str) -> pd.DataFrame:
     from features.match_info import _match_id
 
     frames = []
-    for path in sorted(_matches_dir(group).glob("*.csv")):
+    for path in match_files(group):
         league, season = path.stem.removesuffix("_matches").rsplit("_", 1)
         raw = pd.read_csv(path)
         ts = (_parse_dates(raw["Date"])

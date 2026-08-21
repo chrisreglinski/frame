@@ -27,14 +27,16 @@ Source: [football-data.co.uk](https://www.football-data.co.uk)
 
 ```
 01_data/
-  01_raw/              # per-league-season payload: {group}/{league}_{season}_{domain}.csv
+  league_sets.yaml     # which leagues make up each league set (major / minor / other)
+  01_raw/              # per-league-season payload: {league}/{league}_{season}_{domain}.csv
     01_matches/        # raw CSVs from football-data.co.uk (tracked in git)
     02_attributes/     # per-team attributes: venue coordinates + promoted / reigning-top3 flags
-                       # (minor/other groups: promotee + island flags only, coordinates
-                       #  empty -> travel_distance stays NaN there)
+                       # (second tiers and netherlands/portugal: promotee + island flags only,
+                       #  coordinates empty -> travel_distance stays NaN there)
     03_dates/          # season phase boundaries + international-break windows (shared, global)
-    04_elo/            # Club Elo history (clubelo.com, shared) + per-group team-name maps
-    05_xg/             # Understat match xG per league-season + per-group team-name map
+    04_elo/            # Club Elo ratings per club (clubelo.com) + per-league team-name maps
+                       # _archive/ holds the pre-2026-08 snapshot of the old rating system
+    05_xg/             # Understat match xG per league-season + per-league team-name map
     06_europe/         # UEFA club competitions per season (FBref): CL / EL / Conference
                        # + qualifying, UEFA Super Cup, and a team-name map
     07_domestic/       # domestic cups and super cups per league-season (FBref)
@@ -111,10 +113,10 @@ One row per match. Context and market features:
   rescheduled fixture leaves two teams in one round with different counts, in 10% of matches
 - `time_uk_num` — kick-off time (UK) as a number (`hour + minute/60`); `time_uk_cat` — bucketed by floor(hour): `early` (11–13) / `early_afternoon` (14–15) / `late_afternoon` (16–17) / `evening` (18+)
 - `hmt_is_promoted`, `awt_is_promoted`, `travel_distance_km`
-- `hmt_is_top3_last`, `awt_is_top3_last` — team finished top 3 in this league last season (reigning top-3; top-tier groups `major`/`other` only). Earliest season seeded from external final tables; later seasons match `team_season_final` rankings. The `minor` group carries the second-tier analogue `hmt_is_relegated` / `awt_is_relegated` (relegated from the tier above) instead — both are group-scoped in `data.yaml` via `groups:`
+- `hmt_is_top3_last`, `awt_is_top3_last` — team finished top 3 in this league last season (reigning top-3; top-tier leagues only). Earliest season seeded from external final tables; later seasons match `team_season_final` rankings. Second-tier leagues carry the analogue `hmt_is_relegated` / `awt_is_relegated` (relegated from the tier above) instead — both are league-scoped in `data.yaml` via `leagues:`, so a set gets whichever flag its leagues have
 - `hmt_is_island`, `awt_is_island` — team is on a geographically isolated island (Las Palmas, Mallorca, Cagliari, Ajaccio)
 - `travel_distance_cat` — `travel_distance_km` bucketed: `derby` (<30 km) / `regional` (30–100 km) / `domestic` (100–500 km, coach / high-speed rail) / `long_haul` (500+ km, flights)
-- `hmt_elo`, `awt_elo` — Club Elo rating (clubelo.com) of each team as of the match date, joined point-in-time (pre-match; see below)
+- `hmt_elo`, `awt_elo` — Club Elo rating (clubelo.com) of each team as of the match date, joined point-in-time (pre-match; see below). **Currently `active: false` in `data.yaml` and not built** — clubelo rebuilt its site and changed the rating algorithm around 2026-08, so the snapshot these were computed from (`04_elo/_archive/`) no longer matches the source. Every `teams_elo_*` column is inactive for the same reason
 - `hmt_elo_cat2m` / `awt_elo_cat2m` (high/low vs the global elo mean) and `hmt_elo_cat3q` / `awt_elo_cat3q` (tertiles of the pooled per-match elo distribution; thresholds in `thresholds.json`)
 - `b365_*` / `mrkt_*` — odds, implied probabilities (1/odds), bookmaker margin, Shannon entropy of normalized implied probs (pre-closing line). `b365c_*` / `mrktc_*` — the same for the **closing** (kickoff) line (football-data C columns); empty where no closing price
 - `mrkt_favourite`, `mrkt_impl_order`, `mrkt_favrt_impl`, `mrkt_undrd_impl` — derived market signals (mrkt only): favoured side (home/away/balanced), H/D/A ordering by implied prob, stronger/weaker side implied prob
@@ -330,16 +332,17 @@ notebooks can import directly: `from features.match_info import build_match_info
 ## Rebuild pipeline
 
 ```bash
-python build_abt.py               # rebuild the pipeline (default: the top-5 'major' group)
-python build_abt.py --group NAME  # rebuild a different league group (a folder under 01_matches/)
+python build_abt.py               # rebuild the pipeline (default: the top-5 'major' set)
+python build_abt.py --group NAME  # rebuild a different league set (as named in league_sets.yaml)
 python build_abt.py --skip-raw    # skip match_raw_stats (when raw CSVs are unchanged)
 ```
 
 `build_abt.py` in the project root runs all builders in dependency order for one league
-group and prints timing for each step. The pipeline is parameterized by group: a group reads
-its match CSVs from `01_data/01_raw/01_matches/<group>/` and writes to
-`01_data/02_features/<group>/` and `01_data/03_abt/<group>/`, so additional league groups can
-be dropped in as new folders. Only the top-5 `major` group is active for now. Use `--skip-raw`
+group and prints timing for each step. The pipeline is parameterized by league set. Raw data
+is stored per league (`01_data/01_raw/01_matches/<league>/` and likewise for `02_attributes`,
+`04_elo`, `05_xg`); `01_data/league_sets.yaml` names which leagues a set is built from, and the
+set writes to `01_data/02_features/<set>/` and `01_data/03_abt/<set>/`. A new set is a new entry
+in that file, not a new folder tree. Only the top-5 `major` set is active for now. Use `--skip-raw`
 when the source CSVs have not changed.
 
 Or use `03_notebooks/template.ipynb` to load all tables directly.

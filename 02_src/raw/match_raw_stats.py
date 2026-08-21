@@ -4,6 +4,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from features.utils import league_set, match_files
+
 
 _ROOT = Path(__file__).parents[2]
 _DATA = _ROOT / "01_data"
@@ -22,10 +24,6 @@ _RAW_COLS = [
 ]
 
 
-def _matches_dir(group: str) -> Path:
-    return _DATA / "01_raw" / "01_matches" / group
-
-
 def _features_dir(group: str) -> Path:
     return _DATA / "02_features" / group
 
@@ -36,27 +34,28 @@ def _match_id(league: str, season: str, home: str, away: str) -> str:
 
 def _load_xg(group: str) -> pd.DataFrame | None:
     """Understat home_xg/away_xg keyed by match_id (Understat names translated via the
-    group's team_map). Returns None if the group has no xg coverage."""
-    xg_dir = _XG_DIR / group
-    tmap = xg_dir / "team_map.csv"
-    if not xg_dir.exists() or not tmap.exists():
-        return None
-    u2o = pd.read_csv(tmap).set_index("understat")["team"].to_dict()
+    league's team_map). Returns None if no league in the set has xg coverage."""
     frames = []
-    for path in sorted(xg_dir.glob("*_xg.csv")):
-        league, season = path.stem.removesuffix("_xg").rsplit("_", 1)
-        d = pd.read_csv(path, usecols=["home_team", "away_team", "home_xg", "away_xg"])
-        mid = [_match_id(league, season, u2o.get(h, h), u2o.get(a, a))
-               for h, a in zip(d["home_team"], d["away_team"])]
-        frames.append(pd.DataFrame({"match_id": mid,
-                                    "home_xg": d["home_xg"].values,
-                                    "away_xg": d["away_xg"].values}))
+    for league_name in league_set(group):
+        xg_dir = _XG_DIR / league_name
+        tmap = xg_dir / "team_map.csv"
+        if not tmap.exists():
+            continue
+        u2o = pd.read_csv(tmap).set_index("understat")["team"].to_dict()
+        for path in sorted(xg_dir.glob("*_xg.csv")):
+            league, season = path.stem.removesuffix("_xg").rsplit("_", 1)
+            d = pd.read_csv(path, usecols=["home_team", "away_team", "home_xg", "away_xg"])
+            mid = [_match_id(league, season, u2o.get(h, h), u2o.get(a, a))
+                   for h, a in zip(d["home_team"], d["away_team"])]
+            frames.append(pd.DataFrame({"match_id": mid,
+                                        "home_xg": d["home_xg"].values,
+                                        "away_xg": d["away_xg"].values}))
     return pd.concat(frames, ignore_index=True) if frames else None
 
 
 def build_match_raw_stats(group: str = "major") -> pd.DataFrame:
     frames = []
-    for path in sorted(_matches_dir(group).glob("*.csv")):
+    for path in match_files(group):
         league, season = path.stem.removesuffix("_matches").rsplit("_", 1)
         raw = pd.read_csv(path, usecols=lambda c: c in _RAW_COLS)
         raw.insert(0, "match_id", [

@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 import yaml
 
-from features.utils import round_floats
+from features.utils import league_set, match_files, round_floats
 
 
 _ROOT = Path(__file__).parents[2]
@@ -18,10 +18,6 @@ _YAML_PATH = _ROOT / "06_docs" / "data.yaml"
 _DATES_PATH = _DATA / "01_raw" / "03_dates" / "season_limit_dates.csv"
 _BREAKS_PATH = _DATA / "01_raw" / "03_dates" / "break_dates.csv"
 _ELO_DIR = _DATA / "01_raw" / "04_elo"
-
-
-def _matches_dir(group: str) -> Path:
-    return _DATA / "01_raw" / "01_matches" / group
 
 
 def _features_dir(group: str) -> Path:
@@ -74,15 +70,18 @@ _RAW_ODDS = {
 }
 
 
-# Per-group "reigning strength" flag carried in the team-attribute files: the raw column name and
-# the output column suffix. Top-tier groups (major, other) use last season's top 3
-# (Top3Last -> {side}_is_top3_last); minor uses relegated from the tier above
-# (Relegated -> {side}_is_relegated). The matching contract columns are tagged with
-# `groups:` in data.yaml so each group's ABT carries only the flag that applies to it.
+# Per-league "reigning strength" flag carried in the team-attribute files: the raw column name
+# and the output column suffix. It follows the tier, not the league set — a top flight uses last
+# season's top 3 (Top3Last -> {side}_is_top3_last), a second tier uses relegated from above
+# (Relegated -> {side}_is_relegated). The matching contract columns carry the same league lists
+# under `leagues:` in data.yaml, so a set only gets the flags its leagues actually have.
+_TOP3 = {"raw": "Top3Last", "out": "is_top3_last"}
+_RELEGATED = {"raw": "Relegated", "out": "is_relegated"}
 _LAST_FLAG = {
-    "major": {"raw": "Top3Last",  "out": "is_top3_last"},
-    "other": {"raw": "Top3Last",  "out": "is_top3_last"},
-    "minor": {"raw": "Relegated", "out": "is_relegated"},
+    "england": _TOP3, "spain": _TOP3, "italy": _TOP3, "france": _TOP3, "germany": _TOP3,
+    "netherlands": _TOP3, "portugal": _TOP3,
+    "england2": _RELEGATED, "spain2": _RELEGATED, "italy2": _RELEGATED,
+    "france2": _RELEGATED, "germany2": _RELEGATED,
 }
 
 
@@ -96,8 +95,8 @@ def _columns(group: str) -> list[str]:
         table = meta.get("table")
         if "match_info" not in (table if isinstance(table, list) else [table]):
             continue
-        groups = meta.get("groups")
-        if groups is not None and group not in groups:
+        leagues = meta.get("leagues")
+        if leagues is not None and not set(leagues) & set(league_set(group)):
             continue
         if "dims" in meta:
             keys = list(meta["dims"].keys())
@@ -131,12 +130,12 @@ def _haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     return 2 * R * math.asin(math.sqrt(a))
 
 
-def _load_attributes(league: str, season: str, group: str) -> dict[str, dict] | None:
-    path = _ATTR_DIR / group / f"{league}_{season}_attributes.csv"
+def _load_attributes(league: str, season: str) -> dict[str, dict] | None:
+    path = _ATTR_DIR / league / f"{league}_{season}_attributes.csv"
     if not path.exists():
         return None
     df = pd.read_csv(path)
-    flag = _LAST_FLAG.get(group)
+    flag = _LAST_FLAG.get(league)
     # source files may not carry the flag column yet -> default to False until they are filled
     has_flag = flag is not None and flag["raw"] in df.columns
     return {
@@ -178,7 +177,7 @@ def _break_segments(date: pd.Series, edges: pd.Series) -> tuple[np.ndarray, np.n
     return after, before
 
 
-def _load_file(path: Path, attrs: dict[str, dict], limits: dict, group: str,
+def _load_file(path: Path, attrs: dict[str, dict], limits: dict,
                breaks: pd.DataFrame) -> pd.DataFrame:
     league, season = path.stem.removesuffix("_matches").rsplit("_", 1)
     raw = pd.read_csv(path)
@@ -331,9 +330,9 @@ def _load_file(path: Path, attrs: dict[str, dict], limits: dict, group: str,
         pd.DataFrame(hadiffs),
     ], axis=1)
 
-    # the reigning-strength flag is group-specific (major/other: is_top3_last; minor:
-    # is_relegated); attach it under the group's name so base[cols] can select it.
-    flag = _LAST_FLAG.get(group)
+    # the reigning-strength flag follows the league's tier (top flight: is_top3_last;
+    # second tier: is_relegated); attach it under its own name so base[cols] can select it.
+    flag = _LAST_FLAG.get(league)
     if flag:
         out[f"hmt_{flag['out']}"] = hmt_last.values
         out[f"awt_{flag['out']}"] = awt_last.values
@@ -392,34 +391,52 @@ def _attach_team_break_counters(df: pd.DataFrame, breaks: pd.DataFrame) -> pd.Da
 def _attach_elo(df: pd.DataFrame, group: str) -> pd.DataFrame:
     """Add hmt_elo / awt_elo: the Club Elo rating of each team as of the match date.
 
-    For a match on date D, the rating whose window contains D (From <= D <= To) is the
-    PRE-match rating (Club Elo dates the post-match update to D+1). We resolve it with a
-    point-in-time merge_asof (backward on From), so no future information leaks in.
-    Falls back to NaN if the Elo data or the group's team map is absent, or a team has no
-    rating for that date."""
+    Ratings come from 04_elo/<league>/<slug>.json, one point per match played, where the
+    value on date D is the rating AFTER that day's match. The pre-match rating for a match
+    on D is therefore the last point strictly before D, which is what the point-in-time
+    merge_asof resolves (backward, exact matches excluded), so no future information leaks
+    in. NaN where the team has no slug (clubelo publishes no page for it) or has no earlier
+    point (the site serves roughly four years back, so the first weeks of 22/23 fall off)."""
     df = df.copy()
-    hist_path = _ELO_DIR / "clubelo_history.csv"
-    tmap_path = _ELO_DIR / group / "team_map.csv"
-    if not hist_path.exists() or not tmap_path.exists():
+
+    name_to_slug, frames = {}, []
+    for league in league_set(group):
+        league_dir = _ELO_DIR / league
+        tmap_path = league_dir / "team_map.csv"
+        if not tmap_path.exists():
+            continue
+        tmap = pd.read_csv(tmap_path).fillna({"slug": ""})
+        name_to_slug.update({team: slug
+                             for team, slug in zip(tmap["team"], tmap["slug"]) if slug})
+        for slug in sorted(set(tmap["slug"]) - {""}):
+            path = league_dir / f"{slug}.json"
+            if not path.exists():
+                continue
+            series = json.loads(path.read_text(encoding="utf-8"))
+            frames.append(pd.DataFrame({
+                "slug": slug,
+                "date": [point["Date"][:10] for point in series],
+                "Elo": [point["Elo"] for point in series],
+            }))
+
+    if not frames:
         df["hmt_elo"] = np.nan
         df["awt_elo"] = np.nan
         return df
 
-    name_to_clubelo = pd.read_csv(tmap_path).set_index("team")["clubelo"].to_dict()
-    hist = pd.read_csv(hist_path, usecols=["clubelo", "Elo", "From"])
-    hist["Elo"] = pd.to_numeric(hist["Elo"], errors="coerce")
-    hist["From"] = pd.to_datetime(hist["From"])
-    hist = hist.dropna(subset=["From"]).sort_values("From").reset_index(drop=True)
+    hist = pd.concat(frames, ignore_index=True).drop_duplicates(subset=["slug", "date"])
+    hist["date"] = pd.to_datetime(hist["date"])
+    hist = hist.sort_values("date").reset_index(drop=True)
 
     match_date = pd.to_datetime(df["date"])
     for prefix in ("hmt", "awt"):
         left = pd.DataFrame({
             "_row": range(len(df)),
             "date": match_date.values,
-            "clubelo": df[f"{prefix}_name"].map(name_to_clubelo).values,
+            "slug": df[f"{prefix}_name"].map(name_to_slug).fillna("").values,
         }).sort_values("date")
-        merged = pd.merge_asof(left, hist, left_on="date", right_on="From",
-                               by="clubelo", direction="backward")
+        merged = pd.merge_asof(left, hist, on="date", by="slug",
+                               direction="backward", allow_exact_matches=False)
         df[f"{prefix}_elo"] = merged.sort_values("_row")["Elo"].values
     return df
 
@@ -466,10 +483,10 @@ def build_match_info(group: str = "major") -> pd.DataFrame:
     breaks = _load_break_dates()
     features_dir = _features_dir(group)
     frames = []
-    for path in sorted(_matches_dir(group).glob("*.csv")):
+    for path in match_files(group):
         league, season = path.stem.removesuffix("_matches").rsplit("_", 1)
-        attrs = _load_attributes(league, season, group)
-        frames.append(_load_file(path, attrs, limits, group, breaks))
+        attrs = _load_attributes(league, season)
+        frames.append(_load_file(path, attrs, limits, breaks))
 
     base = _attach_elo(pd.concat(frames, ignore_index=True), group)
     base = _attach_elo_cats(base, group)

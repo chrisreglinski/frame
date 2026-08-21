@@ -1,0 +1,12 @@
+# Which leagues make up each league set.
+#
+# Raw data is stored per league: 01_raw/01_matches/<league>/, and likewise for
+# 02_attributes, 04_elo and 05_xg. A league set is a named group of leagues that
+# gets built together: features land in 02_features/<set>/ and the ABT in
+# 03_abt/<set>/, and thresholds are fitted per set.
+#
+# `python build_abt.py --group <set>` builds one of these.
+
+major: [england, spain, italy, france, germany]
+minor: [england2, spain2, italy2, france2, germany2]
+other: [netherlands, portugal]

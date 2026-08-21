@@ -1,12 +1,14 @@
-"""Rebuild the full pipeline and produce the ABT for a league group.
+"""Rebuild the full pipeline and produce the ABT for a league set.
 
 Usage:
-    python build_abt.py                   # rebuild the 'major' group (default)
-    python build_abt.py --group minor     # rebuild the 'minor' group
+    python build_abt.py                   # rebuild the 'major' set (default)
+    python build_abt.py --group minor     # rebuild the 'minor' set
     python build_abt.py --skip-raw        # skip match_raw_stats (raw CSVs unchanged)
 
-Each group reads its match CSVs from 01_data/01_raw/01_matches/<group>/ and writes its
-features and ABT to 01_data/02_features/<group>/ and 01_data/03_abt/<group>/.
+Raw data is stored per league (01_data/01_raw/01_matches/<league>/ and likewise for
+02_attributes, 04_elo, 05_xg). A set names the leagues built together — the mapping is
+01_data/league_sets.yaml — and its features and ABT go to 01_data/02_features/<set>/
+and 01_data/03_abt/<set>/.
 """
 import argparse
 import time
@@ -36,7 +38,8 @@ def _step(n: int, total: int, name: str, fn, group: str):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--group", default="major",
-                        help="league group to build (folder under 01_matches/, default: major)")
+                        help="league set to build, as named in 01_data/league_sets.yaml "
+                             "(default: major)")
     parser.add_argument("--skip-raw", action="store_true",
                         help="skip match_raw_stats (use when raw CSVs are unchanged)")
     parser.add_argument("--skip-thresholds", action="store_true",

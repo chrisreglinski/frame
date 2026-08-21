@@ -4,17 +4,13 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from features.utils import round_floats
+from features.utils import match_files, round_floats
 import yaml
 
 
 _ROOT = Path(__file__).parents[2]
 _DATA = _ROOT / "01_data"
 _YAML_PATH = _ROOT / "06_docs" / "data.yaml"
-
-
-def _matches_dir(group: str) -> Path:
-    return _DATA / "01_raw" / "01_matches" / group
 
 
 def _features_dir(group: str) -> Path:
@@ -70,7 +66,7 @@ def _load_file(path: Path) -> pd.DataFrame:
 def build_match_target(group: str = "major") -> pd.DataFrame:
     cols = ["match_id"] + _columns()
     features_dir = _features_dir(group)
-    frames = [_load_file(path) for path in sorted(_matches_dir(group).glob("*.csv"))]
+    frames = [_load_file(path) for path in match_files(group)]
     df = round_floats(pd.concat(frames, ignore_index=True)[cols])
 
     features_dir.mkdir(parents=True, exist_ok=True)

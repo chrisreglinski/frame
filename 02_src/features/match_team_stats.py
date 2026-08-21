@@ -7,16 +7,12 @@ import numpy as np
 import pandas as pd
 import yaml
 
-from features.utils import round_floats
+from features.utils import match_files, round_floats
 
 
 _ROOT = Path(__file__).parents[2]
 _DATA = _ROOT / "01_data"
 _YAML_PATH = _ROOT / "06_docs" / "data.yaml"
-
-
-def _matches_dir(group: str) -> Path:
-    return _DATA / "01_raw" / "01_matches" / group
 
 
 def _features_dir(group: str) -> Path:
@@ -26,12 +22,12 @@ def _features_dir(group: str) -> Path:
 _XG_DIR = _DATA / "01_raw" / "05_xg"
 
 
-def _attach_xg(raw: pd.DataFrame, league: str, season: str, group: str) -> pd.DataFrame:
+def _attach_xg(raw: pd.DataFrame, league: str, season: str) -> pd.DataFrame:
     """Merge Understat home_xg/away_xg onto the raw match rows by (HomeTeam, AwayTeam).
-    Understat names are translated to ours via the group's team_map; matches with no xg
-    row (or groups Understat does not cover) keep NaN xg."""
-    path = _XG_DIR / group / f"{league}_{season}_xg.csv"
-    tmap = _XG_DIR / group / "team_map.csv"
+    Understat names are translated to ours via the league's team_map; matches with no xg
+    row (or leagues Understat does not cover) keep NaN xg."""
+    path = _XG_DIR / league / f"{league}_{season}_xg.csv"
+    tmap = _XG_DIR / league / "team_map.csv"
     if not path.exists() or not tmap.exists():
         return raw.assign(home_xg=np.nan, away_xg=np.nan)
     u2o = pd.read_csv(tmap).set_index("understat")["team"].to_dict()
@@ -336,9 +332,9 @@ def build_match_team_stats(group: str = "major") -> pd.DataFrame:
     features_dir = _features_dir(group)
     thresholds_path = features_dir / "thresholds.json"
     frames = []
-    for path in sorted(_matches_dir(group).glob("*.csv")):
+    for path in match_files(group):
         league, season = path.stem.removesuffix("_matches").rsplit("_", 1)
-        raw = _attach_xg(pd.read_csv(path), league, season, group)
+        raw = _attach_xg(pd.read_csv(path), league, season)
         frames.append(_build_long(raw, league, season))
 
     long = _add_stats(_add_summary_stubs(pd.concat(frames, ignore_index=True)))

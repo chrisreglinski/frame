@@ -189,29 +189,29 @@ columns:
 
   hmt_is_top3_last:
     table: match_info
-    groups: [major, other]
-    description: "home team finished top 3 in this league last season (reigning top-3, analogous to promoted for the previous season's best). Top-tier groups only. Seeded from external final tables for the earliest season; agrees with team_season_final rankings for all later seasons"
+    leagues: [england, spain, italy, france, germany, netherlands, portugal]
+    description: "home team finished top 3 in this league last season (reigning top-3, analogous to promoted for the previous season's best). Top-tier leagues only. Seeded from external final tables for the earliest season; agrees with team_season_final rankings for all later seasons"
     inputs: [Top3Last]
     dtype: bool
 
   awt_is_top3_last:
     table: match_info
-    groups: [major, other]
-    description: "away team finished top 3 in this league last season (reigning top-3, analogous to promoted for the previous season's best). Top-tier groups only. Seeded from external final tables for the earliest season; agrees with team_season_final rankings for all later seasons"
+    leagues: [england, spain, italy, france, germany, netherlands, portugal]
+    description: "away team finished top 3 in this league last season (reigning top-3, analogous to promoted for the previous season's best). Top-tier leagues only. Seeded from external final tables for the earliest season; agrees with team_season_final rankings for all later seasons"
     inputs: [Top3Last]
     dtype: bool
 
   hmt_is_relegated:
     table: match_info
-    groups: [minor]
-    description: "home team was relegated from the tier above into this league this season (minor group only; the second-tier analogue of is_top3_last)"
+    leagues: [england2, spain2, italy2, france2, germany2]
+    description: "home team was relegated from the tier above into this league this season (second-tier leagues only; the second-tier analogue of is_top3_last)"
     inputs: [Relegated]
     dtype: bool
 
   awt_is_relegated:
     table: match_info
-    groups: [minor]
-    description: "away team was relegated from the tier above into this league this season (minor group only; the second-tier analogue of is_top3_last)"
+    leagues: [england2, spain2, italy2, france2, germany2]
+    description: "away team was relegated from the tier above into this league this season (second-tier leagues only; the second-tier analogue of is_top3_last)"
     inputs: [Relegated]
     dtype: bool
 
@@ -243,7 +243,7 @@ columns:
 
   "{side}_elo":
     table: match_info
-    description: "Club Elo rating of the {side} team as of the match date (pre-match, From <= date <= To; from clubelo.com via 04_elo/team_map.csv; NaN if the team is unmapped or has no rating for that date)"
+    description: "Club Elo rating of the {side} team as of the match date (pre-match: the last published point strictly before the match, since clubelo dates a rating to the day of the match it follows; from clubelo.com via 04_elo/{league}/team_map.csv and the per-club series; NaN if the team has no clubelo page or no earlier point)"
     dims:
       side: [hmt, awt]
     dtype: float
