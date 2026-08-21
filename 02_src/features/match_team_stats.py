@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import yaml
 
-from features.utils import match_files, round_floats
+from features.utils import league_set, match_files, round_floats
 
 
 _ROOT = Path(__file__).parents[2]
@@ -98,7 +98,7 @@ def _make_stat_cols() -> list[str]:
 _STAT_COLS = _make_stat_cols()
 
 
-def _columns() -> list[str]:
+def _columns(group: str) -> list[str]:
     with open(_YAML_PATH) as f:
         schema = yaml.safe_load(f)
     result = []
@@ -107,6 +107,9 @@ def _columns() -> list[str]:
             continue
         table = meta.get("table")
         if "team_stats" not in (table if isinstance(table, list) else [table]):
+            continue
+        leagues = meta.get("leagues")
+        if leagues is not None and not set(leagues) & set(league_set(group)):
             continue
         if "dims" in meta:
             keys = list(meta["dims"].keys())
@@ -454,7 +457,7 @@ def build_match_team_stats(group: str = "major") -> pd.DataFrame:
         .merge(home_locality, on="match_id")
         .merge(away_locality, on="match_id")
     )
-    result = round_floats(result[["match_id"] + _columns()])
+    result = round_floats(result[["match_id"] + _columns(group)])
 
     result.to_csv(features_dir / "match_team_stats.csv", index=False)
     result.to_parquet(features_dir / "match_team_stats.parquet", index=False)

@@ -229,13 +229,15 @@ columns:
 
   travel_distance_km:
     table: match_info
-    description: "haversine distance between home and away team stadiums"
+    leagues: [england, spain, italy, france, germany]
+    description: "haversine distance between home and away team stadiums. Stadium coordinates are only filled in for the top five leagues, so the column exists for those leagues alone"
     inputs: [Latitude, Longitude]
     dtype: float
     range: [0, 4000]
 
   travel_distance_cat:
     table: match_info
+    leagues: [england, spain, italy, france, germany]
     description: "travel_distance_km bucketed: derby (<30, city rivalries), regional (30-100, neighbouring cities same region), domestic (100-500, coach / high-speed rail incl. Barcelona-Real 499km AVE), long_haul (500+, flight territory)"
     inputs: [Latitude, Longitude]
     dtype: string
@@ -243,6 +245,7 @@ columns:
 
   "{side}_elo":
     table: match_info
+    leagues: [england, spain, italy, france, germany]
     description: "Club Elo rating of the {side} team as of the match date (pre-match: the last published point strictly before the match, since clubelo dates a rating to the day of the match it follows; from clubelo.com via 04_elo/{league}/team_map.csv and the per-club series; NaN if the team has no clubelo page or no earlier point)"
     dims:
       side: [hmt, awt]
@@ -251,6 +254,7 @@ columns:
 
   "{side}_elo_cat2m":
     table: match_info
+    leagues: [england, spain, italy, france, germany]
     description: "high if {side}_elo > global elo mean (thresholds.json elo_mean), else low; None if elo is NaN"
     dims:
       side: [hmt, awt]
@@ -259,6 +263,7 @@ columns:
 
   "{side}_elo_cat3q":
     table: match_info
+    leagues: [england, spain, italy, france, germany]
     description: "tertile of {side}_elo from the pooled per-match elo distribution (thresholds.json elo_p33/p67); None if elo is NaN"
     dims:
       side: [hmt, awt]
@@ -345,7 +350,17 @@ columns:
     dims:
       side: [hmt, awt]
       window: [season, rolling6, rolling8]
-      metric: [goals, shots, shots_on_target, corners, yellow, xg]
+      metric: [goals, shots, shots_on_target, corners, yellow]
+      kind: [for, agst]
+    dtype: float
+
+  "{side}_{window}_xg_{kind}_avg":
+    table: team_stats
+    leagues: [england, spain, italy, france, germany]
+    description: "arithmetic mean of xg {kind} per match over {window}, {side} team. Understat only covers the top five leagues, so the column exists for those leagues alone"
+    dims:
+      side: [hmt, awt]
+      window: [season, rolling6, rolling8]
       kind: [for, agst]
     dtype: float
 
@@ -461,7 +476,17 @@ columns:
     dims:
       side: [hmt, awt]
       window: [season, rolling6, rolling8]
-      metric: [points, flg_diff, goals_diff, goals_total, shots_on_target_diff, shots_on_target_total, xg_diff, xg_total]
+      metric: [points, flg_diff, goals_diff, goals_total, shots_on_target_diff, shots_on_target_total]
+    dtype: float
+
+  "{side}_{window}_{xg_metric}_avg":
+    table: team_stats
+    leagues: [england, spain, italy, france, germany]
+    description: "arithmetic mean of {xg_metric} per match over {window}, {side} team. Understat only covers the top five leagues, so the column exists for those leagues alone"
+    dims:
+      side: [hmt, awt]
+      window: [season, rolling6, rolling8]
+      xg_metric: [xg_diff, xg_total]
     dtype: float
 
   "{side}_{window}_{metric}_std":
@@ -470,7 +495,17 @@ columns:
     dims:
       side: [hmt, awt]
       window: [season, rolling6, rolling8]
-      metric: [goals_diff, goals_total, shots_on_target_diff, shots_on_target_total, xg_diff, xg_total]
+      metric: [goals_diff, goals_total, shots_on_target_diff, shots_on_target_total]
+    dtype: float
+
+  "{side}_{window}_{xg_metric}_std":
+    table: team_stats
+    leagues: [england, spain, italy, france, germany]
+    description: "standard deviation of {xg_metric} per match over {window}, {side} team. Understat only covers the top five leagues, so the column exists for those leagues alone"
+    dims:
+      side: [hmt, awt]
+      window: [season, rolling6, rolling8]
+      xg_metric: [xg_diff, xg_total]
     dtype: float
 
   "{side}_{window}_{result}_ratio":
@@ -691,18 +726,36 @@ columns:
 
   "teams_{window}_{metric}_avg_diff":
     table: match_matchup_stats
-    description: "home {window} {metric} avg minus away {window} {metric} avg; positive = the home team is the stronger / higher-volume side on that metric. metrics that already carry an inner for-agst difference (goals_diff, shots_on_target_diff, xg_diff, flg_diff) give a difference of differences; the per-side scalars (points, impl_points) give a plain one. xg is NaN outside the major group"
+    description: "home {window} {metric} avg minus away {window} {metric} avg; positive = the home team is the stronger / higher-volume side on that metric. metrics that already carry an inner for-agst difference (goals_diff, shots_on_target_diff, flg_diff) give a difference of differences; the per-side scalars (points, impl_points) give a plain one."
     dims:
       window: [season, rolling6, rolling8]
-      metric: [points, flg_diff, goals_diff, goals_total, shots_on_target_diff, shots_on_target_total, xg_diff, xg_total, mp_impl_points, mc_impl_points]
+      metric: [points, flg_diff, goals_diff, goals_total, shots_on_target_diff, shots_on_target_total, mp_impl_points, mc_impl_points]
+    dtype: float
+
+  "teams_{window}_{xg_metric}_avg_diff":
+    table: match_matchup_stats
+    leagues: [england, spain, italy, france, germany]
+    description: "home {window} {xg_metric} avg minus away {window} {xg_metric} avg; a difference of differences on xg_diff, a volume tilt on xg_total. Understat only covers the top five leagues, so the column exists for those leagues alone"
+    dims:
+      window: [season, rolling6, rolling8]
+      xg_metric: [xg_diff, xg_total]
     dtype: float
 
   "teams_{window}_{metric}_avg_total":
     table: match_matchup_stats
-    description: "home {window} {metric} avg plus away {window} {metric} avg; the combined level of the matchup on that metric. on the *_total metrics it reads as combined intensity, on the *_diff and scalar ones as combined quality. xg is NaN outside the major group"
+    description: "home {window} {metric} avg plus away {window} {metric} avg; the combined level of the matchup on that metric. on the *_total metrics it reads as combined intensity, on the *_diff and scalar ones as combined quality."
     dims:
       window: [season, rolling6, rolling8]
-      metric: [points, flg_diff, goals_diff, goals_total, shots_on_target_diff, shots_on_target_total, xg_diff, xg_total, mp_impl_points, mc_impl_points]
+      metric: [points, flg_diff, goals_diff, goals_total, shots_on_target_diff, shots_on_target_total, mp_impl_points, mc_impl_points]
+    dtype: float
+
+  "teams_{window}_{xg_metric}_avg_total":
+    table: match_matchup_stats
+    leagues: [england, spain, italy, france, germany]
+    description: "home {window} {xg_metric} avg plus away {window} {xg_metric} avg; the combined xg level of the matchup. Understat only covers the top five leagues, so the column exists for those leagues alone"
+    dims:
+      window: [season, rolling6, rolling8]
+      xg_metric: [xg_diff, xg_total]
     dtype: float
 
   "teams_{window}_goals_foragst_avg_max":
@@ -722,11 +775,13 @@ columns:
 
   teams_elo_diff:
     table: match_matchup_stats
+    leagues: [england, spain, italy, france, germany]
     description: "hmt_elo minus awt_elo; positive = home team higher-rated (matchup strength tilt). NaN if either elo is NaN"
     dtype: float
 
   teams_elo_total:
     table: match_matchup_stats
+    leagues: [england, spain, italy, france, germany]
     description: "hmt_elo plus awt_elo; overall rating level of the matchup. NaN if either elo is NaN"
     dtype: float
 
@@ -738,61 +793,73 @@ columns:
 
   teams_elo_diff_crr_impl_diff:
     table: match_matchup_stats
+    leagues: [england, spain, italy, france, germany]
     description: "elo-implied home-minus-away win-probability margin, CUBIC form fit to RESULTS (crr): expected p_home - p_away from teams_elo_diff and league via g(d) = a0[league] + a1*d + a2*d^2 + a3*d^3 fit to realized outcomes (t_home_flg - t_away_flg); coefficients in thresholds.json as elo_crr. d is clamped to the cubic's monotone range so extreme mismatches plateau instead of hitting the polynomial turnover. Equals teams_elo_diff_crr_impl_stgh + teams_elo_diff_crr_impl_lhfa. NaN if teams_elo_diff is NaN"
     dtype: float
 
   teams_elo_diff_crr_impl_stgh:
     table: match_matchup_stats
+    leagues: [england, spain, italy, france, germany]
     description: "strength component of teams_elo_diff_crr_impl_diff: the antisymmetric (venue-free) part a1*d + a3*d^3, odd in teams_elo_diff so it flips sign when the teams swap. NaN if teams_elo_diff is NaN"
     dtype: float
 
   teams_elo_diff_crr_impl_lhfa:
     table: match_matchup_stats
+    leagues: [england, spain, italy, france, germany]
     description: "league home-field-advantage component of teams_elo_diff_crr_impl_diff: per-league intercept a0[league] plus the symmetric a2*d^2 term. NaN if teams_elo_diff is NaN"
     dtype: float
 
   teams_elo_diff_cmr_impl_diff:
     table: match_matchup_stats
+    leagues: [england, spain, italy, france, germany]
     description: "elo-implied home-minus-away margin, CUBIC form fit to MARKET (cmr): the same cubic g(d) = a0[league] + a1*d + a2*d^2 + a3*d^3 but fit to the market price mrkt_home_away_impl_diff instead of outcomes (coefficients in thresholds.json as elo_cmr). d clamped to the monotone range as for crr. Reconstructs the elo+league component of the market price. Equals teams_elo_diff_cmr_impl_stgh + teams_elo_diff_cmr_impl_lhfa. NaN if teams_elo_diff is NaN"
     dtype: float
 
   teams_elo_diff_cmr_impl_stgh:
     table: match_matchup_stats
+    leagues: [england, spain, italy, france, germany]
     description: "strength component of teams_elo_diff_cmr_impl_diff: the antisymmetric part a1*d + a3*d^3 of the market-price fit. NaN if teams_elo_diff is NaN"
     dtype: float
 
   teams_elo_diff_cmr_impl_lhfa:
     table: match_matchup_stats
+    leagues: [england, spain, italy, france, germany]
     description: "league home-field-advantage component of teams_elo_diff_cmr_impl_diff: per-league intercept a0[league] plus a2*d^2, from the market-price fit. NaN if teams_elo_diff is NaN"
     dtype: float
 
   teams_elo_diff_lrr_impl_diff:
     table: match_matchup_stats
+    leagues: [england, spain, italy, france, germany]
     description: "elo-implied home-minus-away margin, LOGISTIC form fit to RESULTS (lrr): margin = 2/(1 + 10^(-(d + hfa[league])/scale)) - 1 (the ClubElo Elo equation, d = teams_elo_diff), with a global scale and a per-league home-field shift hfa[league] in elo points, fit to realized outcomes (t_flg_diff); parameters in thresholds.json as elo_lrr. Fixed logistic shape (only scale + hfa fitted), saturates smoothly toward +-1 so no clamping is needed. Equals teams_elo_diff_lrr_impl_stgh + teams_elo_diff_lrr_impl_lhfa. NaN if teams_elo_diff is NaN"
     dtype: float
 
   teams_elo_diff_lrr_impl_stgh:
     table: match_matchup_stats
+    leagues: [england, spain, italy, france, germany]
     description: "strength component of teams_elo_diff_lrr_impl_diff: the venue-free margin 2/(1 + 10^(-d/scale)) - 1 (hfa=0), odd in teams_elo_diff. Fitted scale only; no home-field. NaN if teams_elo_diff is NaN"
     dtype: float
 
   teams_elo_diff_lrr_impl_lhfa:
     table: match_matchup_stats
+    leagues: [england, spain, italy, france, germany]
     description: "league home-field-advantage component of teams_elo_diff_lrr_impl_diff: the boost the hfa[league] elo-point shift adds to the margin, = diff - stgh. Unlike the cubic's, it saturates toward 0 as |d| grows (home advantage matters less in lopsided matches). NaN if teams_elo_diff is NaN"
     dtype: float
 
   teams_elo_diff_lmr_impl_diff:
     table: match_matchup_stats
+    leagues: [england, spain, italy, france, germany]
     description: "elo-implied home-minus-away margin, LOGISTIC form fit to MARKET (lmr): the same logistic margin = 2/(1 + 10^(-(d + hfa[league])/scale)) - 1 but with scale + hfa[league] fit to the market price mrkt_home_away_impl_diff instead of outcomes (parameters in thresholds.json as elo_lmr). Reconstructs the elo+league component of the market price. Equals teams_elo_diff_lmr_impl_stgh + teams_elo_diff_lmr_impl_lhfa. NaN if teams_elo_diff is NaN"
     dtype: float
 
   teams_elo_diff_lmr_impl_stgh:
     table: match_matchup_stats
+    leagues: [england, spain, italy, france, germany]
     description: "strength component of teams_elo_diff_lmr_impl_diff: the venue-free margin 2/(1 + 10^(-d/scale)) - 1 (hfa=0) at the market-fit scale. NaN if teams_elo_diff is NaN"
     dtype: float
 
   teams_elo_diff_lmr_impl_lhfa:
     table: match_matchup_stats
+    leagues: [england, spain, italy, france, germany]
     description: "league home-field-advantage component of teams_elo_diff_lmr_impl_diff: the market-priced home boost from hfa[league], = diff - stgh, saturating toward 0 as |d| grows. NaN if teams_elo_diff is NaN"
     dtype: float
 

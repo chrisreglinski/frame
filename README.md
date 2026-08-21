@@ -32,7 +32,7 @@ Source: [football-data.co.uk](https://www.football-data.co.uk)
     01_matches/        # raw CSVs from football-data.co.uk (tracked in git)
     02_attributes/     # per-team attributes: venue coordinates + promoted / reigning-top3 flags
                        # (second tiers and netherlands/portugal: promotee + island flags only,
-                       #  coordinates empty -> travel_distance stays NaN there)
+                       #  coordinates empty -> no travel_distance columns for those leagues)
     03_dates/          # season phase boundaries + international-break windows (shared, global)
     04_elo/            # Club Elo ratings per club (clubelo.com) + per-league team-name maps
                        # _archive/ holds the pre-2026-08 snapshot of the old rating system
@@ -139,7 +139,7 @@ Statistics per team per window:
 - Goals, shots, shots on target, corners, yellow cards, xG — for & against averages
 - Points — average
 - goals_diff, goals_total, shots_on_target_diff, shots_on_target_total, xg_diff, xg_total — average & std
-- xG is sourced from Understat (`05_xg/`, mapped via `team_map`); available only where Understat covers the league (major group) — NaN elsewhere
+- xG is sourced from Understat (`05_xg/`, mapped via `team_map`), which covers only the top five leagues. The xg columns therefore carry their own contract entries scoped with `leagues:`, and a set built from other leagues does not get them at all rather than getting them empty. `travel_distance_*` and every `elo` column are scoped the same way, for the same reason — the contract states where a source reaches
 - Win / draw / loss ratio
 - Goals total / for / against threshold ratios (e.g. over 2.5, clean sheets)
 - Shots on target conversion ratio
