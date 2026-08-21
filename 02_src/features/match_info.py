@@ -388,8 +388,9 @@ def _attach_team_break_counters(df: pd.DataFrame, breaks: pd.DataFrame) -> pd.Da
     return df
 
 
-def _attach_elo(df: pd.DataFrame, group: str) -> pd.DataFrame:
-    """Add hmt_elo / awt_elo: the Club Elo rating of each team as of the match date.
+def _attach_clubelo(df: pd.DataFrame, group: str) -> pd.DataFrame:
+    """Add the two Club Elo ratings of each team as of the match date: {side}_elo and
+    {side}_golo, the latter clubelo's attacking rate published on the same series.
 
     Ratings come from 04_elo/<league>/<slug>.json, one point per match played, where the
     value on date D is the rating AFTER that day's match. The pre-match rating for a match
@@ -416,12 +417,14 @@ def _attach_elo(df: pd.DataFrame, group: str) -> pd.DataFrame:
             frames.append(pd.DataFrame({
                 "slug": slug,
                 "date": [point["Date"][:10] for point in series],
-                "Elo": [point["Elo"] for point in series],
+                "elo": [point["Elo"] for point in series],
+                "golo": [point["Golo"] for point in series],
             }))
 
     if not frames:
-        df["hmt_elo"] = np.nan
-        df["awt_elo"] = np.nan
+        for prefix in ("hmt", "awt"):
+            df[f"{prefix}_elo"] = np.nan
+            df[f"{prefix}_golo"] = np.nan
         return df
 
     hist = pd.concat(frames, ignore_index=True).drop_duplicates(subset=["slug", "date"])
@@ -436,8 +439,10 @@ def _attach_elo(df: pd.DataFrame, group: str) -> pd.DataFrame:
             "slug": df[f"{prefix}_name"].map(name_to_slug).fillna("").values,
         }).sort_values("date")
         merged = pd.merge_asof(left, hist, on="date", by="slug",
-                               direction="backward", allow_exact_matches=False)
-        df[f"{prefix}_elo"] = merged.sort_values("_row")["Elo"].values
+                               direction="backward", allow_exact_matches=False
+                               ).sort_values("_row")
+        df[f"{prefix}_elo"] = merged["elo"].values
+        df[f"{prefix}_golo"] = merged["golo"].values
     return df
 
 
@@ -488,7 +493,7 @@ def build_match_info(group: str = "major") -> pd.DataFrame:
         attrs = _load_attributes(league, season)
         frames.append(_load_file(path, attrs, limits, breaks))
 
-    base = _attach_elo(pd.concat(frames, ignore_index=True), group)
+    base = _attach_clubelo(pd.concat(frames, ignore_index=True), group)
     base = _attach_elo_cats(base, group)
     base = _attach_team_break_counters(base, breaks)
     df = round_floats(base[cols])

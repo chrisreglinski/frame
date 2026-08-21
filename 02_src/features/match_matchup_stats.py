@@ -74,11 +74,14 @@ def build_match_matchup_stats(group: str = "major") -> pd.DataFrame:
     cols = _columns(group)
     src = pd.read_parquet(features_dir / "match_team_stats.parquet")
     has_elo = "teams_elo_diff" in cols
-    if has_elo:
-        # elo and league live in match_info, not match_team_stats — pull them in for the
-        # matchup elo features (league is needed for the per-league home-field intercept)
+    has_golo = "teams_golo_diff" in cols
+    if has_elo or has_golo:
+        # the clubelo ratings and league live in match_info, not match_team_stats — pull in
+        # what this set asks for (league is needed for the per-league home-field intercept)
+        rating_cols = (["hmt_elo", "awt_elo"] if has_elo else []) \
+                    + (["hmt_golo", "awt_golo"] if has_golo else [])
         info = pd.read_parquet(features_dir / "match_info.parquet")[
-            ["match_id", "hmt_elo", "awt_elo", "league"]]
+            ["match_id", "league"] + rating_cols]
         src = src.merge(info, on="match_id", how="left")
     # the schedule-density columns live in their own table; the teams_ combinations of them
     # belong here with the rest of the matchup features, so pull the whole table in
@@ -153,6 +156,11 @@ def build_match_matchup_stats(group: str = "major") -> pd.DataFrame:
             computed[f"teams_elo_diff_{prefix}_impl_stgh"] = stgh
             computed[f"teams_elo_diff_{prefix}_impl_lhfa"] = diff - stgh
             computed[f"teams_elo_diff_{prefix}_impl_diff"] = diff
+
+    # matchup golo: the attacking tilt and the combined scoring potential of the matchup
+    if has_golo:
+        computed["teams_golo_diff"] = src["hmt_golo"] - src["awt_golo"]
+        computed["teams_golo_total"] = src["hmt_golo"] + src["awt_golo"]
 
     # teams_ combinations of match_team_fatigue: every contract column of the form
     # teams_<stem>_total / _diff whose per-side halves exist in that table. Reading the

@@ -270,6 +270,15 @@ columns:
     dtype: string
     categories: [low, medium, high]
 
+  "{side}_golo":
+    table: match_info
+    leagues: [england, spain, italy, france, germany]
+    description: "Club Elo's second rating for the {side} team, published alongside the elo on the same per-club series and joined the same point-in-time way (last point strictly before the match). clubelo.com gives no definition; measured across 95 clubs it correlates +0.75 with goals scored per match and +0.03 with goals conceded, so it reads as a purely attacking rate, opponent-adjusted (Bayern 2.45 against 3.59 goals per match actually scored, Getafe 0.78 against 0.84) - roughly the goals a team would be expected to score against an average opponent. NaN wherever {side}_elo is NaN"
+    dims:
+      side: [hmt, awt]
+    dtype: float
+    range: [0, 5]
+
   "{bookmaker}_{outcome}_odds":
     table: match_info
     description: "odds from {bookmaker} for outcome {outcome}. b365/mrkt are the pre-closing line (football-data non-C columns); b365c/mrktc are the closing (kickoff) line (football-data C columns) — same bookmaker/market with a trailing c. Empty where football-data has no closing price"
@@ -783,6 +792,18 @@ columns:
     table: match_matchup_stats
     leagues: [england, spain, italy, france, germany]
     description: "hmt_elo plus awt_elo; overall rating level of the matchup. NaN if either elo is NaN"
+    dtype: float
+
+  teams_golo_diff:
+    table: match_matchup_stats
+    leagues: [england, spain, italy, france, germany]
+    description: "hmt_golo minus awt_golo; positive = the home team is the stronger attacking side. NaN if either golo is NaN"
+    dtype: float
+
+  teams_golo_total:
+    table: match_matchup_stats
+    leagues: [england, spain, italy, france, germany]
+    description: "hmt_golo plus awt_golo; the combined scoring potential of the matchup, the natural over/under axis. NaN if either golo is NaN"
     dtype: float
 
   # elo -> home-minus-away margin, 2x2 grid: FORM (c=cubic / l=logistic) x FIT (rr=results / mr=market).
