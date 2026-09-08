@@ -126,9 +126,8 @@ def stats_table(title, all_stats, group_df):
 
 
 def stats_block_rows(title, rows_df, highlight=False):
-    """A block like stats_table but with arbitrary labelled rows (index = row label) and no
-    all-seasons summary. Columns align with stats_header. Used for the inverted out-of-sample
-    block: a 'season 25/26' title with the left/peak/right buffers indented beneath it."""
+    """A block like stats_table but with arbitrary labelled rows (index = row label) and no summary
+    row. Columns align with stats_header; `highlight` tints the block."""
     body = [_TINDENT + _trow(str(name), _cells(row), bold=True) for name, row in rows_df.iterrows()]
     lines = [f"<b>{title}</b>"] + body
     css = "blk hl" if highlight else "blk"

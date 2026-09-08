@@ -9,12 +9,14 @@ are two independent curves.
 import pandas as pd
 
 
-def reliability_curve(prob, outcome, n_bins=10):
-    """Bin `prob` into `n_bins` equal-count (quantile) buckets and return per-bin mean predicted
-    probability, observed frequency, and count. Equal-count bins keep every point about as
-    statistically reliable as the next.
+def reliability_curve(prob, outcome, min_per_bucket=100):
+    """Bin `prob` into equal-count (quantile) buckets and return per-bin mean predicted probability,
+    observed frequency, and count. The number of buckets aims for at least `min_per_bucket`
+    observations each, clamped to 3–7 — equal-count bins keep every point about as statistically
+    reliable as the next, and the clamp keeps the diagram readable and not over-split.
     """
     df = pd.DataFrame({"prob": pd.Series(prob).to_numpy(), "outcome": pd.Series(outcome).to_numpy()})
+    n_bins = max(3, min(7, len(df) // min_per_bucket))
     df["bin"] = pd.qcut(df["prob"], n_bins, duplicates="drop")
 
     grouped = df.groupby("bin", observed=True)

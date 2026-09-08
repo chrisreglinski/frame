@@ -74,18 +74,18 @@ def buffer_curve(preds, grid=DEFAULT_BUFFER_GRID, smooth_window=21, smooth_poly=
 
 
 def pick_buffers(curve):
-    """Three reference buffers off the smoothed profit curve, from its local maxima:
+    """Three reference buffers from the local maxima of the smoothed profit curve:
 
-    - `left`   — the first local maximum from the left: where sieving off the clear losers is done
-      and the marginal edge first hits zero. The operative choice — it generalizes best; anything
-      higher is a dev-specific bump that overfits.
-    - `right`  — the last local maximum: the highest buffer where adding matches still adds profit.
+    - `left`   — the first (lowest-buffer) local maximum.
+    - `right`  — the last (highest-buffer) local maximum.
     - `middle` — the midpoint between `left` and `right`.
+
+    Peaks are detected on `profit_smooth` with a prominence floor so minor wiggles are ignored.
     """
     profit = curve["profit_smooth"].to_numpy()
     buffers = curve.index.to_numpy()
 
-    prominence = 0.01 * (profit.max() - profit.min())
+    prominence = 0.03 * (profit.max() - profit.min())
     peaks, _ = find_peaks(profit, prominence=prominence)
     if len(peaks) == 0:
         peaks = [int(profit.argmax())]

@@ -1,65 +1,56 @@
 # tearsheet_spec
 
-Specyfikacja jednostronicowego raportu modelu (tearsheet). Wielokrotnego użytku —
-opisuje układ dla **dowolnego** modelu betowego w tym frameworku, nie zamraża
-konkretnego modelu.
+Specification of the tearsheet — a reusable one-page model report. It works for **any** betting
+model that (a) runs on some subset of the ABT and (b) can be split by season. It knows nothing
+about which model, subset, segment or staking rule is used — those are the caller's decisions.
 
-## Kontekst dla zimnej sesji
+## Input
 
-Powierzchnie i pojęcia, do których odwołują się bullety niżej:
+A predictions frame from `evaluation.predictions.collect_predictions`: one row per match with
+`implied`, `model_p`, `y`, plus passthrough meta (`season`, `league`, teams, goals, `date`). The
+caller chooses the ABT subset, features, model and fold scheme (LOSO or walk-forward) and hands in
+the frame; the report only reads it.
 
-- **Framework**: `02_src/evaluation/model_check.py` — `season_folds` (LOSO),
-  `expanding_folds` (walk-forward), 3 bramki (LOSO ≥3/4 sezonów dodatnie,
-  drop-best-league, walk-forward floor), `portfolio_roi` (stawkowanie implied).
-- **Grupy ABT**: `major` = top-5 (dane deweloperskie). `other` = NL/PT
-  (holdout OOD, oceniany raz po zamrożeniu modelu). `minor` = drugie ligi top-5.
-- **Okno dev**: sezony **2223–2425** (3 sezony) — źródło wyboru bufora i ROI do
-  stakingu. **2526** to najnowszy sezon — sekcja zgłębiająca, będąca zarazem
-  najnowszym walk-forward (train 2223–2425 → 2526).
-- **Filtr protokołu**: `hmt_game_number>8 & awt_game_number>8`.
-- **Wybór bufora** (deterministyczny, bez oka): na siatce buforów licz profit;
-  `thr = 0.9*profit.max()`, `band = bufory[profit>=thr]`;
-  `left=band.min()`, `peak=bufory[profit.argmax()]`, `right=band.max()`.
-- **ROI_dev**: pooled OOF ROI na 2223–2425 przy buforze `peak`.
-- **Staking (bankroll)**: half Kelly z **bieżącego** bankrolla (compounding),
-  start 100. Prawdopodobieństwo do Kelly = `implied_mecz × (1 + ROI_dev)` —
-  **nie** modelowe `p`. Selekcja betów wciąż z modelu (`p > implied + buffer`).
-  Stały mnożnik `(1+ROI_dev)` dla każdego betu (zakłada stały % edge — v1).
-- **Reliability**: kubełkuj każdy predyktor osobno po jego własnym `p`
-  (`mean p` vs `mean Y`); dwie niezależne krzywe (model, rynek).
+## Building blocks
 
-## Bullety raportu
+Computation lives in `evaluation/` and is format-agnostic (returns DataFrames/Series):
 
-1. **nagłówek** — definicja modelu + liczby kluczowe (na walk-forward top-5;
-   konkretna zawartość liczb ustalona później).
+- `predictions.collect_predictions` — model × folds → out-of-fold predictions frame.
+- `stats.portfolio_stats` — summary of any match subset (n, staked, wins, profit, ROI, hit rate,
+  breakeven, one-sided p-value) under proportional (implied) staking.
+- `stats.buffer_curve` / `stats.pick_buffers` — profit vs bet threshold, and reference buffers
+  (`left`/`middle`/`right`) from the local maxima of the smoothed profit curve.
+- `calibration.reliability_curve` — per-bucket predicted probability vs observed frequency.
 
-2. **dochód od bufora** — pooled OOF 2223–2425; zaznacz left/peak/right (0.9·max).
-   Obok tabele ROI:
-   - a) per sezon + ROI całości bez najlepszego sezonu
-   - b) per liga + ROI całości bez najlepszej ligi
+Presentation lives in `reporting/` (`panels`, `render`) and only draws what the blocks compute.
 
-   Sens: krzywa z pikiem = model separuje dobre bety od złych; tabele = wynik nie
-   stoi na jednym sezonie/lidze.
+## Sections
 
-3. **reliability** — dwie krzywe (model + rynek). Lewo: 3 sezony, wszystkie mecze.
-   Prawo: mecze bet (bufor peak). Mówi: czy `p` trafne → czy przed Kellym
-   rekalibrować.
+1. **header** — model identity + headline numbers.
+2. **profit vs buffer** — the profit curve with the reference buffers marked, beside per-group
+   breakdowns (per season, per league) from `group_stats`.
+3. **calibration** — reliability / calibration panels (model and market), over all matches and
+   over the bet matches.
+4. **bankroll** — a Kelly bankroll curve bet-by-bet in chronological order, with drawdown. *(to build)*
+5. **bets listing** *(optional)* — the placed bets, one row per bet.
 
-4. **sekcja 2526 — bankroll** — krzywa bankrolla zakład po zakładzie
-   (chronologicznie), start 100, half Kelly wg `implied×(1+ROI_dev)` z bieżącego
-   bankrolla; zacieniony drawdown; finalny bankroll obok.
+## Buffer reference points
 
-5. **sekcja 2526 — 3 confusion matrix obok siebie** (bet = klasa pozytywna):
-   1. zwykła, liczność meczów (bet → TP/FP, no-bet → TN/FN)
-   2. profit per kafelek, staking płaski względem 100 (no-bet=0, TP=+, FP=−)
-   3. profit per kafelek, staking z pełnego bankrolla (chronologicznie)
+`pick_buffers` returns the local maxima of the smoothed profit curve — `left` (lowest buffer),
+`right` (highest), and `middle` (their midpoint). Which one to operate on is the caller's choice.
 
-6. **sekcja 2526 — statystyki**:
-   - wiersz 1: n meczów sezonu, n betów (+% całości), trafione (+% betów),
-     nietrafione (+% betów)
-   - wiersz 2: % trafionych, spodziewany % (mean implied), p-value na tych
-     wartościach (dwumianowy: trafienia vs Σ implied)
+## Output target
 
-7. **listing betów 2526** (opcjonalna, od nowej strony) — chronologicznie:
-   home, away, odds, implied, model_p, stake/100, stake/bankroll, gole H, gole A,
-   result (HDA), profit/100, profit/bankroll, bankroll skumulowany.
+- **Primary: a Claude Artifact** — a self-contained HTML page, theme-aware, sections stacking
+  vertically.
+- **Secondary: a printable A4-portrait PDF** — from the artifact or separately. Fit the page
+  width; keep a section from splitting across pages (`page-break-inside: avoid`).
+
+Author panels as composable blocks (SVG for charts, HTML for tables) so they compose into the
+artifact and print cleanly.
+
+## Out of scope
+
+Model-specific decisions — which ABT subset, which segment to include or exclude, which fold is
+the holdout, how (or whether) to recalibrate for staking — belong to the notebook/driver that uses
+the report, never to the reporting module.
