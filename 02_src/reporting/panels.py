@@ -1,158 +1,274 @@
-"""Tearsheet panels — each takes a predictions frame and returns a figure and/or a table.
+"""Tearsheet panels — each takes a predictions frame and returns a chart spec (data + axes).
 
-Panels are presentation only: they call the evaluation layer to compute, then draw. Nothing here
-fits models or decides staking.
+Panels are presentation only: they call the evaluation layer to compute, then shape the result
+into a spec the render layer draws as browser-side SVG. Nothing here fits models or decides
+staking, and nothing draws pixels — the spec is theme-agnostic (colours are CSS token names).
 """
-import matplotlib.pyplot as plt
 import pandas as pd
 
 from evaluation.stats import buffer_curve, pick_buffers, portfolio_stats
-from evaluation.calibration import reliability_curve
-
-_MODEL_C = "#c0392b"
-_MARKET_C = "#2980b9"
-
-# Match the chart's font to the HTML (Consolas monospace) so the whole report reads as one.
-plt.rcParams["font.family"] = "monospace"
-plt.rcParams["font.monospace"] = ["Consolas", "DejaVu Sans Mono"]
-
-_MARK = {"left": "#27ae60", "middle": "#8e44ad", "right": "#7f8c8d"}
+from evaluation.staking import kelly_bankroll
+from reporting import render
 
 
-def panel_buffer_profit(preds):
-    """Profit vs bet threshold (buffer = model_p − implied): raw and smoothed profit curve, with the
-    reference buffers from pick_buffers marked. Returns (fig, points).
-    """
-    curve = buffer_curve(preds)
-    points = pick_buffers(curve)
+# Colour tokens (resolved against the theme at draw time) for the buffer reference lines.
+_MARK = {"left": "--mark-left", "middle": "--mark-mid", "right": "--mark-right",
+         "peak": "--mark-mid", "operational": "--mark-op"}
 
-    fig, ax = plt.subplots(figsize=(8.5, 3.0))
-    ax.plot(curve.index, curve["profit"], color="#e6b0aa", lw=1)
-    ax.plot(curve.index, curve["profit_smooth"], color="#c0392b", lw=2)
-    ax.axhline(0, color="#999", lw=0.8)
-    for name, buffer in points.items():
-        ax.axvline(buffer, ls="--", lw=1, color=_MARK[name])
-    for i, (name, buffer) in enumerate(reversed(points.items())):
-        ax.text(0.985, 0.04 + i * 0.07, f"{name}  {buffer:.3f}", transform=ax.transAxes,
-                ha="right", va="bottom", fontsize=8, color=_MARK[name])
-    ax.set_xlabel("buffer  (model_p − implied)")
-    ax.set_ylabel("profit  (implied staking)")
-    ax.grid(alpha=0.3)
-    fig.tight_layout()
-    return fig, points
-
+# Short legend descriptions for each reference buffer.
+_MARK_DESC = {
+    "left": "local profit maximum from the left",
+    "right": "local profit maximum from the right",
+    "middle": "midpoint of left and right",
+    "peak": "the local profit maximum",
+    "operational": "chosen as a report parameter",
+}
 
 _SHOWN = ["n_matches", "breakeven", "hit_rate", "roi", "profit"]
 
 
-def panel_edge_calibration(data, min_per_bucket=300):
-    """Bucket matches by edge (model_p − implied); plot observed frequency, model probability and
-    market (implied) probability against the mean edge per bucket. Bucketing by one quantity keeps
-    all three lines on the same matches. (model = market + edge by construction.)
+def _pts(xs, ys):
+    return [[float(x), float(y)] for x, y in zip(xs, ys)]
+
+
+def _buffer_marks(points, operational):
+    """Which reference buffers to draw, capped so the chart never carries four lines at once.
+
+    Twin peaks (left/right): draw `left`, `right`, and the `operational` buffer if one is given,
+    else the `middle`. Single peak: draw `peak`, plus `operational` if given. So the count is three
+    (left/right/operational-or-middle), two (peak/operational) or one (peak).
     """
-    d = data.assign(edge=data["model_p"] - data["implied"])
-    n_bins = max(3, min(10, len(d) // min_per_bucket))
-    grouped = d.assign(_bin=pd.qcut(d["edge"], n_bins, duplicates="drop")).groupby("_bin", observed=True)
-    x = grouped["edge"].mean()
-
-    fig, ax = plt.subplots(figsize=(8, 4.5))
-    ax.axvline(0, color="#ccc", lw=1)
-    ax.plot(x, grouped["y"].mean(), "o-", color="#333333", lw=1.6, ms=4, label="observed")
-    ax.plot(x, grouped["model_p"].mean(), "s-", color=_MODEL_C, lw=1.6, ms=4, label="model")
-    ax.plot(x, grouped["implied"].mean(), "^-", color=_MARKET_C, lw=1.6, ms=4, label="market")
-    ax.set_title(f"probability vs edge   n={len(d)}, {n_bins} buckets", fontsize=9)
-    ax.set_xlabel("edge  (model_p − implied)")
-    ax.set_ylabel("probability / frequency")
-    ax.grid(alpha=0.3)
-    ax.legend(fontsize=8)
-    fig.tight_layout()
-    return fig
+    if "peak" in points:
+        marks = {"peak": points["peak"]}
+        if operational is not None:
+            marks["operational"] = float(operational)
+        return marks
+    marks = {"left": points["left"], "right": points["right"]}
+    if operational is not None:
+        marks["operational"] = float(operational)
+    else:
+        marks["middle"] = points["middle"]
+    return marks
 
 
-def _reliability_ax(ax, data, title, min_per_bucket):
-    model = reliability_curve(data["model_p"], data["y"], min_per_bucket)
-    market = reliability_curve(data["implied"], data["y"], min_per_bucket)
-
-    points = pd.concat([model[["mean_prob", "mean_outcome"]], market[["mean_prob", "mean_outcome"]]])
-    lo, hi = points.min().min(), points.max().max()
-    ax.plot([lo, hi], [lo, hi], ls=":", color="#999", lw=1)
-    ax.plot(model["mean_prob"], model["mean_outcome"], "o-", color=_MODEL_C, lw=1.5, ms=4, label="model")
-    ax.plot(market["mean_prob"], market["mean_outcome"], "s-", color=_MARKET_C, lw=1.5, ms=4, label="market")
-    ax.set_title(f"{title}   n={len(data)}, {len(model)} buckets (~{len(data) // len(model)}/bucket)", fontsize=9)
-    ax.set_xlabel("predicted probability")
-    ax.set_ylabel("observed frequency")
-    ax.grid(alpha=0.3)
-    ax.legend(fontsize=8)
+def operative_buffer(points, operational=None):
+    """The buffer to score bets at: the caller's `operational` if given, otherwise the reference
+    point from pick_buffers (`middle` for twin peaks, `peak` for a single peak)."""
+    if operational is not None:
+        return float(operational)
+    return points.get("middle", points.get("peak"))
 
 
-def panel_reliability(preds, buffer, min_per_bucket=100):
-    """Two reliability diagrams (model and market, each bucketed by its own probability): left over
-    all matches, right over the bet matches (model_p > implied + buffer). Bucket count is chosen so
-    each holds at least `min_per_bucket` matches.
+def panel_buffer_profit(preds, operational=None):
+    """Spec for profit vs bet threshold (buffer = model_p − implied): the raw and smoothed profit
+    curves, with reference buffers marked as vertical lines. `operational` is the caller's chosen
+    buffer; when given it is drawn (and replaces `middle` in the twin-peak case). Returns
+    (spec, points).
     """
-    bets = preds[preds["model_p"] > preds["implied"] + buffer]
-    fig, axes = plt.subplots(1, 2, figsize=(9, 4.2))
-    _reliability_ax(axes[0], preds, "all matches", min_per_bucket)
-    _reliability_ax(axes[1], bets, "bet matches", min_per_bucket)
-    fig.tight_layout()
-    return fig
+    curve = buffer_curve(preds)
+    points = pick_buffers(curve)
+    marks = _buffer_marks(points, operational)
+    x = curve.index.to_numpy()
+    raw = curve["profit"].to_numpy()
+    smooth = curve["profit_smooth"].to_numpy()
+
+    ylo = min(raw.min(), smooth.min(), 0.0)
+    yhi = max(raw.max(), smooth.max(), 0.0)
+    # Hover tooltip per raw point: bets, staked and profit at that buffer (values pre-formatted).
+    tip_data = [[["bets", f"{int(n)}"], ["staked", f"{s:.1f}"], ["profit", f"{p:+.1f}"]]
+                for n, s, p in zip(curve["n_matches"], curve["staked"], raw)]
+    spec = {
+        "w": 780, "h": 320, "margins": {"l": 54, "r": 96, "t": 22, "b": 44},
+        "xLabel": "buffer  (model_p − implied)", "yLabel": "profit",
+        "tip": True, "tipXLabel": "buffer", "tipData": tip_data,
+        "xDomain": [float(x.min()), float(x.max())],
+        "yDomain": render.pad_domain(ylo, yhi),
+        "xTicks": render.ticks(-0.04, 0.12, 0.04, "plus2"),
+        "yTicks": render.auto_ticks(ylo, yhi, 5, "int"),
+        "refLines": [{"o": "h", "v": 0.0}] + [
+            {"o": "v", "v": b, "color": _MARK[name], "name": name,
+             "label": f"{name} {b:.3f}", "desc": _MARK_DESC[name]}
+            for name, b in marks.items()
+        ],
+        "series": [
+            {"name": "raw", "color": "--profit-faint", "points": _pts(x, raw),
+             "width": 1, "r": 0, "desc": "profit at each threshold"},
+            {"name": "smoothed", "color": "--profit", "points": _pts(x, smooth),
+             "width": 2.4, "r": 0, "desc": "savgol on raw profit"},
+        ],
+        "aria": "Profit versus bet-threshold buffer, raw and smoothed, with reference buffers marked.",
+    }
+    return spec, points
 
 
-def _calibration_ax(ax, data, by, other, x_label, other_label, other_color, min_per_bucket, title):
-    """Bucket `data` by column `by`; per bucket plot observed frequency and the mean of the `other`
-    predictor against the mean of `by`. Bucketing by one predictor keeps every line on the same
-    matches, so the points correspond. The diagonal is where `by` itself is perfectly calibrated.
+def panel_edge_ranking(preds, window=300, mark_buffer=None):
+    """Spec for the edge-ranking curve: matches sorted by edge (model_p − implied), high to low,
+    with a rolling mean (width `window`) of the observed outcome rate, the model probability and the
+    market (implied) probability against match rank.
+
+    This is the local (marginal) view of the signal the profit-vs-buffer curve integrates: where the
+    observed line runs above the market, the high-edge matches carry genuine excess events; the model
+    line sitting above observed shows it ranks well but overshoots the level. If `mark_buffer` is
+    given, a vertical line marks the rank where edge crosses it — the bets sit to its left.
+    """
+    d = (preds.assign(edge=preds["model_p"] - preds["implied"])
+         .sort_values("edge", ascending=False).reset_index(drop=True))
+    roll = lambda s: s.rolling(window, center=True, min_periods=window // 2).mean()
+    rank = d.index.to_numpy()
+    edge = roll(d["edge"]).to_numpy()
+    obs = roll(d["y"].astype(float)).to_numpy()
+    model = roll(d["model_p"]).to_numpy()
+    market = roll(d["implied"]).to_numpy()
+
+    stride = max(1, len(d) // 1200)                       # lean SVG: the curve is already smooth
+    sl = slice(None, None, stride)
+    n = len(d)
+
+    # Hover tooltip per point: the local edge and the three rolling rates at that rank.
+    def _row(e, o, m, k):
+        return [["edge", f"{e:+.3f}"], ["observed", f"{o:.3f}"],
+                ["model", f"{m:.3f}"], ["market", f"{k:.3f}"]]
+    tip_data = [_row(e, o, m, k) for e, o, m, k in zip(edge[sl], obs[sl], model[sl], market[sl])]
+    ylo = float(min(obs.min(), model.min(), market.min()))
+    yhi = float(max(obs.max(), model.max(), market.max()))
+
+    ref = []
+    if mark_buffer is not None:
+        n_bets = int((d["edge"] > mark_buffer).sum())
+        ref = [{"o": "v", "v": float(n_bets), "color": "--ink", "label": f"buffer {mark_buffer:.2f}"}]
+
+    return {
+        "w": 780, "h": 320, "margins": {"l": 54, "r": 96, "t": 22, "b": 44},
+        "xLabel": "matches ranked by edge  (high → low)", "yLabel": "rate / probability",
+        "xDomain": [0.0, float(n)], "yDomain": render.pad_domain(ylo, yhi),
+        "xTicks": render.auto_ticks(0, n, 6, "int"),
+        "yTicks": render.auto_ticks(ylo, yhi, 5, "f1"),
+        "tip": True, "tipXLabel": "rank", "tipXFmt": "int", "tipData": tip_data,
+        "refLines": ref,
+        "series": [
+            {"name": "market", "color": "--market", "points": _pts(rank[sl], market[sl]),
+             "width": 1.6, "r": 0},
+            {"name": "model", "color": "--model", "points": _pts(rank[sl], model[sl]),
+             "width": 1.6, "r": 0},
+            {"name": "observed", "color": "--observed", "points": _pts(rank[sl], obs[sl]),
+             "width": 2.4, "r": 0},
+        ],
+        "aria": "Observed rate, model and market probability by match rank, sorted by edge.",
+    }
+
+
+def _calibration_spec(data, by, other, other_name, other_color, x_label, title, min_per_bucket):
+    """Bucket `data` by column `by`; per bucket the mean of `by`, the observed frequency and the
+    mean of the `other` predictor. Bucketing by one predictor keeps every line on the same matches,
+    so the points correspond; the dashed diagonal is where `by` is perfectly calibrated.
     """
     n_bins = max(3, min(7, len(data) // min_per_bucket))
-    binned = data.assign(_bin=pd.qcut(data[by], n_bins, duplicates="drop"))
-    grouped = binned.groupby("_bin", observed=True)
-    x = grouped[by].mean()
-    observed = grouped["y"].mean()
-    other_mean = grouped[other].mean()
+    grouped = (data.assign(_bin=pd.qcut(data[by], n_bins, duplicates="drop"))
+               .groupby("_bin", observed=True))
+    x = grouped[by].mean().to_numpy()
+    observed = grouped["y"].mean().to_numpy()
+    other_mean = grouped[other].mean().to_numpy()
 
     lo = min(x.min(), observed.min(), other_mean.min())
     hi = max(x.max(), observed.max(), other_mean.max())
-    ax.plot([lo, hi], [lo, hi], ls=":", color="#999", lw=1)
-    ax.plot(x, observed, "o-", color="#333333", lw=1.5, ms=4, label="observed")
-    ax.plot(x, other_mean, "s-", color=other_color, lw=1.5, ms=4, label=other_label)
-    ax.set_title(f"{title}   n={len(data)}, {n_bins} buckets", fontsize=9)
-    ax.set_xlabel(x_label)
-    ax.set_ylabel("frequency / probability")
-    ax.grid(alpha=0.3)
-    ax.legend(fontsize=8)
+    # Square domain wrapping this panel's own data tightly (four ticks), so the diagonal stays at 45
+    # degrees. This is the default zoomed view; unify_calibration_scale adds the shared scale as the
+    # unzoom alternate.
+    dom, tk = render.wrap_scale(lo, hi)
+    return {
+        "w": 470, "h": 400, "margins": {"l": 60, "r": 54, "t": 16, "b": 44},
+        "title": f"{title}   n={len(data)}, {n_bins} buckets",
+        "xLabel": x_label, "yLabel": "frequency / probability",
+        "xDomain": dom, "yDomain": dom,
+        "xTicks": tk,
+        "yTicks": tk,
+        "refLines": [{"o": "diag"}],
+        "series": [
+            {"name": "observed", "color": "--observed", "points": _pts(x, observed),
+             "width": 1.8, "r": 3.4},
+            {"name": other_name, "color": other_color, "points": _pts(x, other_mean),
+             "width": 1.8, "r": 3.4},
+        ],
+        "tip": True, "tipXLabel": x_label.split()[0],
+        "aria": f"Calibration bucketed by {x_label}: observed frequency and {other_name} per bucket.",
+    }
 
 
-def panel_calibration(all_matches, bet_matches, min_per_bucket=100):
-    """A 2x2 calibration grid where each panel buckets by one predictor, so all lines share matches.
-    Row 1 buckets by the market price (x = implied), overlaying observed frequency and the model's
-    probability. Row 2 buckets by the model (x = model_p), overlaying observed and the market price.
-    Columns are all matches (left) and bet matches (right).
+def panel_calibration_by_market(data, title, min_per_bucket=100):
+    """Calibration spec bucketed by the market price (x = implied), overlaying observed frequency
+    and the model's probability."""
+    return _calibration_spec(data, "implied", "model_p", "model", "--model",
+                             "market probability", title, min_per_bucket)
+
+
+def panel_calibration_by_model(data, title, min_per_bucket=100):
+    """Calibration spec bucketed by the model (x = model_p), overlaying observed frequency and the
+    market (implied) probability."""
+    return _calibration_spec(data, "model_p", "implied", "market", "--market",
+                             "model probability", title, min_per_bucket)
+
+
+def unify_calibration_scale(specs):
+    """Add one shared square scale across a group of calibration specs, wrapping the combined data, as
+    the unzoom alternate. Each panel keeps its own tight scale as the default (zoomed) view; toggling
+    unzoom switches every panel to this shared scale so they become directly comparable. Mutates specs.
     """
-    fig, axes = plt.subplots(2, 2, figsize=(9, 8.4))
-    _calibration_ax(axes[0, 0], all_matches, "implied", "model_p", "market probability", "model", _MODEL_C, min_per_bucket, "all matches")
-    _calibration_ax(axes[0, 1], bet_matches, "implied", "model_p", "market probability", "model", _MODEL_C, min_per_bucket, "bet matches")
-    _calibration_ax(axes[1, 0], all_matches, "model_p", "implied", "model probability", "market", _MARKET_C, min_per_bucket, "all matches")
-    _calibration_ax(axes[1, 1], bet_matches, "model_p", "implied", "model probability", "market", _MARKET_C, min_per_bucket, "bet matches")
-    fig.tight_layout()
-    return fig
+    coords = [c for spec in specs for s in spec["series"] for p in s["points"] for c in p]
+    dom, tk = render.wrap_scale(min(coords), max(coords))
+    for spec in specs:
+        spec["zoom"] = {"xDomain": dom, "yDomain": dom, "xTicks": tk, "yTicks": tk}
+    return specs
 
 
-def panel_reliability_grid(rows, buffer, min_per_bucket=100):
-    """A grid of reliability diagrams: one row per (label, predictions) in `rows`, each row showing
-    all matches (left) and bet matches (right) — for comparing calibration across groups (e.g. seasons).
+def panel_bankroll(bets, roi, start=100.0, kelly_fraction=1.0, season_label=str):
+    """Spec for the compounding Kelly bankroll over `bets` (staked in the given row order).
+
+    Draws the bankroll against bet number from a zero baseline, a solid line at zero, a dashed line at
+    the starting bankroll, and each season change as a labelled vertical line. `roi` is the portfolio
+    ROI that lifts the implied probability into the stake (see evaluation.staking.kelly_bankroll).
+    `season_label` formats a raw season value for its vertical-line label.
     """
-    fig, axes = plt.subplots(len(rows), 2, figsize=(9, 4.2 * len(rows)))
-    for (label, data), (ax_all, ax_bet) in zip(rows, axes):
-        bets = data[data["model_p"] > data["implied"] + buffer]
-        _reliability_ax(ax_all, data, f"{label} — all matches", min_per_bucket)
-        _reliability_ax(ax_bet, bets, f"{label} — bet matches", min_per_bucket)
-    fig.tight_layout()
-    return fig
+    curve = kelly_bankroll(bets, roi, start=start, kelly_fraction=kelly_fraction)
+    x = curve["step"].to_numpy()
+    b = curve["bankroll"].to_numpy()
+    yhi = max(float(b.max()), float(start))
+
+    # A solid baseline at zero, a dashed line at the starting bankroll, then a vertical line wherever
+    # the season changes.
+    ref = [{"o": "h", "v": 0.0},
+           {"o": "h", "v": float(start), "dash": True, "color": "--muted", "label": f"{start:.0f}",
+            "desc": "starting bankroll"}]
+    prev = None
+    for step, season in zip(x, curve["season"].to_numpy()):
+        if step != 0 and season != prev:
+            ref.append({"o": "v", "v": float(step), "color": "--muted", "label": season_label(season)})
+        prev = season
+
+    def _date(v):
+        try:
+            return pd.Timestamp(v).strftime("%Y-%m-%d")
+        except (ValueError, TypeError):
+            return ""
+    tip_data = [[["date", _date(d)], ["bankroll", f"{bk:.1f}"]]
+                for d, bk in zip(curve["date"], b)]
+
+    return {
+        "w": 780, "h": 320, "margins": {"l": 54, "r": 96, "t": 22, "b": 44},
+        "xLabel": "bet number", "yLabel": "bankroll",
+        "xDomain": [0.0, float(x.max())], "yDomain": [0.0, yhi * 1.2],
+        "xTicks": render.auto_ticks(0, float(x.max()), 6, "int"),
+        "yTicks": render.auto_ticks(0, yhi, 5, "int"),
+        "tip": True, "tipXLabel": "bet", "tipXFmt": "int", "tipData": tip_data,
+        "refLines": ref,
+        "series": [{"name": "bankroll", "color": "--profit", "points": _pts(x, b),
+                    "width": 2.0, "r": 0}],
+        "aria": "Compounding Kelly bankroll over the sequence of bets, by bet number.",
+    }
 
 
 def group_stats(preds, group, buffer):
     """Per-group stats at one bet threshold, straight from portfolio_stats: n_matches, breakeven,
-    hit_rate, roi. `group` is a column name like 'season' or 'league'.
+    hit_rate, roi, profit. `group` is a column name like 'season' or 'league'.
     """
     bets = preds[preds["model_p"] > preds["implied"] + buffer]
     return bets.groupby(group).apply(portfolio_stats, include_groups=False)[_SHOWN]
