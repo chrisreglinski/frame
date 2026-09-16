@@ -17,24 +17,31 @@ from scipy.signal import savgol_filter, find_peaks
 DEFAULT_BUFFER_GRID = np.round(np.arange(-0.04, 0.1201, 0.001), 4)
 
 
-def portfolio_stats(matches, implied="implied", outcome="y"):
+def portfolio_stats(matches, implied="implied", outcome="y", prob=None):
     """Proportional-staking stats for a subset of matches.
 
-    Staking is implied-proportional: stake = implied, a win returns 1, so profit = wins - staked
-    and ROI = profit / staked (scale-independent). The p-value is one-sided (upper tail): under the
-    null that the market is right (true P = implied for each match), it is the probability of the
-    outcome landing at least as often as observed — a normal approximation to the Poisson-binomial
-    (mean Sum(p), variance Sum(p(1-p))). Small p = the subset outperformed its price.
+    Staking is implied-proportional: stake = implied, a win returns 1, so profit = wins - staked and
+    ROI = profit / staked (scale-independent). These use the price you pay, where the raw implied is
+    exactly the break-even probability.
+
+    The p-value is a separate question (could this subset have come up by chance?) and needs a real
+    probability estimate, which the raw price is not: it carries the bookmaker margin, and the H/D/A
+    prices sum to more than one. Pass `prob`, a column of the best true-probability estimate (the
+    devigged implied), for the null; it falls back to `implied` only for backward compatibility. Under
+    the null P_i = prob_i the count is Poisson-binomial (mean Sum(p), variance Sum(p(1-p))) and the
+    p-value is the one-sided upper tail by a normal approximation. Small p = the outcomes are hard to
+    explain by chance under that probability model.
     """
     imp = matches[implied].to_numpy(dtype=float)
     y = matches[outcome].to_numpy(dtype=float)
+    p = matches[prob].to_numpy(dtype=float) if prob else imp
 
     staked = imp.sum()
     wins = y.sum()
     profit = wins - staked
 
-    variance = (imp * (1 - imp)).sum()
-    z = (wins - staked) / np.sqrt(variance) if variance > 0 else np.nan
+    variance = (p * (1 - p)).sum()
+    z = (wins - p.sum()) / np.sqrt(variance) if variance > 0 else np.nan
     p_value = float(norm.sf(z)) if variance > 0 else np.nan
 
     return pd.Series({
@@ -61,8 +68,8 @@ def buffer_curve(preds, grid=DEFAULT_BUFFER_GRID, smooth_window=21, smooth_poly=
     for buffer in grid:
         bets = preds[preds["model_p"] > preds["implied"] + buffer]
         stats = portfolio_stats(bets)
-        rows.append({"buffer": buffer, "profit": stats["profit"],
-                     "roi": stats["roi"], "n_matches": stats["n_matches"]})
+        rows.append({"buffer": buffer, "profit": stats["profit"], "roi": stats["roi"],
+                     "n_matches": stats["n_matches"], "staked": stats["staked"]})
     curve = pd.DataFrame(rows).set_index("buffer")
 
     window = min(smooth_window, len(curve) - (1 - len(curve) % 2))  # odd, <= length
@@ -74,21 +81,21 @@ def buffer_curve(preds, grid=DEFAULT_BUFFER_GRID, smooth_window=21, smooth_poly=
 
 
 def pick_buffers(curve):
-    """Three reference buffers from the local maxima of the smoothed profit curve:
+    """Reference buffers from the local maxima of the smoothed profit curve.
 
-    - `left`   — the first (lowest-buffer) local maximum.
-    - `right`  — the last (highest-buffer) local maximum.
-    - `middle` — the midpoint between `left` and `right`.
-
-    Peaks are detected on `profit_smooth` with a prominence floor so minor wiggles are ignored.
+    Two or more maxima give a `left`/`middle`/`right` triple (the lowest-buffer maximum, their
+    midpoint, and the highest-buffer maximum). A single maximum gives one `peak`. Peaks are detected
+    on `profit_smooth` with a prominence floor so minor wiggles are ignored; with none found the
+    global argmax is used as the single peak.
     """
     profit = curve["profit_smooth"].to_numpy()
     buffers = curve.index.to_numpy()
 
     prominence = 0.03 * (profit.max() - profit.min())
     peaks, _ = find_peaks(profit, prominence=prominence)
-    if len(peaks) == 0:
-        peaks = [int(profit.argmax())]
+    if len(peaks) <= 1:
+        idx = int(peaks[0]) if len(peaks) == 1 else int(profit.argmax())
+        return {"peak": float(buffers[idx])}
 
     left, right = float(buffers[peaks[0]]), float(buffers[peaks[-1]])
     return {"left": left, "middle": (left + right) / 2, "right": right}
