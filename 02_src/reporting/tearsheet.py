@@ -246,13 +246,35 @@ def _num_word(n):
     return _NUM_WORDS.get(n, str(n))
 
 
-def _intro(n_seasons):
+# Display phrasing for a league set. The set membership lives in 01_data/league_sets.yaml (the single
+# source); this is only how the report names a set in prose. Unknown sets fall back to the raw name.
+_LEAGUE_SETS = {
+    "major": {"phrase": "top five European leagues",
+              "members": "England, France, Germany, Italy, Spain"},
+}
+
+
+def _league_phrase(name):
+    """The prose name for a league set, e.g. major -> "top five European leagues"."""
+    return _LEAGUE_SETS.get(name, {}).get("phrase", name)
+
+
+def _league_tip_val(name):
+    """The Overview leagues-tile tooltip: the phrase and, when known, the member leagues."""
+    info = _LEAGUE_SETS.get(name)
+    if not info:
+        return None
+    members = info.get("members")
+    return f"the {info['phrase']}" + (f": {members}." if members else ".")
+
+
+def _intro(n_seasons, leagues_phrase):
     w = _num_word(n_seasons)
     return (
         '<p class="lede">This tearsheet report showcases promising, profitable football betting models. '
         "In simple terms, a model is profitable when betting on the outcomes it rates above the market's "
         'implied probability yields a positive return. The models are trained and assessed on the last '
-        f'{w} full seasons from the top five European leagues. Training and assessment use {w}-fold '
+        f'{w} full seasons from the {leagues_phrase}. Training and assessment use {w}-fold '
         'cross-validation, with each season serving as the test set once. All results are reported under '
         f'the following assumptions, unless noted otherwise: results are pooled across the {w} test sets; '
         'profitability is measured against margin-inclusive market prematch odds; stakes are proportional '
@@ -317,7 +339,7 @@ def _overview(run, variables=None, hyperparameters=None):
     settings = '<div class="ov-grid" data-equal-cards>' + "".join([
         _attr("method", model.method, tip="the algorithm the model is built on."),
         _attr("leagues", model.domain.leagues, tip="the leagues the model is trained and evaluated on.",
-              tip_val="the top five European leagues: England, France, Germany, Italy, Spain."),
+              tip_val=_league_tip_val(model.domain.leagues)),
         _attr("domain", f"gameweek &gt; {model.domain.gameweek_min}",
               tip="the slice of matches the model runs on.",
               tip_val="only matches once both teams are past their eighth game of the season, so "
@@ -506,7 +528,7 @@ def render_tearsheet(run, variables=None, hyperparameters=None):
     body = f"""<div class="wrap" lang="en">
 <p class="eyebrow">model · tearsheet</p>
 <h1>{model.name} - {model.tagline}</h1>
-{_chapter("01", "Intro", _intro(n_seasons))}
+{_chapter("01", "Intro", _intro(n_seasons, _league_phrase(model.domain.leagues)))}
 {_chapter("02", "Overview", overview)}
 {ch_profit}
 {ch_cal}
