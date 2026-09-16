@@ -47,6 +47,9 @@ Source: [football-data.co.uk](https://www.football-data.co.uk)
 02_src/
   01_raw/              # match_raw_stats builder (aggregates raw CSVs)
   02_features/         # feature builders (one file per table)
+  evaluation/          # folds, predictions, staking, portfolio stats
+  models/              # model repository: one model per file, plus run()
+  reporting/           # tearsheet report: panels, render primitives, tearsheet
 03_notebooks/          # exploratory notebooks (gitignored except template.ipynb)
 04_models/             # trained models (gitignored)
 05_reports/            # outputs (gitignored)
