@@ -6,6 +6,7 @@ staking, and nothing draws pixels — the spec is theme-agnostic (colours are CS
 """
 import pandas as pd
 
+from evaluation.calibration import calibration_overlay
 from evaluation.stats import buffer_curve, pick_buffers, portfolio_stats
 from evaluation.staking import kelly_bankroll
 from reporting import render
@@ -162,12 +163,11 @@ def _calibration_spec(data, by, other, other_name, other_color, x_label, title, 
     mean of the `other` predictor. Bucketing by one predictor keeps every line on the same matches,
     so the points correspond; the dashed diagonal is where `by` is perfectly calibrated.
     """
-    n_bins = max(3, min(7, len(data) // min_per_bucket))
-    grouped = (data.assign(_bin=pd.qcut(data[by], n_bins, duplicates="drop"))
-               .groupby("_bin", observed=True))
-    x = grouped[by].mean().to_numpy()
-    observed = grouped["y"].mean().to_numpy()
-    other_mean = grouped[other].mean().to_numpy()
+    curve = calibration_overlay(data, by, other, min_per_bucket=min_per_bucket)
+    x = curve[by].to_numpy()
+    observed = curve["observed"].to_numpy()
+    other_mean = curve[other].to_numpy()
+    n_bins = len(curve)
 
     lo = min(x.min(), observed.min(), other_mean.min())
     hi = max(x.max(), observed.max(), other_mean.max())

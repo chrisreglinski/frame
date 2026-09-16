@@ -25,3 +25,23 @@ def reliability_curve(prob, outcome, min_per_bucket=100):
         "mean_outcome": grouped["outcome"].mean(),
         "count": grouped["prob"].size(),
     }).reset_index(drop=True)
+
+
+def calibration_overlay(data, by, other, outcome="y", min_per_bucket=100):
+    """Reliability of `by` with a second predictor `other` overlaid on the same bins.
+
+    Bin `data` into equal-count buckets by column `by`, and per bin return the mean of `by`, the
+    observed frequency of `outcome`, and the mean of `other`. Bucketing by one predictor keeps every
+    series on the same matches, so within a bin the `by`, `observed` and `other` points line up and
+    the diagonal is where `by` is perfectly calibrated. The bin count aims for at least
+    `min_per_bucket` per bucket, clamped to 3-7. Returns a DataFrame with columns [by, "observed",
+    other], one row per bucket.
+    """
+    n_bins = max(3, min(7, len(data) // min_per_bucket))
+    grouped = (data.assign(_bin=pd.qcut(data[by], n_bins, duplicates="drop"))
+               .groupby("_bin", observed=True))
+    return pd.DataFrame({
+        by: grouped[by].mean().to_numpy(),
+        "observed": grouped[outcome].mean().to_numpy(),
+        other: grouped[other].mean().to_numpy(),
+    })
