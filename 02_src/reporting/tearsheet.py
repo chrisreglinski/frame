@@ -235,29 +235,45 @@ def _chapter(num, question, body):
 
 
 # ---- prose (fixed for the report type) -------------------------------------------------------
-_INTRO = (
-    '<p class="lede">This tearsheet report showcases promising, profitable football betting models. '
-    "In simple terms, a model is profitable when betting on the outcomes it rates above the market's "
-    'implied probability yields a positive return. The models are trained and assessed on the last '
-    'four full seasons from the top five European leagues. Training and assessment use four-fold '
-    'cross-validation, with each season serving as the test set once. All results are reported under '
-    'the following assumptions, unless noted otherwise: results are pooled across the four test sets; '
-    'profitability is measured against margin-inclusive market prematch odds; stakes are proportional '
-    "to the market-implied probability, weighting every match equally with no bankroll-dependent "
-    'staking.</p>'
-)
+# Season counts are read from the run, so the copy never lies about the data it summarizes: an intro
+# built for five seasons says "five", not "four".
+_NUM_WORDS = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six", 7: "seven",
+              8: "eight", 9: "nine", 10: "ten", 11: "eleven", 12: "twelve"}
 
-_PROFIT_INTRO = (
-    "Is the model profitable? "
-    "A model is profitable when backing the outcomes it rates above the market's implied probability "
-    "yields a positive return. Its value, however, lies not in any single threshold, but in its "
-    "ability to consistently separate bets worth taking from those that are not. The buffer controls "
-    "how selective the strategy is: lower values admit more marginal opportunities, while higher "
-    "values require a larger model-market gap and therefore a stronger estimated edge. If that "
-    "separation is real, profitability should remain broadly positive across a range of thresholds "
-    "rather than depend on one finely tuned cutoff. To avoid in-sample optimization, the profit curve "
-    "pools the first three seasons, and the selected buffer is then evaluated on the held-out season."
-)
+
+def _num_word(n):
+    """The English word for a small count, falling back to digits past twelve."""
+    return _NUM_WORDS.get(n, str(n))
+
+
+def _intro(n_seasons):
+    w = _num_word(n_seasons)
+    return (
+        '<p class="lede">This tearsheet report showcases promising, profitable football betting models. '
+        "In simple terms, a model is profitable when betting on the outcomes it rates above the market's "
+        'implied probability yields a positive return. The models are trained and assessed on the last '
+        f'{w} full seasons from the top five European leagues. Training and assessment use {w}-fold '
+        'cross-validation, with each season serving as the test set once. All results are reported under '
+        f'the following assumptions, unless noted otherwise: results are pooled across the {w} test sets; '
+        'profitability is measured against margin-inclusive market prematch odds; stakes are proportional '
+        "to the market-implied probability, weighting every match equally with no bankroll-dependent "
+        'staking.</p>'
+    )
+
+
+def _profit_intro(n_dev):
+    return (
+        "Is the model profitable? "
+        "A model is profitable when backing the outcomes it rates above the market's implied probability "
+        "yields a positive return. Its value, however, lies not in any single threshold, but in its "
+        "ability to consistently separate bets worth taking from those that are not. The buffer controls "
+        "how selective the strategy is: lower values admit more marginal opportunities, while higher "
+        "values require a larger model-market gap and therefore a stronger estimated edge. If that "
+        "separation is real, profitability should remain broadly positive across a range of thresholds "
+        "rather than depend on one finely tuned cutoff. To avoid in-sample optimization, the profit curve "
+        f"pools the first {_num_word(n_dev)} seasons, and the selected buffer is then evaluated on the "
+        "held-out season."
+    )
 
 _CAL_INTRO = (
     "Is the model calibrated? A model is calibrated when its probability estimates match the actual "
@@ -274,27 +290,30 @@ _EDGE_INTRO = (
     "advantage matches the edge in size."
 )
 
-_BANKROLL_INTRO = (
-    "Is the profitability steady? Profitability measures the edge per unit staked, but a bankroll "
-    "depends also on how much is risked on each bet and on the order in which wins and losses arrive. "
-    "Staking each bet at a half-Kelly fraction of the running bankroll and compounding across the four "
-    "seasons shows whether that edge accumulates into real growth, and how steadily. For a more "
-    "realistic estimate of the edge, the stakes use the portfolio's realized yield rather than the "
-    "edge from the model's own probabilities."
-)
+def _bankroll_intro(n_seasons):
+    return (
+        "Is the profitability steady? Profitability measures the edge per unit staked, but a bankroll "
+        "depends also on how much is risked on each bet and on the order in which wins and losses arrive. "
+        "Staking each bet at a half-Kelly fraction of the running bankroll and compounding across the "
+        f"{_num_word(n_seasons)} seasons shows whether that edge accumulates into real growth, and how "
+        "steadily. For a more realistic estimate of the edge, the stakes use the portfolio's realized "
+        "yield rather than the edge from the model's own probabilities."
+    )
 
 _BETS_INTRO = "How does the model bet on specific matches? Explore the list of all placed bets."
 
 
-def _overview(run):
+def _overview(run, variables=None, hyperparameters=None):
     model, m = run.model, run.metrics
     preds = run.predictions
 
-    # Variables and hyperparameters stay hidden for now (a report parameter to fill in later); the
-    # data is on the model, so switching to model.features / model.hyperparams is a one-line change.
-    vars_card = render.info_card("variables", render.var_list(["hidden"]), mode="toggle", placeholder="")
-    hp_card = render.info_card("hyperparameters", render.param_list([("hidden", "")]),
-                               mode="toggle", placeholder="")
+    # The variables and hyperparameters slots default to the model's own. The caller can pass
+    # replacement content, e.g. ["hidden"] / {"hidden": ""}, to withhold them from a public build. The
+    # report does not interpret the content, it just renders what it is given.
+    feats = list(model.features) if variables is None else variables
+    hps = model.hyperparams if hyperparameters is None else hyperparameters
+    vars_card = render.info_card("variables", render.var_list(feats), mode="toggle", placeholder="")
+    hp_card = render.info_card("hyperparameters", render.param_list(hps), mode="toggle", placeholder="")
     settings = '<div class="ov-grid" data-equal-cards>' + "".join([
         _attr("method", model.method, tip="the algorithm the model is built on."),
         _attr("leagues", model.domain.leagues, tip="the leagues the model is trained and evaluated on.",
@@ -385,20 +404,29 @@ _BET_METRICS = [
 ]
 
 
-def render_tearsheet(run):
-    """Render one Run into a self-contained tearsheet (an HTML string, no external assets)."""
+def render_tearsheet(run, variables=None, hyperparameters=None):
+    """Render one Run into a self-contained tearsheet (an HTML string, no external assets).
+
+    `variables` and `hyperparameters` default to the model's own; pass replacement content (for
+    example ["hidden"] and {"hidden": ""}) to withhold them from a public build. Season counts in the
+    prose are read from the run, so the copy matches the data it summarizes.
+    """
     model, m = run.model, run.metrics
     preds = run.predictions
     buffer = run.buffer
     bets = preds[preds["model_p"] > preds["implied"] + buffer]
 
+    n_seasons = len(run.seasons)
+    n_dev = n_seasons - 1
+
     buffer_name = run.buffer_name
     if buffer_name == "operational":
         buffer_phrase = "the operational buffer"
     else:
-        buffer_phrase = f"the {buffer_name} buffer selected earlier using the three-season data"
+        buffer_phrase = (f"the {buffer_name} buffer selected earlier using the "
+                         f"{_num_word(n_dev)}-season data")
 
-    overview = _overview(run)
+    overview = _overview(run, variables=variables, hyperparameters=hyperparameters)
 
     # Profitability: buffer chosen on the development seasons, scored across all.
     preds_dev = preds[preds["season"] != run.holdout]
@@ -412,7 +440,7 @@ def render_tearsheet(run):
         render.panel(render.stats_table("per league", league_df)),
     )
     ch_profit = _chapter("03", "Profitability",
-                         f'<p class="lede">{_PROFIT_INTRO}</p>'
+                         f'<p class="lede">{_profit_intro(n_dev)}</p>'
                          + render.line_chart(spec_buf)
                          + f'<p class="caption spaced">{buffer_name.capitalize()} buffer is chosen to '
                            'score the model.</p>'
@@ -451,12 +479,12 @@ def render_tearsheet(run):
                                       kelly_fraction=run.kelly_fraction,
                                       season_label=lambda s: f"{str(s)[:2]}/{str(s)[2:]}")
     ch_bankroll = _chapter("06", "Bankroll",
-                           f'<p class="lede">{_BANKROLL_INTRO}</p>'
+                           f'<p class="lede">{_bankroll_intro(n_seasons)}</p>'
                            + render.line_chart(spec_bank)
                            + render.caption("Bankroll from a 100 unit start, compounding bet by bet "
-                                            "across the four seasons in date order. Stakes are "
-                                            "half-Kelly on the market price lifted by the portfolio "
-                                            "ROI."))
+                                            f"across the {_num_word(n_seasons)} seasons in date order. "
+                                            "Stakes are half-Kelly on the market price lifted by the "
+                                            "portfolio ROI."))
 
     # Bets.
     bets_disp = bets.sort_values("date")
@@ -478,7 +506,7 @@ def render_tearsheet(run):
     body = f"""<div class="wrap" lang="en">
 <p class="eyebrow">model · tearsheet</p>
 <h1>{model.name} - {model.tagline}</h1>
-{_chapter("01", "Intro", _INTRO)}
+{_chapter("01", "Intro", _intro(n_seasons))}
 {_chapter("02", "Overview", overview)}
 {ch_profit}
 {ch_cal}
