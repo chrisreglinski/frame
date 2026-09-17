@@ -30,8 +30,8 @@ sybilla = Model(
         "mrkt_draw_impl",
     ],
     hyperparams={
-        "max_depth": 50, "n_estimators": 5000, "learning_rate": 0.01,
-        "subsample": 0.7, "colsample_bytree": 0.8, "min_child_weight": 10,
+        "max_depth": 50, "n_estimators": 150, "learning_rate": 0.05,
+        "subsample": 0.7, "colsample_bytree": 0.8, "min_child_weight": 20,
         "reg_lambda": 3.0, "reg_alpha": 0.5,
     },
     make_model=make_model,
