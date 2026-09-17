@@ -421,7 +421,7 @@ _BET_COLS = [
 _BET_METRICS = [
     {"key": "staked", "label": "staked", "decimals": 1},
     {"key": "profit", "label": "profit", "decimals": 1},
-    {"kind": "ratio", "num": "profit", "den": "staked", "label": "roi", "decimals": 1,
+    {"kind": "ratio", "num": "profit", "den": "staked", "label": "yield", "decimals": 1,
      "scale": 100, "suffix": "%"},
 ]
 
