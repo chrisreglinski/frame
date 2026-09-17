@@ -1,4 +1,4 @@
-"""Riccardo: an XGBoost draw model on the major leagues.
+"""Sybilla: an XGBoost draw model on the major leagues.
 
 This file is the whole model: its parameters (data, snapshotted into every run) and one thin hook
 that builds the estimator. It loads no data, trains nothing and knows nothing about the report.
@@ -15,8 +15,8 @@ def make_model(hyperparams):
                          n_jobs=4, verbosity=0, enable_categorical=True)
 
 
-riccardo = Model(
-    name="Riccardo",
+sybilla = Model(
+    name="Sybilla",
     tagline="an XGBoost model for predicting draws.",
     method="XGBoost",
     target="t_draw_flg",

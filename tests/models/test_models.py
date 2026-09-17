@@ -68,8 +68,8 @@ def test_snapshot_drops_make_model_and_recurses():
 # ---- registry --------------------------------------------------------------------------------
 
 def test_registry_get_and_names():
-    assert "Riccardo" in registry.names()
-    assert registry.get("Riccardo").name == "Riccardo"
+    assert "Sybilla" in registry.names()
+    assert registry.get("Sybilla").name == "Sybilla"
 
 
 def test_registry_unknown_name_raises():

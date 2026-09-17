@@ -3,9 +3,9 @@
 One entry per model, keyed by its declared name. This is the working registry while models live in
 code. It can later become an index over persisted runs (see 06_docs on the model repository).
 """
-from models.riccardo import riccardo
+from models.sybilla import sybilla
 
-_MODELS = {m.name: m for m in [riccardo]}
+_MODELS = {m.name: m for m in [sybilla]}
 
 
 def get(name):

@@ -6,7 +6,7 @@ nothing about which model produced it. This spec describes the pieces and where 
 ## Three entities: model, run, report
 
 - **Model**: a definition with a stable identity. Its learning parameters (target, features,
-  hyperparameters, domain) plus one hook that builds the estimator. Riccardo is a model. It carries
+  hyperparameters, domain) plus one hook that builds the estimator. Sybilla is a model. It carries
   no results, and the same model holds across years.
 - **Run**: one instantiation of a model on a specific data snapshot and protocol (which seasons, the
   fold scheme, the buffer). A run produces out-of-fold predictions and a frozen summary. The same
@@ -40,7 +40,7 @@ Computation lives in `evaluation/` and is format-agnostic (DataFrames and Series
 Models live in `models/`:
 
 - `_spec.Model`, `Domain`, `apply_domain`, `snapshot`.
-- `riccardo.py`, one model per file.
+- `sybilla.py`, one model per file.
 - `registry.get`, look up a model by name.
 - `run.run`, apply a model to data on a protocol and return a Run. Training lives here.
 
