@@ -286,8 +286,8 @@ def _intro(n_seasons, leagues_phrase):
 def _profit_intro(n_dev):
     return (
         "Is the model profitable? "
-        "A model is profitable when backing the outcomes it rates above the market's implied probability "
-        "yields a positive return. Its value, however, lies not in any single threshold, but in its "
+        "A model is profitable when backing the match outcomes it rates higher than the market gives a "
+        "positive return. Its value, however, lies not in any single threshold, but in its "
         "ability to consistently separate bets worth taking from those that are not. The buffer controls "
         "how selective the strategy is: lower values admit more marginal opportunities, while higher "
         "values require a larger model-market gap and therefore a stronger estimated edge. If that "
