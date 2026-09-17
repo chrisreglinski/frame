@@ -272,8 +272,8 @@ def _intro(n_seasons, leagues_phrase):
     w = _num_word(n_seasons)
     return (
         '<p class="lede">This tearsheet report showcases promising, profitable football betting models. '
-        "In simple terms, a model is profitable when betting on the outcomes it rates above the market's "
-        'implied probability yields a positive return. The models are trained and assessed on the last '
+        "In simple terms, a model is profitable when betting on the match outcomes it rates higher than "
+        'the market gives a positive return. The models are trained and assessed on the last '
         f'{w} full seasons from the {leagues_phrase}. Training and assessment use {w}-fold '
         'cross-validation, with each season serving as the test set once. All results are reported under '
         f'the following assumptions, unless noted otherwise: results are pooled across the {w} test sets; '
