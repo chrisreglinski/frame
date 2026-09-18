@@ -73,14 +73,30 @@ def test_snapshot_is_plain_data():
 
 # ---- registry --------------------------------------------------------------------------------
 
-def test_registry_get_and_names():
-    assert "Sybilla" in registry.names()
-    assert registry.get("Sybilla").name == "Sybilla"
+def _seed_model(root):
+    """A minimal params.yaml under `root`, since real models live in gitignored 04_models."""
+    import yaml
+    d = root / "toy"
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "params.yaml").write_text(yaml.safe_dump({
+        "name": "Toy", "slug": "toy", "target": "t_draw_flg", "implied": "mrkt_draw_impl",
+        "domain": {"gameweek_min": 8, "leagues": "major"},
+        "spaces": ["anchor"], "estimator": "xgb", "hyperparams": {"max_depth": 3},
+    }), encoding="utf-8")
 
 
-def test_registry_unknown_name_raises():
+def test_registry_get_and_names(tmp_path):
+    _seed_model(tmp_path)
+    assert registry.names(root=tmp_path) == ["Toy"]
+    m = registry.get("Toy", root=tmp_path)
+    assert m.name == "Toy"
+    assert m.features == ["mrkt_draw_impl"]     # spaces resolved by the loader
+
+
+def test_registry_unknown_name_raises(tmp_path):
+    _seed_model(tmp_path)
     with pytest.raises(KeyError):
-        registry.get("nobody")
+        registry.get("nobody", root=tmp_path)
 
 
 # ---- run plumbing ----------------------------------------------------------------------------

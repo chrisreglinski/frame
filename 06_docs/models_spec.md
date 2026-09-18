@@ -105,9 +105,11 @@ legibility.)
 
 ## Status
 
-Decided, partly built. Faza 0 is in place: the model / run / report split with a `Run` in memory, and
-Sybilla as code in `02_src/models/sybilla.py`. This spec is the target: models as data records under
-`04_models`, an estimator factory, spaces, and persisted runs. Migrating there is the pending work.
+Mostly built. In place: the feature-space registry, the estimator factory, the `Model` as plain data
+(features resolved from spaces), `run` returning a `Run`, the save layer (`params.yaml` plus per-run
+folders), the params loader, and the registry as a view over `04_models/*/params.yaml`. Sybilla lives
+at `04_models/sybilla/params.yaml`. Pending: the report reading a saved run instead of an in-memory
+one, and the generated index view over models.
 
 ## Possible later
 

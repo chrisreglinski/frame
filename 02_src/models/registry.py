@@ -1,21 +1,33 @@
-"""The model repository: named models the report and scoring code look up by name.
+"""The model repository as a view over 04_models: every model is a params.yaml folder.
 
-One entry per model, keyed by its declared name. This is the working registry while models live in
-code. It can later become an index over persisted runs (see 06_docs on the model repository).
+There is no in-code list of models. `get` and `names` scan `04_models/*/params.yaml` and load each
+definition. A model is keyed by its human name if it has one, else its slug. Since 04_models is
+gitignored, a fresh checkout has no models until params files are created.
 """
-from models.sybilla import sybilla
+from pathlib import Path
 
-_MODELS = {m.name: m for m in [sybilla]}
+from models.loader import load_model
+from models.store import ROOT
 
 
-def get(name):
-    """The model registered under `name`."""
+def _index(root=ROOT):
+    """name-or-slug -> Model for every params.yaml under `root`."""
+    models = {}
+    for params in sorted(Path(root).glob("*/params.yaml")):
+        model = load_model(params)
+        models[model.name or model.slug] = model
+    return models
+
+
+def get(name, root=ROOT):
+    """The model registered under `name` (its human name or, failing that, its slug)."""
+    models = _index(root)
     try:
-        return _MODELS[name]
+        return models[name]
     except KeyError:
-        raise KeyError(f"no model named {name!r}; known: {sorted(_MODELS)}") from None
+        raise KeyError(f"no model named {name!r}; known: {sorted(models)}") from None
 
 
-def names():
-    """All registered model names."""
-    return sorted(_MODELS)
+def names(root=ROOT):
+    """All model names (or slugs) found under `root`."""
+    return sorted(_index(root))
