@@ -1,17 +1,15 @@
 """The model contract: what every model in the repository declares, and helpers over it.
 
-A model is a declaration, not a pipeline. It carries the parameters that define what it learns (the
-data fields, snapshotted into every run) and one thin hook, make_model, that builds the estimator
-from the hyperparameters. It loads no data, trains nothing, and knows nothing about the report.
-`models.run` applies a model to data, and `reporting.tearsheet` renders the result.
+A model is a declaration, not a pipeline. It is plain data: what it learns (target, domain, features,
+estimator name, hyperparameters) with no code. It loads no data, trains nothing, and knows nothing
+about the report. `models.run` applies a model to data (building the estimator through the factory),
+and `reporting.tearsheet` renders the result.
 
-The parameters live in code here for flexibility while the set of estimators is still moving. Because
-every field except make_model is plain data, the repository can later move to a declarative form
-(a per-model YAML plus an estimator factory) without touching run or the report. See
-06_docs on the model repository.
+Features are a plain column list, resolved from feature spaces upstream (see models.spaces); the
+`spaces` field keeps the space names as metadata for the slug and the snapshot, and nothing in the
+run path reads them. See 06_docs/models_spec.
 """
 from dataclasses import asdict, dataclass, field
-from typing import Callable
 
 
 @dataclass(frozen=True)
@@ -28,12 +26,13 @@ class Domain:
 
 @dataclass(frozen=True)
 class Model:
-    """A named model: its learning parameters plus the estimator hook.
+    """A named model, plain data.
 
     name/tagline/method are identity and display. target and implied are ABT column names (the 0/1
     outcome and the market price). domain, features and hyperparams define what is learned and where.
-    make_model takes the hyperparams dict and returns a fresh sklearn-style estimator. findings holds
-    model-specific notes keyed by report section (empty until written).
+    estimator is a factory name (see models.factory) built from the hyperparams. spaces are the
+    feature-space names the features were resolved from, kept as metadata for the slug and snapshot.
+    findings holds model-specific notes keyed by report section (empty until written).
     """
     name: str
     tagline: str
@@ -42,8 +41,9 @@ class Model:
     implied: str
     domain: Domain
     features: list
+    estimator: str
     hyperparams: dict
-    make_model: Callable
+    spaces: list = field(default_factory=list)
     findings: dict = field(default_factory=dict)
 
 
@@ -57,11 +57,6 @@ def apply_domain(abt, domain):
 
 
 def snapshot(model):
-    """The model's data parameters as a plain dict, for freezing into a run manifest.
-
-    Every field except make_model, which is code and cannot be serialized. asdict recurses into the
-    Domain, so the result is fully plain (dicts, lists and scalars).
-    """
-    data = asdict(model)
-    data.pop("make_model", None)
-    return data
+    """The model as a plain dict, for freezing into a run manifest. Every field is data, so asdict
+    (which recurses into the Domain) gives a fully plain result of dicts, lists and scalars."""
+    return asdict(model)

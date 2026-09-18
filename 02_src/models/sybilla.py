@@ -1,19 +1,13 @@
 """Sybilla: an XGBoost draw model on the major leagues.
 
-This file is the whole model: its parameters (data, snapshotted into every run) and one thin hook
-that builds the estimator. It loads no data, trains nothing and knows nothing about the report.
-Change a hyperparameter here and the next run carries the new value in its manifest.
+The whole model is plain data: the feature spaces it is built on, the estimator name, and the
+hyperparameters. Features are resolved from the spaces here, at definition time, so the run path only
+ever sees a plain column list. It loads no data, trains nothing and knows nothing about the report.
 """
-from xgboost import XGBClassifier
-
+from models import spaces
 from models._spec import Domain, Model
 
-
-def make_model(hyperparams):
-    """Build the estimator from the modeling hyperparameters, adding fixed operational settings."""
-    return XGBClassifier(**hyperparams, eval_metric="logloss",
-                         n_jobs=4, verbosity=0, enable_categorical=True)
-
+SPACES = ["goals_foragst", "points", "anchor"]
 
 sybilla = Model(
     name="Sybilla",
@@ -22,17 +16,12 @@ sybilla = Model(
     target="t_draw_flg",
     implied="mrkt_draw_impl",
     domain=Domain(gameweek_min=8, leagues="major"),
-    features=[
-        "hmt_season_goals_for_avg", "hmt_season_goals_agst_avg",
-        "awt_season_goals_for_avg", "awt_season_goals_agst_avg",
-        "hmt_season_points_avg", "awt_season_points_avg",
-        "hmt_season_mp_impl_points_avg", "awt_season_mp_impl_points_avg",
-        "mrkt_draw_impl",
-    ],
+    spaces=SPACES,
+    features=spaces.resolve(SPACES),
+    estimator="xgb",
     hyperparams={
         "max_depth": 50, "n_estimators": 150, "learning_rate": 0.05,
         "subsample": 0.7, "colsample_bytree": 0.8, "min_child_weight": 20,
         "reg_lambda": 3.0, "reg_alpha": 0.5,
     },
-    make_model=make_model,
 )

@@ -14,6 +14,7 @@ from evaluation.folds import season_folds
 from evaluation.predictions import collect_predictions
 from evaluation.staking import kelly_bankroll
 from evaluation.stats import buffer_curve, pick_buffers, portfolio_stats
+from models import factory
 from models._spec import Model, apply_domain
 
 _ABT_ROOT = Path(__file__).parents[2] / "01_data" / "03_abt"
@@ -64,7 +65,7 @@ def run(model, abt=None, buffer=None, holdout="last", bank_start=100.0, kelly_fr
         subset=feats + [model.implied, model.target, "league", "season"]).copy()
 
     def make():
-        return model.make_model(model.hyperparams)
+        return factory.build(model.estimator, model.hyperparams)
 
     preds = collect_predictions(matches, season_folds(matches), features=feats,
                                 outcome=model.target, implied=model.implied, make_model=make)

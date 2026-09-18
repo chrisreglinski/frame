@@ -9,9 +9,15 @@ import pandas as pd
 import pytest
 from sklearn.linear_model import LogisticRegression
 
-from models import registry
+from models import factory, registry
 from models._spec import Domain, Model, apply_domain, snapshot
 from models.run import Run, run
+
+
+@factory.register("test_lr")
+def _test_lr(hp):
+    """A light estimator registered only for these tests, so run stays off xgboost."""
+    return LogisticRegression(**hp)
 
 
 def tiny_model():
@@ -19,8 +25,7 @@ def tiny_model():
         name="Tiny", tagline="a toy model", method="LR",
         target="t_draw_flg", implied="mrkt_draw_impl",
         domain=Domain(gameweek_min=0, leagues="major"),
-        features=["f1", "f2"], hyperparams={"max_iter": 200},
-        make_model=lambda hp: LogisticRegression(**hp),
+        features=["f1", "f2"], estimator="test_lr", hyperparams={"max_iter": 200},
     )
 
 
@@ -57,11 +62,12 @@ def test_apply_domain_filters_by_gameweek():
     assert list(kept.index) == [2]          # row 0 fails on home, row 1 on away, row 2 passes both
 
 
-def test_snapshot_drops_make_model_and_recurses():
+def test_snapshot_is_plain_data():
     snap = snapshot(tiny_model())
-    assert "make_model" not in snap
+    assert "make_model" not in snap                 # no code fields anymore
     assert snap["domain"] == {"gameweek_min": 0, "leagues": "major"}
     assert snap["hyperparams"] == {"max_iter": 200}
+    assert snap["estimator"] == "test_lr"
     assert snap["name"] == "Tiny"
 
 
