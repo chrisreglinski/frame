@@ -105,11 +105,12 @@ legibility.)
 
 ## Status
 
-Mostly built. In place: the feature-space registry, the estimator factory, the `Model` as plain data
+Built. In place: the feature-space registry, the estimator factory, the `Model` as plain data
 (features resolved from spaces), `run` returning a `Run`, the save layer (`params.yaml` plus per-run
-folders), the params loader, and the registry as a view over `04_models/*/params.yaml`. Sybilla lives
-at `04_models/sybilla/params.yaml`. Pending: the report reading a saved run instead of an in-memory
-one, and the generated index view over models.
+folders with results.yaml, predictions.parquet and report.html), the params loader, the registry as a
+view over `04_models/*/params.yaml`, and the report rendering from a loaded run (store.load_run) so it
+is a pure visualization of a persisted run. Sybilla lives at `04_models/sybilla/params.yaml` with a
+saved run and its report. Pending: the generated index view over models (a table on demand).
 
 ## Possible later
 
