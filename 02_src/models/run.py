@@ -73,6 +73,10 @@ def run(model, abt=None, buffer=None, holdout="last", bank_start=100.0, kelly_fr
     fair = _devig(matches)
     preds["fair"] = preds["match_id"].map(fair).fillna(preds["implied"])
 
+    # Attach the model's feature columns, so the saved register is a thin self-contained ABT.
+    feat_cols = [c for c in feats if c not in preds.columns]
+    preds = preds.merge(matches[["match_id", *feat_cols]], on="match_id", how="left")
+
     seasons = sorted(preds["season"].unique())
     hold = seasons[-1] if holdout == "last" else holdout
 

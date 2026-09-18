@@ -15,9 +15,10 @@ import hashlib
 import json
 from pathlib import Path
 
+import pandas as pd
 import yaml
 
-from models._spec import snapshot
+from models._spec import model_from_snapshot, snapshot
 
 ROOT = Path(__file__).parents[2] / "04_models"
 
@@ -79,3 +80,21 @@ def save_run(run, html=None, root=ROOT):
     if html is not None:
         (d / "report.html").write_text(html, encoding="utf-8")
     return d
+
+
+def load_run(run_dir):
+    """Reconstruct a Run from a saved run folder (results.yaml plus predictions.parquet), so the
+    report renders a persisted run without retraining. The model is rebuilt from the frozen snapshot,
+    the predictions from the parquet."""
+    from models.run import Run   # local import to avoid a module import cycle
+
+    run_dir = Path(run_dir)
+    results = yaml.safe_load((run_dir / "results.yaml").read_text(encoding="utf-8"))
+    r = results["run"]
+    return Run(
+        model=model_from_snapshot(results["model"]),
+        predictions=pd.read_parquet(run_dir / "predictions.parquet"),
+        buffer=r["buffer"], buffer_name=r["buffer_name"], holdout=r["holdout"],
+        seasons=r["seasons"], bank_start=r["bank_start"], kelly_fraction=r["kelly_fraction"],
+        metrics=results["metrics"],
+    )

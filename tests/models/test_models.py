@@ -108,6 +108,7 @@ def test_run_contract():
 
     for col in ("model_p", "implied", "y", "fair", "season", "date", "match_id"):
         assert col in r.predictions.columns
+    assert "f1" in r.predictions.columns and "f2" in r.predictions.columns   # features attached
     assert len(r.predictions) == 60            # gameweek_min 0 keeps all, no NaN dropped
 
     assert r.buffer == -1.0

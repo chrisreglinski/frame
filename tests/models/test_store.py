@@ -60,3 +60,16 @@ def test_save_run_writes_the_package(tmp_path):
     back = pd.read_parquet(d / "predictions.parquet")
     assert list(back["match_id"]) == [1, 2]
     assert (d / "report.html").read_text(encoding="utf-8") == "<title>x</title>"
+
+
+def test_save_then_load_run_round_trips(tmp_path):
+    run = a_run(a_model())
+    d = store.save_run(run, root=tmp_path)
+    back = store.load_run(d)
+
+    assert back.model.name == "Sybilla"
+    assert back.model.features == run.model.features        # rebuilt from the frozen snapshot
+    assert back.buffer == 0.05 and back.buffer_name == "operational"
+    assert back.holdout == "2526" and back.seasons == ["2223", "2324", "2425", "2526"]
+    assert back.metrics["roi"] == 0.05
+    assert list(back.predictions["match_id"]) == [1, 2]

@@ -62,3 +62,11 @@ def snapshot(model):
     """The model as a plain dict, for freezing into a run manifest. Every field is data, so asdict
     (which recurses into the Domain) gives a fully plain result of dicts, lists and scalars."""
     return asdict(model)
+
+
+def model_from_snapshot(data):
+    """Rebuild a Model from a snapshot dict (the inverse of snapshot). The features are taken as
+    stored, not re-resolved from spaces, so a saved run reproduces exactly what it ran on."""
+    data = dict(data)
+    data["domain"] = Domain(**data["domain"])
+    return Model(**data)
