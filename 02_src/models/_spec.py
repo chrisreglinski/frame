@@ -31,8 +31,9 @@ class Model:
     name/tagline/method are identity and display. target and implied are ABT column names (the 0/1
     outcome and the market price). domain, features and hyperparams define what is learned and where.
     estimator is a factory name (see models.factory) built from the hyperparams. spaces are the
-    feature-space names the features were resolved from, kept as metadata for the slug and snapshot.
-    findings holds model-specific notes keyed by report section (empty until written).
+    feature-space names the features were resolved from, kept as metadata. slug is a hand-written
+    display label only, never parsed for logic (every value is read from its own field). findings
+    holds model-specific notes keyed by report section (empty until written).
     """
     name: str
     tagline: str
@@ -43,6 +44,7 @@ class Model:
     features: list
     estimator: str
     hyperparams: dict
+    slug: str = ""
     spaces: list = field(default_factory=list)
     findings: dict = field(default_factory=dict)
 

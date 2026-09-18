@@ -11,6 +11,7 @@ SPACES = ["goals_foragst", "points", "anchor"]
 
 sybilla = Model(
     name="Sybilla",
+    slug="draw-major-goals_foragst+points+anchor-xgb",
     tagline="an XGBoost model for predicting draws.",
     method="XGBoost",
     target="t_draw_flg",
