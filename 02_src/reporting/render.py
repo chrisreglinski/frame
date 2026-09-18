@@ -204,7 +204,7 @@ def _row_label(name):
 
 # (header label, column) for the metric columns shown in a stats table.
 _TCOLS = [("matches", "n_matches"), ("breakeven", "breakeven"), ("hit rate", "hit_rate"),
-          ("ROI", "roi"), ("profit", "profit")]
+          ("yield", "roi"), ("profit", "profit")]
 
 
 def _cell(col, value):

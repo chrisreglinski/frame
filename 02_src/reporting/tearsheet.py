@@ -506,7 +506,7 @@ def render_tearsheet(run, variables=None, hyperparameters=None):
                            + render.caption("Bankroll from a 100 unit start, compounding bet by bet "
                                             f"across the {_num_word(n_seasons)} seasons in date order. "
                                             "Stakes are half-Kelly on the market price lifted by the "
-                                            "portfolio ROI."))
+                                            "portfolio yield."))
 
     # Bets.
     bets_disp = bets.sort_values("date")
