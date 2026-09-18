@@ -1,28 +1,21 @@
 # tearsheet_spec
 
-The tearsheet is a reusable one-page model report. It renders one run of a betting model and knows
-nothing about which model produced it. This spec describes the pieces and where the boundaries sit.
-
-## Three entities: model, run, report
-
-- **Model**: a definition with a stable identity. Its learning parameters (target, features,
-  hyperparameters, domain) plus one hook that builds the estimator. Sybilla is a model. It carries
-  no results, and the same model holds across years.
-- **Run**: one instantiation of a model on a specific data snapshot and protocol (which seasons, the
-  fold scheme, the buffer). A run produces out-of-fold predictions and a frozen summary. The same
-  model on a different set of seasons is a different run.
-- **Report**: a view over one run. It holds the section order, the prose and the styling, and it
-  trains nothing.
+The tearsheet is a reusable one-page model report. It renders one saved run of a betting model and
+knows nothing about which model produced it. How models are defined, run and stored is in models_spec,
+which is the authority where the two overlap. This document covers the report. The three entities are
+model, run and report: the first two live in models_spec, the report is here.
 
 ## Input
 
-The report takes a Run (`models.run.Run`). A run carries the model (for identity and the Overview),
-the out-of-fold predictions frame, the buffer used and how it was chosen, the seasons, and the frozen
-headline metrics.
+The report renders one saved run. It reads:
 
-The predictions frame (the match register) has one row per match: `model_p`, `implied`, `fair`
-(devigged), `y`, plus passthrough meta (`season`, `league`, teams, `date`). Everything the report
-draws is derivable from this register plus the model snapshot and the buffer.
+- **`results.yaml`**: a frozen snapshot of the model definition, the chosen buffer, and the headline
+  metrics,
+- **`predictions.parquet`**: the out-of-fold match register plus the model's feature columns.
+
+The register has one row per match: `model_p`, `implied`, `fair` (devigged), `y`, plus meta
+(`season`, `league`, teams, `date`). Everything the report draws is derivable from the register plus
+the snapshot and the buffer.
 
 ## Building blocks
 
@@ -37,19 +30,14 @@ Computation lives in `evaluation/` and is format-agnostic (DataFrames and Series
 - `calibration.calibration_overlay`: equal-count reliability buckets of one predictor with a second
   predictor on the same bins.
 
-Models live in `models/`:
-
-- `_spec.Model`, `Domain`, `apply_domain`, `snapshot`.
-- `sybilla.py`, one model per file.
-- `registry.get`, look up a model by name.
-- `run.run`, apply a model to data on a protocol and return a Run. Training lives here.
-
 Presentation lives in `reporting/`:
 
 - `panels`: chart recipes. Each takes a frame and returns a spec (data and axes) and computes nothing
   of its own.
 - `render`: layout primitives and the browser-side chart engine.
 - `tearsheet.render_tearsheet`: composes the sections, holds the prose, emits the HTML.
+
+Models, runs and their storage are specified in models_spec.
 
 ## The compute and render boundary
 
@@ -68,16 +56,6 @@ for identity and the chosen buffer). Derivation happens as late as it is cheap:
 
 So persistence freezes the register plus the scalar summary. The report derives static specs from the
 register. The browser does only the interactive re-aggregation.
-
-## Model repository
-
-Models live in code (`02_src/models/`). A model is a config of parameters plus one `make_model` hook.
-The parameters are plain data, so a run freezes a snapshot of them into its manifest and the report
-reads identity and settings from there without importing the model.
-
-The buffer is a run argument, not a model parameter. Passed explicitly it is the operational buffer.
-Left out, it is picked from the profit curve on the development seasons (`middle` for twin peaks,
-`peak` for one). Whatever value is used is recorded on the run.
 
 ## Report structure
 
@@ -107,7 +85,7 @@ interpret it, so a real feature named "hidden" is unaffected.
 ## Out of scope
 
 Model-specific decisions (which subset, which fold is the holdout, how or whether to recalibrate for
-staking) belong to the model and the run, never to the reporting module.
+staking) belong to the model and the run, never to the reporting module. See models_spec.
 
 ## Possible improvements
 
@@ -116,8 +94,3 @@ staking) belong to the model and the run, never to the reporting module.
   season) and answer the deployment question rather than the stability one. Making the fold scheme a
   run argument would expose both. It is not a pure drop-in, because the buffer-selection protocol
   assumes a single holdout and the CV prose would adapt to the scheme.
-- **Declarative models.** Model parameters live in code today. Because every field except
-  `make_model` is plain data, a model could move to a per-model YAML plus an estimator factory that
-  maps a named estimator and its hyperparameters to an object. The run would then freeze a copy of
-  the file. This trades the estimator flexibility of code for a fully declarative definition, at the
-  cost of a factory that every estimator type passes through.
