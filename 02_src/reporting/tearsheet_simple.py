@@ -212,5 +212,5 @@ def render_simple(run, variables=None, hyperparameters=None):
 </div>
 <div class="frame-tt" id="frame-tt" aria-hidden="true"></div>"""
 
-    return (f"<title>{run.model.name}, plainly</title>\n<style>{ts.CSS}</style>\n{body}\n"
+    return (f"<title>{run.model.name}</title>\n<style>{ts.CSS}</style>\n{body}\n"
             f"<script>{engine}</script>\n")
