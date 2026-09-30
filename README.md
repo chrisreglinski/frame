@@ -155,31 +155,54 @@ in [`spaces_spec.md`](06_docs/spaces_spec.md).
   set, the spaces, the extra variables, the estimator name and its hyperparameters. Its identity
   renders as a slug like `draw-major-goals_foragst+points-xgb-d5b3b3`, where the final hash stands for
   the extra variables. A model that looks promising also gets a human name (e.g. Sybilla).
-- A **run** is one model trained on specific seasons under the fold protocol. It is saved to
-  `runs/<run-id>/` with a frozen snapshot of the definition, the out-of-fold predictions and the
-  headline metrics, so it can be reloaded without retraining.
+- A **run** trains and evaluates a model on specific seasons. It saves to `runs/<run-id>/` a frozen
+  snapshot of the definition, the out-of-fold predictions and the metrics, so it can be reloaded
+  without retraining.
 - A **report** is a view over a saved run. The tearsheet comes in a technical variant
   (`render_tearsheet`) and a plain-language one (`render_simple`).
+
+What a run does:
+
+1. **Leave-one-season-out folds**: each season is predicted by a model trained on the other seasons,
+   so every prediction is out of sample.
+2. **Bets** are placed where the model's probability beats the market price by more than a buffer.
+   Unless given, the buffer is picked from the profit curve on every season except the newest, which
+   stays out as a holdout.
+3. **Metrics** are the money metrics from Evaluation: proportional staking for the edge, a half-Kelly
+   bankroll for the money path.
 
 ```python
 from models import registry
 from models.run import run
-from models.store import save_run, load_run
+from models.store import save_run
+from reporting.tearsheet import render_tearsheet
 
-r = run(registry.get("Sybilla"))
-run_dir = save_run(r)
-r = load_run(run_dir)
+model = registry.get("Sybilla")         # definition from 04_models/sybilla/params.yaml
+r = run(model)                          # season-out CV: train, predict, bet, score
+r.metrics                               # yield, p-value, drawdown, ...
+r.predictions                           # one row per match: model_p, implied, y, ...
+save_run(r, html=render_tearsheet(r))   # -> 04_models/sybilla/runs/<run-id>/
 ```
 
-Details: [`models_spec.md`](06_docs/models_spec.md) and [`tearsheet_spec.md`](06_docs/tearsheet_spec.md).
+A saved run is reloaded with `models.store.load_run(run_dir)`. Details:
+[`models_spec.md`](06_docs/models_spec.md) and [`tearsheet_spec.md`](06_docs/tearsheet_spec.md).
 
 ---
 
 ## Evaluation
 
-Classification metrics like accuracy, precision or AUC are not used. The odds already reflect most of
-what is known about a match, so a model can predict well and still lose money. The question is whether
-it beats the odds, and that is measured in money:
+Plain functions in `02_src/evaluation/`, usable on any predictions or bets, with or without the model
+framework. Two layers:
+
+**Forecast quality.** `scoring` gives skill scores against a constant baseline: R² for a predicted
+margin, Brier skill score for a probability, and optionally RPSS for the H/D/A triple. Every
+`compare_*` scores a model and the market on the same matches and returns the gap, so a model can be
+measured directly against the odds. `calibration` checks whether predicted probabilities match
+observed frequencies.
+
+**Money.** Beating the market's forecast is not enough: the odds already reflect most of what is
+known about a match, so a model can forecast well and still lose money. The final test is profit at
+the odds on offer:
 
 | Metric | Key | Meaning |
 |--------|-----|---------|
@@ -189,16 +212,19 @@ it beats the odds, and that is measured in money:
 | max drawdown | `bank_maxdd` | largest fall of the bankroll from its peak |
 | CAGR | `bank_cagr` | annual growth of the bankroll |
 
-Metrics are always computed on out-of-sample predictions. How those are produced (folds, bet
-threshold) is decided per run, see [`models_spec.md`](06_docs/models_spec.md).
+- **Proportional staking** (`portfolio_stats`) sizes each bet by the implied probability and ignores
+  the bankroll. The result does not depend on scale or bet order, so it isolates the edge (`roi`,
+  `profit`, `p_value`).
+- **Kelly on a bankroll** (`kelly_bankroll`) stakes a fraction of the current bankroll, so gains and
+  losses compound. It shows what the money would actually do (`bank_maxdd`, `bank_cagr`).
 
-The metrics come from two staking modes, which answer different questions:
+```python
+from evaluation.stats import portfolio_stats
 
-- **Proportional staking** sizes each bet by the implied probability and ignores the bankroll. The
-  result does not depend on scale or on the order of bets, so it isolates the edge itself: is there
-  one, and how large (`roi`, `profit`, `p_value`).
-- **Kelly on a bankroll** stakes a fraction of the current bankroll, so gains and losses compound and
-  order matters. It shows what the money would actually do (`bank_maxdd`, `bank_cagr`).
+# back every away favourite: is there an edge?
+bets = abt[abt["mrkt_favourite"] == "away"]
+portfolio_stats(bets, implied="mrkt_away_impl", outcome="t_away_flg")
+```
 
 ---
 
