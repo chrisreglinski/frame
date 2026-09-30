@@ -151,25 +151,11 @@ selection. Form spaces also come in rolling versions (`_r6`, `_r8`). A model can
 variables outside any space, listed as `extra`. The registry is `02_src/models/spaces.py`, described
 in [`spaces_spec.md`](06_docs/spaces_spec.md).
 
-- A **model** is a data record, not code: `04_models/<name>/params.yaml` holds the target, the league
-  set, the spaces, the extra variables, the estimator name and its hyperparameters. Its identity
-  renders as a slug like `draw-major-goals_foragst+points-xgb-d5b3b3`, where the final hash stands for
-  the extra variables. A model that looks promising also gets a human name (e.g. Sybilla).
-- A **run** trains and evaluates a model on specific seasons. It saves to `runs/<run-id>/` a frozen
-  snapshot of the definition, the out-of-fold predictions and the metrics, so it can be reloaded
-  without retraining.
-- A **report** is a view over a saved run. The tearsheet comes in a technical variant
-  (`render_tearsheet`) and a plain-language one (`render_simple`).
-
-What a run does:
-
-1. **Leave-one-season-out folds**: each season is predicted by a model trained on the other seasons,
-   so every prediction is out of sample.
-2. **Bets** are placed where the model's probability beats the market price by more than a buffer.
-   Unless given, the buffer is picked from the profit curve on every season except the newest, which
-   stays out as a holdout.
-3. **Metrics** are the money metrics from Evaluation: proportional staking for the edge, a half-Kelly
-   bankroll for the money path.
+- **model**: `04_models/<name>/params.yaml` with target, league set, spaces, extra, estimator and
+  hyperparameters. Slug: `draw-major-goals_foragst+points-xgb-d5b3b3`.
+- **run**: leave-one-season-out predictions, bets above a buffer, money metrics. Saved to
+  `runs/<run-id>/`.
+- **report**: a tearsheet over a saved run, `render_tearsheet` or `render_simple`.
 
 ```python
 from models import registry
@@ -177,53 +163,77 @@ from models.run import run
 from models.store import save_run
 from reporting.tearsheet import render_tearsheet
 
-model = registry.get("Sybilla")         # definition from 04_models/sybilla/params.yaml
-r = run(model)                          # season-out CV: train, predict, bet, score
+r = run(registry.get("Sybilla"))        # train, predict, bet, score
 r.metrics                               # yield, p-value, drawdown, ...
-r.predictions                           # one row per match: model_p, implied, y, ...
 save_run(r, html=render_tearsheet(r))   # -> 04_models/sybilla/runs/<run-id>/
 ```
 
-A saved run is reloaded with `models.store.load_run(run_dir)`. Details:
-[`models_spec.md`](06_docs/models_spec.md) and [`tearsheet_spec.md`](06_docs/tearsheet_spec.md).
+Details: [`models_spec.md`](06_docs/models_spec.md), [`tearsheet_spec.md`](06_docs/tearsheet_spec.md).
 
 ---
 
 ## Evaluation
 
-Plain functions in `02_src/evaluation/`, usable on any predictions or bets, with or without the model
-framework. Two layers:
+Plain functions in `02_src/evaluation/`, usable with or without the model framework. Column names are
+arguments, so they run on model predictions or straight on the ABT. The snippets below assume `preds`,
+out-of-fold predictions with `model_p`, `implied`, `fair` (devigged) and `y`, e.g.
+`run(model).predictions`.
 
-**Forecast quality.** `scoring` gives skill scores against a constant baseline: R² for a predicted
-margin, Brier skill score for a probability, and optionally RPSS for the H/D/A triple. Every
-`compare_*` scores a model and the market on the same matches and returns the gap, so a model can be
-measured directly against the odds. `calibration` checks whether predicted probabilities match
-observed frequencies.
+**Forecast quality**
 
-**Money.** Beating the market's forecast is not enough: the odds already reflect most of what is
-known about a match, so a model can forecast well and still lose money. The final test is profit at
-the odds on offer:
+- `scoring`: skill scores against a constant baseline (R² for a margin, Brier skill for a
+  probability, RPSS for H/D/A).
+- `compare_*`: a model and the market scored on the same matches, so a model is measured directly
+  against the odds.
+- `calibration`: predicted probabilities against observed frequencies.
 
-| Metric | Key | Meaning |
-|--------|-----|---------|
-| yield | `roi` | profit per unit staked |
-| profit | `profit` | total profit in stake units |
-| p-value | `p_value` | how likely the result is if the model has no edge over the fair market price |
-| max drawdown | `bank_maxdd` | largest fall of the bankroll from its peak |
-| CAGR | `bank_cagr` | annual growth of the bankroll |
+```python
+from evaluation.scoring import compare_outcome
 
-- **Proportional staking** (`portfolio_stats`) sizes each bet by the implied probability and ignores
-  the bankroll. The result does not depend on scale or bet order, so it isolates the edge (`roi`,
-  `profit`, `p_value`).
-- **Kelly on a bankroll** (`kelly_bankroll`) stakes a fraction of the current bankroll, so gains and
-  losses compound. It shows what the money would actually do (`bank_maxdd`, `bank_cagr`).
+# does the model forecast the outcome better than the market?
+compare_outcome(preds["model_p"], preds["fair"], preds["y"])
+```
+
+**Portfolio quality**
+
+The odds already reflect most of what is known, so a model can forecast well and still lose money.
+The final test is profit at the odds on offer. `portfolio_stats` stakes each bet proportionally to its
+implied probability and ignores the bankroll, so the result does not depend on scale or bet order and
+isolates the edge.
+
+| Key | Meaning |
+|-----|---------|
+| `n_matches` | number of bets |
+| `staked` / `wins` / `profit` | total stake, winning bets, `wins - staked` |
+| `roi` | yield: profit per unit staked |
+| `hit_rate` / `breakeven` | share of bets won, and the share needed to break even (mean implied) |
+| `p_value` | how likely the result is with no edge: against `prob=` if given (devigged), else the raw implied |
 
 ```python
 from evaluation.stats import portfolio_stats
 
-# back every away favourite: is there an edge?
-bets = abt[abt["mrkt_favourite"] == "away"]
-portfolio_stats(bets, implied="mrkt_away_impl", outcome="t_away_flg")
+# bet where the model beats the price by 2 points: is there an edge?
+bets = preds[preds["model_p"] > preds["implied"] + 0.02]
+stats = portfolio_stats(bets, prob="fair")
+```
+
+**Bankroll management**
+
+`bankroll_stats` stakes a Kelly fraction of the current bankroll, sized from the implied price lifted
+by the measured `roi`. Gains and losses compound, so it shows what the money would actually do. The
+bet-by-bet path behind it, for charts, comes from `kelly_bankroll`.
+
+| Key | Meaning |
+|-----|---------|
+| `start` / `final` / `profit` | starting bankroll, bankroll after the last bet, `final - start` |
+| `max_drawdown` | deepest fall from the running peak |
+| `cagr` | annual growth of the bankroll over the betting period |
+
+```python
+from evaluation.staking import bankroll_stats
+
+# the same bets at half-Kelly, staked in date order
+bankroll_stats(bets.sort_values("date"), roi=stats["roi"], kelly_fraction=0.5)
 ```
 
 ---
