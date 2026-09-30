@@ -13,6 +13,10 @@
 # Exploration bookkeeping — local only. model_check.py imports this, so a fresh clone
 # needs it copied in before run_check() works.
 02_src/evaluation/results_registry.py
+03_notebooks/model_checks/results.md
+
+# Model-check protocol notes: a loose working idea, not a fixed spec
+06_docs/model_check.md
 
 # Python
 __pycache__/

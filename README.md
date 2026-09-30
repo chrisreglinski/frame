@@ -1,25 +1,66 @@
 # frame
 
-Football analytics framework that:
-- produces a clean, point-in-time-correct Analytical Base Table (ABT)
-- enables easy EDA on created features
-- enables predictive/betting model investigation and validation under a fixed validation protocol
+A football analytics framework for European league matches. It does three things:
+
+- builds a clean, point-in-time-correct Analytical Base Table (ABT), one row per match,
+- makes it easy to explore the features it contains,
+- defines, validates and reports betting models under one fixed protocol.
 
 ---
 
-## Leagues & seasons
+## Quick start
 
-| League | Seasons |
-|--------|---------|
-| England (Premier League) | 2223, 2324, 2425, 2526 |
-| Spain (La Liga) | 2223, 2324, 2425, 2526 |
-| Italy (Serie A) | 2223, 2324, 2425, 2526 |
-| Germany (Bundesliga) | 2223, 2324, 2425, 2526 |
-| France (Ligue 1) | 2223, 2324, 2425, 2526 |
+```bash
+pip install -e .          # once after cloning: installs 02_src/ as an editable package
+python build_abt.py       # build the ABT for the default league set (major)
+```
 
-Seasons before 2223 excluded — COVID-era matches (2020–2022) had no fans, reducing home advantage and skewing result distributions.
+```python
+import pandas as pd
+abt = pd.read_parquet("01_data/03_abt/major/abt.parquet")
+```
 
-Source: [football-data.co.uk](https://www.football-data.co.uk)
+Notebooks import straight from the package, e.g. `from features.match_info import build_match_info`
+or `from models import registry`. `03_notebooks/template.ipynb` loads every table.
+
+Build options:
+
+```bash
+python build_abt.py --group minor     # another league set from league_sets.yaml
+python build_abt.py --skip-raw        # raw CSVs unchanged, skip match_raw_stats
+python build_abt.py --skip-thresholds # reuse the existing thresholds.json
+```
+
+Tests run on small hand-built data: `pytest`.
+
+---
+
+## Data
+
+Twelve leagues, grouped into league sets in `01_data/league_sets.yaml`. A set is built as one
+unit: its features, thresholds and ABT live under its own name.
+
+| Set | Leagues |
+|-----|---------|
+| `major` | England, Spain, Italy, France, Germany (top flights) |
+| `minor` | the second tiers of the same five countries |
+| `other` | Netherlands, Portugal |
+
+Only `major` is actively used for now. Every league covers seasons **2223 to 2526**. Earlier seasons
+are left out on purpose: in the COVID years matches were played without fans, home advantage shrank,
+and the results come from a different process.
+
+| Source | What it provides | Reach |
+|--------|------------------|-------|
+| [football-data.co.uk](https://www.football-data.co.uk) | results, match stats, pre-closing and closing odds | all leagues |
+| [clubelo.com](http://clubelo.com) | Elo and Golo ratings per club | top flights only |
+| [Understat](https://understat.com) | match xG | top flights only |
+| [FBref](https://fbref.com) | domestic cups, European and FIFA club competitions | all leagues |
+| hand-built | stadium coordinates, promoted / relegated / top-3 / island flags, season phases, international breaks | varies |
+
+Columns that depend on a source with limited reach (xG, Elo, travel distance) are scoped with
+`leagues:` in the contract. A set built from other leagues does not get them at all, rather than
+getting them empty. `01_data/01_raw/04_elo/README.md` explains the Club Elo pull and its gaps.
 
 ---
 
@@ -27,336 +68,147 @@ Source: [football-data.co.uk](https://www.football-data.co.uk)
 
 ```
 01_data/
-  league_sets.yaml     # which leagues make up each league set (major / minor / other)
-  01_raw/              # per-league-season payload: {league}/{league}_{season}_{domain}.csv
-    01_matches/        # raw CSVs from football-data.co.uk (tracked in git)
-    02_attributes/     # per-team attributes: venue coordinates + promoted / reigning-top3 flags
-                       # (second tiers and netherlands/portugal: promotee + island flags only,
-                       #  coordinates empty -> no travel_distance columns for those leagues)
-    03_dates/          # season phase boundaries + international-break windows (shared, global)
-    04_elo/            # Club Elo ratings per club (clubelo.com) + per-league team-name maps
-                       # _archive/ holds the pre-2026-08 snapshot of the old rating system
-    05_xg/             # Understat match xG per league-season + per-league team-name map
-    06_europe/         # UEFA club competitions per season (FBref): CL / EL / Conference
-                       # + qualifying, UEFA Super Cup, and a team-name map
-    07_domestic/       # domestic cups and super cups per league-season (FBref)
-                       # + a team-name map (only the names that differ from football-data)
-    08_intl/           # FIFA club competitions (Club World Cup, Intercontinental Cup)
-  02_features/         # generated feature tables (gitignored, rebuild locally)
-  03_abt/              # final wide ABT (gitignored, rebuild locally)
+  league_sets.yaml     # which leagues make up each set
+  01_raw/              # raw inputs, stored per league: <domain>/<league>/...
+    01_matches/        #   football-data CSVs
+    02_attributes/     #   per-team attributes (coordinates, flags)
+    03_dates/          #   season phase boundaries and international breaks
+    04_elo/            #   Club Elo series and team-name maps
+    05_xg/             #   Understat xG and team-name maps
+    06_europe/         #   UEFA competitions
+    07_domestic/       #   domestic cups and super cups
+    08_intl/           #   FIFA club competitions
+  02_features/<set>/   # generated feature tables (gitignored)
+  03_abt/<set>/        # generated ABT (gitignored)
 02_src/
-  01_raw/              # match_raw_stats builder (aggregates raw CSVs)
-  02_features/         # feature builders (one file per table)
-  evaluation/          # folds, predictions, staking, portfolio stats
-  models/              # model repository: one model per file, plus run()
-  reporting/           # tearsheet report: panels, render primitives, tearsheet
-03_notebooks/          # exploratory notebooks (gitignored except template.ipynb)
-04_models/             # trained models (gitignored)
-05_reports/            # outputs (gitignored)
-06_docs/               # contract, decisions, raw data notes
-tests/                 # pytest suite on small hand-built data (run: `pytest`)
+  raw/                 # match_raw_stats, Club Elo fetcher
+  features/            # one builder per feature table, plus thresholds and the ABT join
+  models/              # spaces, estimator factory, run, save layer, registry
+  evaluation/          # folds, predictions, stats, staking, calibration
+  reporting/           # tearsheet: panels, render primitives, two report variants
+03_notebooks/          # exploration notebooks
+04_models/             # saved models and runs (gitignored)
+05_reports/            # published reports (gitignored)
+06_docs/               # contract, specs, decisions
+tests/                 # pytest suite
+build_abt.py           # runs the whole pipeline for one league set
 ```
 
 ---
 
-## Key design principles
+## Design principles
 
-### Single source of truth — `06_docs/data.yaml`
+**The contract comes first.** `06_docs/data.yaml` defines every table and column: name, dtype,
+dimensions, description, and which leagues it covers. Builders implement the contract, never the
+other way round. A schema change starts in `data.yaml` and only then reaches the code.
 
-Every column in every feature table is defined in `data.yaml` with name, dtype, dims,
-and description. Builders implement the contract; the contract is never changed to match
-the code. Any schema change requires updating `data.yaml` first, then the code.
+**One key.** Every table joins on `match_id = md5(league|season|hmt_name|awt_name)`. The natural key
+columns live only in `match_info`.
 
-### match_id
+**Point-in-time correctness.** No feature may see its own match. Rolling and expanding statistics
+shift by one match before aggregating. Club Elo publishes the post-match rating on the match date, so
+the pre-match rating is the last point strictly before it. Calendar windows are half-open and end
+just before kick-off.
 
-All tables join on `match_id = md5(league|season|hmt_name|awt_name)`.
-Natural key columns (`league`, `season`, `hmt_name`, `awt_name`) live only
-in `match_info` and are not duplicated in other tables.
-
-### Point-in-time correctness
-
-All rolling/expanding statistics use `shift(1)` before any aggregation.
-The current match is never included in its own features.
-
-`hmt_elo` / `awt_elo` are joined point-in-time from Club Elo: the rating whose window
-contains the match date (`From <= date <= To`) is the pre-match value — Club Elo dates each
-post-match update to the following day — so no result leaks into the feature.
-
-### Pre-closing vs closing odds
-
-`mrkt`/`b365` are the **pre-closing** line; `mrktc`/`b365c` are the **closing** line (near
-kickoff). Only the pre-closing line may enter a model — it is the only price available when the match
-is evaluated; the closing line does not exist yet. The closing line is for **validation only**:
-settling a pre-closing signal at closing odds checks whether the edge still earns at that sharper
-price. It is never a model input.
+**Pre-closing vs closing odds.** `mrkt` and `b365` are the pre-closing line, the price available when
+a match is evaluated, and the only one a model may use. `mrktc` and `b365c` are the closing line near
+kick-off. They serve validation only: settling a signal at the closing price checks whether the edge
+survives a sharper market.
 
 ---
 
-## Feature tables
+## ABT tables
 
-### `match_info`
+The ABT (`01_data/03_abt/<set>/abt.parquet`) is a wide join of five tables on `match_id`. It is
+always built in full, and filtering by league, season or phase happens downstream. Every column is
+described in [`data.yaml`](06_docs/data.yaml). The summaries below only say what each table is for.
 
-One row per match. Context and market features:
-
-- `league`, `season`, `date`, `time`, `day_of_week`, `hmt_name`, `awt_name`
-- `season_game_number` — sequential match number in the league-season; `season_game_number_before_end` — the same counted from the end (`-1` = last match, `-N` = first, `N` = full-season match count from team count; a skipped match leaves the last at `-2`)
-- `gameweek` — derived as `ceil(season_game_number / (n_teams / 2))`; `n_teams` computed dynamically per league-season (handles France's drop from 20 to 18 teams after 2223); `gameweek_before_end` — same counted from the end (`-1` = last gameweek)
-- `season_4phase` — `summer / fall / winter / spring` based on hand-coded boundary dates in `01_raw/03_dates/season_limit_dates.csv`
-- `season_3phase` — `start / mid / end` (fall+winter merged into mid)
-- `day_of_week_cat` — `weekend` (sat/sun) / `shoulder` (fri/mon) / `midweek` (tue/wed/thu)
-- Break counters, anchored on the breaks in which **every** league stopped (a FIFA window, or
-  the 2022 World Cup); windows hand-recorded in `01_raw/03_dates/break_dates.csv`. The winter
-  break is not one — England plays through it — and neither is the gap between seasons.
-  `season_game_number_after_break` / `_before_break` count the league-season's matches from the
-  last break and back to the next; `gameweek_after_break` / `_before_break` bucket those into
-  rounds the way `gameweek` buckets `season_game_number`; `hmt_`/`awt_game_number_after_break` /
-  `_before_break` do the same count for each team. The pair mirrors `season_game_number` vs `{side}_game_number`, and the
-  backward ones read like `season_game_number_before_end`: `-1` is the last match before the
-  anchor. The team-level counters are **not** derivable from the league-level ones — a
-  rescheduled fixture leaves two teams in one round with different counts, in 10% of matches
-- `time_uk_num` — kick-off time (UK) as a number (`hour + minute/60`); `time_uk_cat` — bucketed by floor(hour): `early` (11–13) / `early_afternoon` (14–15) / `late_afternoon` (16–17) / `evening` (18+)
-- `hmt_is_promoted`, `awt_is_promoted`, `travel_distance_km`
-- `hmt_is_top3_last`, `awt_is_top3_last` — team finished top 3 in this league last season (reigning top-3; top-tier leagues only). Earliest season seeded from external final tables; later seasons match `team_season_final` rankings. Second-tier leagues carry the analogue `hmt_is_relegated` / `awt_is_relegated` (relegated from the tier above) instead — both are league-scoped in `data.yaml` via `leagues:`, so a set gets whichever flag its leagues have
-- `hmt_is_island`, `awt_is_island` — team is on a geographically isolated island (Las Palmas, Mallorca, Cagliari, Ajaccio)
-- `travel_distance_cat` — `travel_distance_km` bucketed: `derby` (<30 km) / `regional` (30–100 km) / `domestic` (100–500 km, coach / high-speed rail) / `long_haul` (500+ km, flights)
-- `hmt_elo`, `awt_elo` — Club Elo rating (clubelo.com) of each team as of the match date, joined point-in-time (pre-match; see below). **Currently `active: false` in `data.yaml` and not built** — clubelo rebuilt its site and changed the rating algorithm around 2026-08, so the snapshot these were computed from (`04_elo/_archive/`) no longer matches the source. Every `teams_elo_*` column is inactive for the same reason
-- `hmt_elo_cat2m` / `awt_elo_cat2m` (high/low vs the global elo mean) and `hmt_elo_cat3q` / `awt_elo_cat3q` (tertiles of the pooled per-match elo distribution; thresholds in `thresholds.json`)
-- `b365_*` / `mrkt_*` — odds, implied probabilities (1/odds), bookmaker margin, Shannon entropy of normalized implied probs (pre-closing line). `b365c_*` / `mrktc_*` — the same for the **closing** (kickoff) line (football-data C columns); empty where no closing price
-- `mrkt_favourite`, `mrkt_impl_order`, `mrkt_favrt_impl`, `mrkt_undrd_impl` — derived market signals (mrkt only): favoured side (home/away/balanced), H/D/A ordering by implied prob, stronger/weaker side implied prob
-- `{bookmaker}_home_away_impl_diff` — home − away implied gap, for all 4 books (`b365`/`mrkt` pre-closing, `b365c`/`mrktc` closing)
-
-### `match_team_stats`
-
-One row per match, wide format. Team statistics computed from all previous matches in
-the season for both the home team (`hmt_` prefix) and away team (`awt_` prefix).
-
-Three window variants for every statistic:
-
-| Window | Logic |
-|--------|-------|
-| `season` | expanding from match 1 (`min_periods=1`) |
-| `rolling6` | last 6 matches (`min_periods=6`, NaN if fewer) |
-| `rolling8` | last 8 matches (`min_periods=8`, NaN if fewer) |
-
-Statistics per team per window:
-- Goals, shots, shots on target, corners, yellow cards, xG — for & against averages
-- Points — average
-- goals_diff, goals_total, shots_on_target_diff, shots_on_target_total, xg_diff, xg_total — average & std
-- xG is sourced from Understat (`05_xg/`, mapped via `team_map`), which covers only the top five leagues. The xg columns therefore carry their own contract entries scoped with `leagues:`, and a set built from other leagues does not get them at all rather than getting them empty. `travel_distance_*` and every `elo` column are scoped the same way, for the same reason — the contract states where a source reaches
-- Win / draw / loss ratio
-- Goals total / for / against threshold ratios (e.g. over 2.5, clean sheets)
-- Shots on target conversion ratio
-- Red cards average; red card in last match flag
-- Home-only (`hmt_home_*`) and away-only (`awt_away_*`) season splits over that team's home (resp. away) matches only: goals / shots / shots-on-target for & against, points / `flg_diff` / goals_diff / goals_total, win/draw/loss ratio, and `{mp,mc}_impl_points_avg` (expected points) / `{mp,mc}_impl_diff_avg` (implied margin). Plus `{points,flg_diff}_avg_adv` / `{mp,mc}_impl_{points,diff}_avg_adv` — venue advantage: the team's form where it plays this match minus its form at the other venue (home team: home − away, positive = better at home; away team: away − home, usually negative = away disadvantage)
-- `{mp,mc}_impl_{win,draw,loss}_avg` — market average implied probability for this team's outcome, on the **mp** (market pre-closing) / **mc** (market closing) line
-- `{mp,mc}_impl_points_avg` — market-expected points per match (`impl_win_avg * 3 + impl_draw_avg`), mp / mc lines
-- `{mp,mc}_impl_diff_avg` — market-implied margin per match (`impl_win_avg − impl_loss_avg`), the team-oriented `mrkt_home_away_impl_diff`, mp / mc lines
-- `flg_diff_avg` — realized signed-result margin per match (`wins_ratio − losses_ratio`, i.e. mean of `win_flg − loss_flg` ∈ {+1,0,−1}, same axis as `t_flg_diff`); realized counterpart of `impl_diff_avg`
-- Season-level categoricals (`season` window only): `*_cat2m` (binary — vs global mean, or sign) and `*_cat3q` (tertiles from `team_season_final`) for goals and shots-on-target total / diff / for / against
-
-### `match_matchup_stats`
-
-Derived from `match_team_stats`. Comparative features per window:
-- `teams_{window}_goals_foragst_avg_max` — max of the four goals averages (home for, home agst, away for, away agst)
-- `homet/awt_{window}_goals_foragst_avg_max` — per-team max(goals_for_avg, goals_agst_avg) for the home (`hmt_`) and away (`awt_`) side
-- Matchup pairs — `teams_{window}_{metric}_avg_diff` (home − away, positive = home stronger)
-  and `teams_{window}_{metric}_avg_total` (home + away, the combined level of the matchup),
-  for every `metric` in `points, flg_diff, goals_diff, goals_total, shots_on_target_diff,
-  shots_on_target_total, xg_diff, xg_total, mp_impl_points, mc_impl_points`. Both forms exist
-  for all of them: on a `*_total` metric the sum reads as combined intensity, on a `*_diff` or
-  scalar metric as combined quality. Elo has the same pair without a window
-  (`teams_elo_diff` / `teams_elo_total`). The metric list is a contract dim — widening it there
-  widens the table
-- **Schedule density** (`teams_…_total` / `_diff` over every `match_team_fatigue` per-side column —
-  the three rest gaps, the count windows and the decayed loads, each also split by venue and stream).
-  `_total` reads as "how congested is this fixture's slot in the calendar", a property the two teams
-  share; `_diff` reads as "which side comes in fresher", the fatigue asymmetry. Built here rather than
-  in `match_team_fatigue` because the `teams_` prefix marks matchup features — which is why
-  `match_team_fatigue` runs before this step in `build_abt.py`
-- Naming: a for/agst quantity carries an inner for−agst / for+agst term (`goals_diff`, `goals_total`),
-  so its matchup feature reads `_diff_avg_diff` / `_total_avg_total`; a per-side average (points,
-  impl_points, flg_diff) gives `_avg_diff` / `_avg_total`. Elo is a raw rating, so no window.
-- **Elo → probability margin**: the expected `p_home − p_away` implied by `teams_elo_diff`, mapped four
-  ways on a 2×2 grid — **form** (cubic / logistic) × **fit** (to results / to market) — each fit once
-  (offline, per group) and stored in `thresholds.json`. The tag is `{c,l}{r,m}r`:
-  `crr`/`cmr` cubic, `lrr`/`lmr` logistic; `*rr` fit to realized outcomes (the true margin), `*mr` fit to
-  `mrkt_home_away_impl_diff` (the market's pricing skeleton). Each splits additively into `..._stgh`
-  (strength, odd in `d`) and `..._lhfa` (league home-field advantage) = `..._diff`, giving
-  `teams_elo_diff_{crr,cmr,lrr,lmr}_impl_{diff,stgh,lhfa}` — all in the same units as
-  `mrkt_home_away_impl_diff`.
-  - **cubic** `g(d) = a0[league] + a1·d + a2·d² + a3·d³`; strength `a1·d + a3·d³`, home field
-    `a0[league] + a2·d²`. `d` is clamped to the cubic's monotone range so extreme mismatches plateau.
-  - **logistic** `margin = 2/(1 + 10^(−(d + hfa[league])/scale)) − 1` (the ClubElo Elo equation): a fixed
-    shape with just a global `scale` and a per-league home shift `hfa` (in elo points) fitted; strength is
-    the same formula at `hfa=0`, home field is the remainder. It saturates toward ±1 (no clamping needed),
-    matches the cubic's accuracy with fewer parameters, and its home-field term shrinks for lopsided
-    matches. The `*rr` vs `*mr` `hfa` gap is the market's per-league home-advantage mispricing (it
-    underprices spain's fortress, overprices italy's/france's weak home edge); the logistic `scale` is
-    near-identical for `rr` and `mr`, so the market reads elo strength at the right steepness and errs
-    only on the home shift.
-
-### `match_team_fatigue`
-
-One row per match, wide format. Schedule density for both teams, computed on each team's
-**full fixture calendar** — the domestic league plus every cup it played: domestic cups
-(`07_domestic`), European cups incl. qualifying (`06_europe`), domestic and UEFA super cups,
-and the FIFA club competitions (`08_intl`). Non-league fixtures enter the calendar as history
-only; they are never rows of the table.
-
-Fixtures are described on two orthogonal axes, each of which partitions the calendar, so
-either family sums to the total:
-
-- **venue** — `home` / `domestic` (away in the team's own country, or a neutral venue inside
-  it: Wembley, La Cartuja, the Olimpico, Berlin, the Stade de France) / `abroad` (a trip out
-  of the country). Roughly nine in ten `abroad` fixtures are European away legs; the rest are
-  super cups and FIFA competitions, so the column reads as "played a serious match out of the
-  country".
-- **stream** — `league` / `europe` (CL / EL / Conference incl. qualifying) / `other`
-  (domestic cups, domestic and UEFA super cups, FIFA club competitions).
-
-The full venue × stream grid is *not* carried as features — several of its cells hold a few
-dozen rows across four seasons — but `team_calendar.parquet`, written alongside the table,
-keeps it in a `cell` column. No competition carries a weight: the parts are counted separately
-so their relative cost is estimated downstream instead of asserted here.
-
-- `{side}_hours_since_{n}_match` for `n` in `last, 2nd_last, 3rd_last` — hours since that
-  team's previous fixture in any competition, since the one before it, and since the one
-  before that. Kick-offs are normalised to CET first (football-data prints UK times, FBref
-  prints venue-local with CET in brackets). Each depth is capped at the 95th percentile of
-  its own distribution rather than a hand-set hour count, because each spans one more fixture
-  than the last and so lives on its own scale — 340 / 530 / 714 hours on the current data,
-  recorded in `thresholds.json`. Past the cap the gap is a break or a postponement and the
-  number stops describing recovery
-- `{side}_hours_since_{n}_match_cat2q` / `_cat3q` — median split and tertiles of each gap,
-  cut on the pooled hmt + awt values across all seasons (thresholds in `thresholds.json`),
-  same convention as `elo_cat3q`. `q` rather than the `m` of `cat2m` because the two-way
-  split is the median, not the mean. The p95 cap sits above p67 at every depth, so the
-  capped tail is all `high` and the boundaries below it are untouched
-- `{side}_games_in_{x}d`, `{side}_{venue}_games_in_{x}d`, `{side}_{stream}_games_in_{x}d` —
-  fixtures in the `x` days before kick-off, in total and split along each axis; windows
-  `8, 15, 45` days
-- `{side}_games_load_{tau}d` / `{side}_games_load_gauss_{tau}d` (and their per-axis versions) —
-  the same fixtures under a smooth kernel instead of a hard window. Each earlier fixture of the
-  season contributes `exp(−(age_in_days / tau)^k)`, so nothing is dropped and nothing counts in
-  full. `k = 1` (exponential) at `tau = 7, 14` — recent congestion and a chronic season load;
-  `k = 2` (gaussian) at `tau = 4, 7` — flat for the first days then falling away sharply, which
-  separates 3 / 4 / 5 days of rest where the exponential barely does
-- `{side}_last_match_is_away`, `{side}_last_match_is_europe`, `{side}_last_match_is_abroad` —
-  attributes of the previous fixture, whatever competition it was
-
-Every backward window is half-open (`[kick-off − x days, kick-off)`), so the current match is
-never counted, and is truncated at the season start.
-
-### `match_target`
-
-Targets prefixed `t_`:
-- `t_home_goals`, `t_away_goals`, `t_result`
-- `t_home_flg`, `t_draw_flg`, `t_away_flg`
-- `t_flg_diff` — signed result: 1 home / 0 draw / −1 away (`t_home_flg − t_away_flg`)
-- `t_goals_diff`, `t_goals_total`
-- `t_home_profit`, `t_draw_profit`, `t_away_profit` — profit from a unit stake on that outcome at mrkt odds (win: `1 - impl`; lose: `-impl`)
-
-### ABT (`01_data/03_abt/abt.parquet`)
-
-Wide join of all five tables on `match_id`. ~7 000 rows, ~700 columns.
-Full table always generated; filter by league/season/phase/game_number downstream.
+- **`match_info`**: context and market. Dates, gameweeks and season phases, counters relative to
+  international breaks, kick-off time, promoted and top-3 flags, travel distance, Club Elo ratings,
+  and odds, implied probabilities and margins for both the pre-closing and closing lines.
+- **`match_team_stats`**: each team's form before the match, over three windows (`season`,
+  `rolling6`, `rolling8`). Goals, shots, xG, points, result ratios and market-implied points, with
+  home-only and away-only splits for the venue each team plays at.
+- **`match_matchup_stats`**: the two teams compared. Home minus away (`_diff`) and home plus away
+  (`_total`) for every form metric, Elo mapped to an expected result margin, and the fatigue
+  columns combined per match.
+- **`match_team_fatigue`**: schedule density on each team's full calendar, cups included. Hours since
+  the last three fixtures, fixture counts over 8, 15 and 45 days, and smoothly decaying loads, each
+  split by venue (home / domestic / abroad) and competition (league / europe / other).
+- **`match_target`**: the outcomes, prefixed `t_`. Goals, result, outcome flags, goal difference and
+  total, and the profit of a unit bet on each outcome.
 
 ---
 
-## Home/away feature spaces
+## Models
 
-A `home_away_feature_space` is a named bundle of symmetric ABT columns describing the
-home and away team — a name plus a list of ABT columns (`home`, `away`, and optionally
-derived columns like `draw_impl`). No transformation happens inside a space; input
-columns are transformed beforehand. Two registries sit on top: a catalogue of existing
-spaces (`goals_foragst`, `shots_on_target_foragst`, `points`, `elo`, `impl`, …) and a
-log of models built on them. Full description:
-[`06_docs/spaces.md`](06_docs/spaces.md).
+A model is built from **spaces**, groups of ABT columns that belong together by content and describe
+both teams the same way, such as `goals_foragst`, `points`, `xg` or `elo`. Form spaces also come in
+rolling versions (`_r6`, `_r8`). Single variables outside any space can be added as `extra`. The
+registry is `02_src/models/spaces.py`, described in [`spaces_spec.md`](06_docs/spaces_spec.md).
 
----
+- A **model** is a data record, not code: `04_models/<name>/params.yaml` holds the target, the league
+  set, the spaces, the extra variables, the estimator name and its hyperparameters. Its identity
+  renders as a slug like `draw-major-goals_foragst+points-xgb-d5b3b3`, where the final hash stands for
+  the extra variables. A model that looks promising also gets a human name (e.g. Sybilla).
+- A **run** is one model trained on specific seasons under the fold protocol. It is saved to
+  `runs/<run-id>/` with a frozen snapshot of the definition, the out-of-fold predictions and the
+  headline metrics, so it can be reloaded without retraining.
+- A **report** is a view over a saved run. The tearsheet comes in a technical variant
+  (`render_tearsheet`) and a plain-language one (`render_simple`).
 
-## Model-check framework
+```python
+from models import registry
+from models.run import run
+from models.store import save_run, load_run
 
-Betting strategies are validated by the model-check framework in
-[`02_src/evaluation/model_check.py`](02_src/evaluation/model_check.py) — the source of truth for the
-protocol (no versioned spec). A check is: filter the ABT → segment the matches → fit a bet-signal
-model (train only, per fold) → bet where the model beats the market → score, then pass three
-robustness gates (LOSO time, drop-best-league, walk-forward floor). Each `model_checks/` notebook
-supplies only the changing parts — the **space**, **target**, **segmenter** and **model** — in
-dedicated cells; the folds, gates and registry write come from the framework. The protocol is
-space-independent (works on any feature set). Full description:
-[`06_docs/model_check.md`](06_docs/model_check.md).
-
----
-
-## Two ways to stake a portfolio
-
-Once a model selects which matches to bet, there are two distinct ways to size those
-bets — and they answer two different questions. The project uses both, deliberately, and
-they should never be conflated.
-
-**Proportional (implied) staking — "is there an edge, and where?"**
-Every bet stakes an amount proportional to the market's implied probability. Exposure per bet is
-fixed and the current bankroll is ignored, so the result is **scale-independent**: the headline
-number is ROI / yield — profit per unit staked. This is the right lens for *measuring the edge
-itself* and for comparing decisions like the bet threshold (buffer), because it isolates selection
-quality from the path-dependent luck of when wins and losses arrive.
-
-**Kelly on a bankroll — "what would the money actually do?"**
-Each bet stakes a fraction of the **current** bankroll, where the fraction comes from the Kelly
-formula and grows or shrinks with both wealth and the probability edge (usually run at a
-conservative fraction — half- or quarter-Kelly). The bankroll compounds, so this is
-**path-dependent**: order matters, drawdowns are real, and the output is a capital trajectory, not
-a single yield. This is the right lens for *the realistic money story* and for judging survival
-(drawdown, risk of ruin).
-
-A subtlety that ties the two together: the probability fed into Kelly need not be the model's raw
-`p`. Because the model is a good *selector* but not necessarily well *calibrated*, staking can use
-a recalibrated estimate — e.g. the market price scaled by the measured edge, `implied × (1 + ROI)` —
-so selection stays with the model while sizing rests on the more trustworthy, aggregate edge.
-
-Rule of thumb: use **proportional staking to prove and tune the edge**, and **Kelly-on-bankroll to
-show and stress-test the capital**.
-
----
-
-## Setup
-
-```bash
-pip install -e .
+r = run(registry.get("Sybilla"))
+run_dir = save_run(r)
+r = load_run(run_dir)
 ```
 
-Required once after cloning. Installs the `02_src/` package in editable mode so
-notebooks can import directly: `from features.match_info import build_match_info`,
-`from evaluation.portfolio import portfolio_roi`, etc.
+Details: [`models_spec.md`](06_docs/models_spec.md) and [`tearsheet_spec.md`](06_docs/tearsheet_spec.md).
 
 ---
 
-## Rebuild pipeline
+## Evaluation
 
-```bash
-python build_abt.py               # rebuild the pipeline (default: the top-5 'major' set)
-python build_abt.py --group NAME  # rebuild a different league set (as named in league_sets.yaml)
-python build_abt.py --skip-raw    # skip match_raw_stats (when raw CSVs are unchanged)
-```
+A run evaluates a model with leave-one-season-out folds: each season is predicted by a model trained
+on the other seasons, so every prediction is out of sample. The model bets where its probability
+beats the market price by more than a buffer. Unless given, the buffer is picked from the profit curve
+on every season except the newest, which stays out as a holdout. The p-value tests the result against
+the devigged market probability.
 
-`build_abt.py` in the project root runs all builders in dependency order for one league
-group and prints timing for each step. The pipeline is parameterized by league set. Raw data
-is stored per league (`01_data/01_raw/01_matches/<league>/` and likewise for `02_attributes`,
-`04_elo`, `05_xg`); `01_data/league_sets.yaml` names which leagues a set is built from, and the
-set writes to `01_data/02_features/<set>/` and `01_data/03_abt/<set>/`. A new set is a new entry
-in that file, not a new folder tree. Only the top-5 `major` set is active for now. Use `--skip-raw`
-when the source CSVs have not changed.
+Bets are sized in two ways, and they answer different questions:
 
-Or use `03_notebooks/template.ipynb` to load all tables directly.
+- **Proportional staking** stakes in proportion to the implied probability and ignores the bankroll.
+  The result is a yield, independent of scale and of the order of bets. This is the lens for proving
+  and tuning the edge.
+- **Kelly on a bankroll** stakes a fraction of the current bankroll, so it compounds and depends on
+  the order of bets. The output is a capital path with real drawdowns. This is the lens for what the
+  money would actually do.
 
 ---
 
-## Known data quality issues
+## Documentation
 
-See `06_docs/01_raw/comments.txt` for full notes. Key issues:
+| File | Contents |
+|------|----------|
+| [`data.yaml`](06_docs/data.yaml) | the data contract: every table and column |
+| [`models_spec.md`](06_docs/models_spec.md) | models, runs and how they are stored |
+| [`tearsheet_spec.md`](06_docs/tearsheet_spec.md) | the model report |
+| [`spaces_spec.md`](06_docs/spaces_spec.md) | feature spaces: what they are and which exist |
+| [`decisions.md`](06_docs/decisions.md) | the few design decisions worth their reasons |
+| [`journal.md`](06_docs/journal.md) | working journal |
+| [`01_raw/`](06_docs/01_raw/) | notes on raw data quality |
 
-- **germany_2425**: one match (Union Berlin vs Bochum, 14/12/2024) has NaN for all
-  shot/corner/card stats. Propagates as NaN in rolling windows for both clubs for
-  several subsequent matches. Left as-is.
-- **france_2526**: 305 matches instead of 306 — Nantes vs Toulouse abandoned mid-match.
+---
+
+## Known data issues
+
+Full notes in `06_docs/01_raw/comments.txt`.
+
+- **germany_2425**: Union Berlin vs Bochum (14/12/2024) has no shot, corner or card stats. Rolling
+  averages skip the missing value, so the only effect is a NaN `red_last_match` in the next match of
+  both clubs.
+- **france_2526**: 305 matches instead of 306. Nantes vs Toulouse was abandoned on the final matchday.
