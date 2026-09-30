@@ -57,6 +57,15 @@ for identity and the chosen buffer). Derivation happens as late as it is cheap:
 So persistence freezes the register plus the scalar summary. The report derives static specs from the
 register. The browser does only the interactive re-aggregation.
 
+## Variants
+
+The report comes in two variants that share all computation, panels and styling and differ only in
+prose and section order. `reporting.tearsheet.render_technical` is the default, concise and precise
+for a specialist. `reporting.tearsheet_simple.render_simple` is the plain-language, story-first
+version for a non-specialist: it explains each chart in visible text (there is no hover on a phone),
+spells out a glossary of the scoreboard, and reorders the sections as a story. A run can be rendered
+in either and saved side by side as `report-technical.html` and `report-simple.html`.
+
 ## Report structure
 
 Sections, in order: Intro, Overview, Profitability, Calibration, Edge, Bankroll, Bets.

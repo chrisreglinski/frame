@@ -543,3 +543,8 @@ def render_tearsheet(run, variables=None, hyperparameters=None):
 
     return (f"<title>{model.name}</title>\n<style>{CSS}</style>\n{body}\n"
             f"<script>{engine}</script>\n")
+
+
+# The default report is the technical variant. The plain-language variant lives in
+# reporting.tearsheet_simple.render_simple and reuses the machinery in this module.
+render_technical = render_tearsheet
