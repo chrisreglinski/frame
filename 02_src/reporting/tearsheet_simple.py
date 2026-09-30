@@ -200,7 +200,7 @@ def render_simple(run, variables=None, hyperparameters=None):
         "'Archivo','Helvetica Neue',Arial,sans-serif")
 
     body = f"""<div class="wrap" lang="en">
-<p class="eyebrow">model · tearsheet · plain language</p>
+<p class="eyebrow">model · tearsheet</p>
 <h1>{run.model.name} - finding value in football draw bets</h1>
 {ts._chapter("01", "What this is", intro)}
 {ch_overview}
