@@ -60,7 +60,9 @@ and the results come from a different process.
 
 Columns that depend on a source with limited reach (xG, Elo, travel distance) are scoped with
 `leagues:` in the contract. A set built from other leagues does not get them at all, rather than
-getting them empty. `01_data/01_raw/04_elo/README.md` explains the Club Elo pull and its gaps.
+getting them empty. Source folders carry their own notes:
+[`01_matches/README.md`](01_data/01_raw/01_matches/README.md) for the football-data files and their
+known issues, [`04_elo/README.md`](01_data/01_raw/04_elo/README.md) for the Club Elo pull and its gaps.
 
 ---
 
@@ -200,15 +202,10 @@ Bets are sized in two ways, and they answer different questions:
 | [`spaces_spec.md`](06_docs/spaces_spec.md) | feature spaces: what they are and which exist |
 | [`decisions.md`](06_docs/decisions.md) | the few design decisions worth their reasons |
 | [`journal.md`](06_docs/journal.md) | working journal |
-| [`01_raw/`](06_docs/01_raw/) | notes on raw data quality |
 
 ---
 
 ## Known data issues
 
-Full notes in `06_docs/01_raw/comments.txt`.
-
-- **germany_2425**: Union Berlin vs Bochum (14/12/2024) has no shot, corner or card stats. Rolling
-  averages skip the missing value, so the only effect is a NaN `red_last_match` in the next match of
-  both clubs.
-- **france_2526**: 305 matches instead of 306. Nantes vs Toulouse was abandoned on the final matchday.
+Listed per league in [`01_matches/README.md`](01_data/01_raw/01_matches/README.md). The `major` set
+has two: one Bundesliga match without stats and one abandoned Ligue 1 match.
