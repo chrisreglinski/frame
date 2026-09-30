@@ -45,3 +45,27 @@ def kelly_bankroll(bets, roi, start=100.0, kelly_fraction=1.0, max_fraction=1.0,
     curve["peak"] = curve["bankroll"].cummax()
     curve["drawdown"] = curve["bankroll"] / curve["peak"] - 1.0
     return curve
+
+
+def bankroll_stats(bets, roi, start=100.0, kelly_fraction=1.0, max_fraction=1.0,
+                   implied="implied", outcome="y"):
+    """Kelly-bankroll summary of `bets`, the staking counterpart of stats.portfolio_stats.
+
+    Runs kelly_bankroll with the same arguments and reduces the path to the headline numbers: the
+    starting and final bankroll, the profit, the max drawdown (deepest fall from the running peak, a
+    negative fraction) and the CAGR over the calendar span of the bets. `bets` must already be in the
+    order to stake.
+    """
+    curve = kelly_bankroll(bets, roi, start=start, kelly_fraction=kelly_fraction,
+                           max_fraction=max_fraction, implied=implied, outcome=outcome)
+    final = float(curve["bankroll"].iloc[-1])
+    d0, d1 = pd.Timestamp(curve["date"].iloc[0]), pd.Timestamp(curve["date"].iloc[-1])
+    cagr = (final / start) ** (365.25 / max((d1 - d0).days, 1)) - 1.0
+
+    return pd.Series({
+        "start":        float(start),
+        "final":        final,
+        "profit":       final - start,
+        "max_drawdown": float(curve["drawdown"].min()),
+        "cagr":         cagr,
+    })

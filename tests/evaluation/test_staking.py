@@ -7,7 +7,7 @@ by hand.
 import pandas as pd
 import pytest
 
-from evaluation.staking import kelly_bankroll
+from evaluation.staking import bankroll_stats, kelly_bankroll
 
 
 @pytest.fixture
@@ -68,3 +68,13 @@ def test_max_fraction_caps_the_bet(bets):
     """A rich edge is capped by max_fraction before kelly_fraction scales it."""
     curve = kelly_bankroll(bets, roi=5.0, start=100.0, max_fraction=0.3)
     assert curve.iloc[1]["fraction"] == pytest.approx(0.3)
+
+
+def test_bankroll_stats_summarises_the_path(bets):
+    """Same win-then-loss path: 100 -> 120 -> 96, over 7 days."""
+    s = bankroll_stats(bets, roi=0.2, start=100.0)
+    assert s["start"] == pytest.approx(100.0)
+    assert s["final"] == pytest.approx(96.0)
+    assert s["profit"] == pytest.approx(-4.0)
+    assert s["max_drawdown"] == pytest.approx(-0.2)
+    assert s["cagr"] == pytest.approx(0.96 ** (365.25 / 7) - 1.0)

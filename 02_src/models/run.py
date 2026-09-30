@@ -12,7 +12,7 @@ import pandas as pd
 
 from evaluation.folds import season_folds
 from evaluation.predictions import collect_predictions
-from evaluation.staking import kelly_bankroll
+from evaluation.staking import bankroll_stats
 from evaluation.stats import buffer_curve, pick_buffers, portfolio_stats
 from models import factory
 from models._spec import Model, apply_domain
@@ -91,19 +91,15 @@ def run(model, abt=None, buffer=None, holdout="last", bank_start=100.0, kelly_fr
     bets = preds[preds["model_p"] > preds["implied"] + buffer]
     ps = portfolio_stats(bets, prob="fair")
 
-    bank = kelly_bankroll(bets.sort_values("date"), ps["roi"], start=bank_start,
+    bank = bankroll_stats(bets.sort_values("date"), ps["roi"], start=bank_start,
                           kelly_fraction=kelly_fraction)
-    bank_final = float(bank["bankroll"].iloc[-1])
-    bank_maxdd = float(bank["drawdown"].min())
-    d0, d1 = pd.Timestamp(bank["date"].iloc[0]), pd.Timestamp(bank["date"].iloc[-1])
-    bank_cagr = (bank_final / bank_start) ** (365.25 / max((d1 - d0).days, 1)) - 1.0
 
     metrics = {
         "n_bets": int(ps["n_matches"]), "staked": float(ps["staked"]),
         "wins": float(ps["wins"]), "profit": float(ps["profit"]), "roi": float(ps["roi"]),
         "hit_rate": float(ps["hit_rate"]), "breakeven": float(ps["breakeven"]),
         "p_value": float(ps["p_value"]),
-        "bank_final": bank_final, "bank_maxdd": bank_maxdd, "bank_cagr": bank_cagr,
+        "bank_final": bank["final"], "bank_maxdd": bank["max_drawdown"], "bank_cagr": bank["cagr"],
     }
     return Run(model=model, predictions=preds, buffer=buffer, buffer_name=buffer_name,
                holdout=hold, seasons=seasons, bank_start=bank_start,

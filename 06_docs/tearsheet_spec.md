@@ -27,6 +27,8 @@ Computation lives in `evaluation/` and is format-agnostic (DataFrames and Series
 - `stats.buffer_curve` and `stats.pick_buffers`: profit vs bet threshold, and reference buffers
   (`left`, `middle`, `right`, or a single `peak`) from the smoothed profit curve.
 - `staking.kelly_bankroll`: a compounding Kelly bankroll bet by bet, with running peak and drawdown.
+- `staking.bankroll_stats`: the summary of that bankroll (final, profit, max drawdown, CAGR), the
+  staking counterpart of `portfolio_stats`.
 - `calibration.calibration_overlay`: equal-count reliability buckets of one predictor with a second
   predictor on the same bins.
 
