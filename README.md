@@ -144,10 +144,12 @@ described in [`data.yaml`](06_docs/data.yaml). The summaries below only say what
 
 ## Models
 
-A model is built from **spaces**, groups of ABT columns that belong together by content and describe
-both teams the same way, such as `goals_foragst`, `points`, `xg` or `elo`. Form spaces also come in
-rolling versions (`_r6`, `_r8`). Single variables outside any space can be added as `extra`. The
-registry is `02_src/models/spaces.py`, described in [`spaces_spec.md`](06_docs/spaces_spec.md).
+Model exploration is built around **spaces**: groups of ABT columns that belong together by content
+and describe both teams the same way, such as `goals_foragst`, `points`, `xg` or `elo`. Trying spaces
+and their combinations first shows which families of features carry signal, before any finer
+selection. Form spaces also come in rolling versions (`_r6`, `_r8`). A model can also take single
+variables outside any space, listed as `extra`. The registry is `02_src/models/spaces.py`, described
+in [`spaces_spec.md`](06_docs/spaces_spec.md).
 
 - A **model** is a data record, not code: `04_models/<name>/params.yaml` holds the target, the league
   set, the spaces, the extra variables, the estimator name and its hyperparameters. Its identity
@@ -175,20 +177,28 @@ Details: [`models_spec.md`](06_docs/models_spec.md) and [`tearsheet_spec.md`](06
 
 ## Evaluation
 
-A run evaluates a model with leave-one-season-out folds: each season is predicted by a model trained
-on the other seasons, so every prediction is out of sample. The model bets where its probability
-beats the market price by more than a buffer. Unless given, the buffer is picked from the profit curve
-on every season except the newest, which stays out as a holdout. The p-value tests the result against
-the devigged market probability.
+Classification metrics like accuracy, precision or AUC are not used. The odds already reflect most of
+what is known about a match, so a model can predict well and still lose money. The question is whether
+it beats the odds, and that is measured in money:
 
-Bets are sized in two ways, and they answer different questions:
+| Metric | Key | Meaning |
+|--------|-----|---------|
+| yield | `roi` | profit per unit staked |
+| profit | `profit` | total profit in stake units |
+| p-value | `p_value` | how likely the result is if the model has no edge over the fair market price |
+| max drawdown | `bank_maxdd` | largest fall of the bankroll from its peak |
+| CAGR | `bank_cagr` | annual growth of the bankroll |
 
-- **Proportional staking** stakes in proportion to the implied probability and ignores the bankroll.
-  The result is a yield, independent of scale and of the order of bets. This is the lens for proving
-  and tuning the edge.
-- **Kelly on a bankroll** stakes a fraction of the current bankroll, so it compounds and depends on
-  the order of bets. The output is a capital path with real drawdowns. This is the lens for what the
-  money would actually do.
+Metrics are always computed on out-of-sample predictions. How those are produced (folds, bet
+threshold) is decided per run, see [`models_spec.md`](06_docs/models_spec.md).
+
+The metrics come from two staking modes, which answer different questions:
+
+- **Proportional staking** sizes each bet by the implied probability and ignores the bankroll. The
+  result does not depend on scale or on the order of bets, so it isolates the edge itself: is there
+  one, and how large (`roi`, `profit`, `p_value`).
+- **Kelly on a bankroll** stakes a fraction of the current bankroll, so gains and losses compound and
+  order matters. It shows what the money would actually do (`bank_maxdd`, `bank_cagr`).
 
 ---
 
