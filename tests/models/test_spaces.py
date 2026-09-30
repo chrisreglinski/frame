@@ -3,13 +3,12 @@ import pytest
 
 from models import spaces
 
-# Sybilla's feature set, which must equal goals_foragst + points + anchor.
+# Sybilla's space columns: goals_foragst + points (her extra variable is outside any space).
 SYBILLA = {
     "hmt_season_goals_for_avg", "hmt_season_goals_agst_avg",
     "awt_season_goals_for_avg", "awt_season_goals_agst_avg",
     "hmt_season_points_avg", "awt_season_points_avg",
     "hmt_season_mp_impl_points_avg", "awt_season_mp_impl_points_avg",
-    "mrkt_draw_impl",
 }
 
 
@@ -32,19 +31,18 @@ def test_rolling_suffix_swaps_the_window():
 
 
 def test_fixed_spaces():
-    assert spaces.columns("anchor") == ["mrkt_draw_impl"]
     assert spaces.columns("elo") == ["hmt_elo", "awt_elo"]
 
 
 def test_resolve_reproduces_sybilla():
-    assert set(spaces.resolve(["goals_foragst", "points", "anchor"])) == SYBILLA
+    assert set(spaces.resolve(["goals_foragst", "points"])) == SYBILLA
 
 
 def test_resolve_dedups_and_keeps_order():
-    cols = spaces.resolve(["anchor", "goals_foragst", "anchor"])
-    assert cols[0] == "mrkt_draw_impl"
-    assert cols.count("mrkt_draw_impl") == 1
-    assert len(cols) == 5
+    cols = spaces.resolve(["elo", "goals_foragst", "elo"])
+    assert cols[:2] == ["hmt_elo", "awt_elo"]
+    assert cols.count("hmt_elo") == 1
+    assert len(cols) == 6
 
 
 def test_unknown_space_raises():
@@ -54,4 +52,4 @@ def test_unknown_space_raises():
 
 def test_names_lists_windowed_variants():
     n = spaces.names()
-    assert {"goals_foragst", "goals_foragst_r6", "goals_foragst_r8", "elo", "anchor"} <= set(n)
+    assert {"goals_foragst", "goals_foragst_r6", "goals_foragst_r8", "elo"} <= set(n)

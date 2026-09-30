@@ -1,12 +1,13 @@
-"""Feature spaces: named groups of ABT columns a model is built on.
+"""Feature spaces: groups of ABT columns that belong together by content, for both sides.
 
-A model is defined by a combination of spaces, not a raw column list. Windowed spaces (team form)
-have a base version on the season window and rolling variants suffixed `_r6` / `_r8`. Non-windowed
-spaces (elo, anchor) have a single version. Column names follow the data.yaml contract.
+A model is defined by a combination of spaces, plus optional single variables kept outside them.
+Windowed spaces (team form) have a base version on the season window and rolling variants suffixed
+`_r6` / `_r8`. Non-windowed spaces (elo) have a single version. Column names follow the data.yaml
+contract. See 06_docs/spaces_spec.
 
     columns("goals_foragst")            -> the four season goals for/against columns
     columns("xg_r6")                    -> the four rolling6 xg columns
-    resolve(["goals_foragst", "anchor"]) -> their ordered, de-duplicated union
+    resolve(["goals_foragst", "elo"])   -> their ordered, de-duplicated union
 """
 
 _SIDES = ("hmt", "awt")
@@ -23,8 +24,7 @@ _WINDOWED = {
 
 # Non-windowed spaces: fixed column lists.
 _FIXED = {
-    "elo":    ["hmt_elo", "awt_elo"],
-    "anchor": ["mrkt_draw_impl"],
+    "elo": ["hmt_elo", "awt_elo"],
 }
 
 
@@ -37,7 +37,7 @@ def _split_window(space):
 
 
 def columns(space):
-    """The ABT column names of one space, e.g. 'goals_foragst', 'points_r8', 'anchor'."""
+    """The ABT column names of one space, e.g. 'goals_foragst', 'points_r8', 'elo'."""
     if space in _FIXED:
         return list(_FIXED[space])
     base, window = _split_window(space)

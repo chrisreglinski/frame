@@ -9,7 +9,7 @@ from models.run import Run
 
 def a_model():
     return Model(
-        name="Sybilla", slug="draw-major-goals_foragst+points+anchor-xgb",
+        name="Sybilla", slug="draw-major-goals_foragst-xgb",
         tagline="a toy", method="XGBoost", target="t_draw_flg", implied="mrkt_draw_impl",
         domain=Domain(gameweek_min=8, leagues="major"),
         spaces=["goals_foragst"], features=["hmt_season_goals_for_avg", "awt_season_goals_for_avg"],
@@ -37,7 +37,9 @@ def test_save_params_writes_spaces_not_features(tmp_path):
     assert params["spaces"] == ["goals_foragst"]
     assert params["estimator"] == "xgb"
     assert params["domain"] == {"gameweek_min": 8, "leagues": "major"}
+    assert params["extra"] == []
     assert "features" not in params            # features are derived from spaces on load
+    assert "slug" not in params                # so is the slug
 
 
 def test_run_id_is_span_plus_hash():

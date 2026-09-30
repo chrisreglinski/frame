@@ -15,11 +15,10 @@ Where the two overlap, this document is the authority on models and the report d
 
 ## Spaces
 
-A space is a named, coherent group of feature columns (goals for and against, actual and implied
-points, xG, elo, and the market draw anchor as its own space). Models are built on spaces and their
-combinations, not on hand-picked columns. Spaces are defined once, derived from the data contract in
-`06_docs/data.yaml`, so a space is a named subset of contract columns. Exploration is space-centric:
-you check how a space, and combinations of spaces, perform, rather than picking variables ad hoc.
+A space is a defined group of dimensions that belong together by content (goals for and against for
+both sides, actual and implied points, xG, elo). Models are built on spaces and their combinations
+by default, and may add single variables outside any space as `extra`. Spaces are a named subset of
+contract columns. The full definition and the catalogue are in spaces_spec.
 
 ## Model definition
 
@@ -28,6 +27,7 @@ A model is a data record, not code. `04_models/<name|slug>/params.yaml` holds:
 - **target**: the outcome column (e.g. draw),
 - **domain**: leagues (a set from `01_data/league_sets.yaml`) and the gameweek-min filter,
 - **spaces**: the feature spaces the model uses,
+- **extra**: single variables outside any space (optional),
 - **estimator**: a name resolved by a factory,
 - **hyperparameters**: the canonical set (from the winning run),
 - **canonical_run**: the run-id whose settings are canonical.
@@ -41,13 +41,18 @@ type, `run`, the save layer, and the index view. No individual model lives in co
 
 ## Identity and naming
 
-A model's identity is target + leagues + spaces + estimator. Not the hyperparameters, and not the
-gameweek filter, which is near-constant and lives in the file. The identity renders as a web-style
-slug:
+A model's identity is target + leagues + spaces + extra variables + estimator. Not the
+hyperparameters, and not the gameweek filter, which is near-constant and lives in the file. The
+identity renders as a web-style slug, computed from these fields on load rather than written by hand:
 
-`draw-major-goals_foragst+points+anchor-xgb`
+`draw-major-goals_foragst+points-xgb` (spaces only)
 
-`-` separates the parts, `+` joins spaces. A model may also get a human name (Sybilla), which takes
+`draw-major-goals_foragst+points-xgb-d5b3b3` (with extra variables)
+
+`-` separates the parts, `+` joins spaces. The target part is the target column without its `t_`
+prefix and `_flg` suffix. Extra variables appear as a six-character hash of their sorted list, like
+the hash in a run-id: the slug only signals that there are extras and tells two sets apart, while the
+list itself is in `params.yaml` and in every run's snapshot. A model may also get a human name (Sybilla), which takes
 precedence over the slug in file and folder names: the on-disk name is coalesce(name, slug). A human
 name marks a promising model, its absence marks one reviewed but not promoted.
 

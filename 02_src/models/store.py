@@ -40,13 +40,13 @@ def run_id(run):
 
 
 def save_params(model, root=ROOT):
-    """Write the model's authored definition to params.yaml. Stores the spaces, not the resolved
-    features, since features are derived from the spaces on load."""
+    """Write the model's authored definition to params.yaml. Stores the spaces and extra variables,
+    not the resolved features or the slug, since both are derived on load."""
     params = {
-        "name": model.name, "slug": model.slug, "tagline": model.tagline, "method": model.method,
+        "name": model.name, "tagline": model.tagline, "method": model.method,
         "target": model.target, "implied": model.implied,
         "domain": {"gameweek_min": model.domain.gameweek_min, "leagues": model.domain.leagues},
-        "spaces": list(model.spaces), "estimator": model.estimator,
+        "spaces": list(model.spaces), "extra": list(model.extra), "estimator": model.estimator,
         "hyperparams": dict(model.hyperparams),
     }
     d = model_dir(model, root)
