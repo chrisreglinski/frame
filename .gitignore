@@ -1,0 +1,55 @@
+# Generated data — rebuild with builders
+01_data/01_raw/match_raw_stats.csv
+01_data/01_raw/match_raw_stats.parquet
+01_data/02_features/*
+!01_data/02_features/.gitkeep
+01_data/03_abt/*
+!01_data/03_abt/.gitkeep
+
+# Models
+04_models/*
+!04_models/.gitkeep
+
+# Exploration bookkeeping — local only. model_check.py imports this, so a fresh clone
+# needs it copied in before run_check() works.
+02_src/evaluation/results_registry.py
+03_notebooks/model_checks/results.md
+
+# Model-check protocol notes: a loose working idea, not a fixed spec
+06_docs/model_check.md
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env
+
+# Notebooks — only template is tracked; push others explicitly when needed
+03_notebooks/*.ipynb
+!03_notebooks/template.ipynb
+!03_notebooks/t_goals_diff_corrs_and_LR.ipynb
+!03_notebooks/t_draw_flg_corrs_and_LR.ipynb
+!03_notebooks/market_calibration.ipynb
+!03_notebooks/market_impl_scatter_groups.ipynb
+!03_notebooks/goals_foragst_scatter_groups.ipynb
+!03_notebooks/shots_on_target_foragst_scatter_groups.ipynb
+!03_notebooks/goals_totaldiff_scatter_groups.ipynb
+!03_notebooks/shots_on_target_totaldiff_scatter_groups.ipynb
+!03_notebooks/matchup_goals_shots_on_target_scatter_groups.ipynb
+.ipynb_checkpoints/
+
+# Reports
+05_reports/*
+!05_reports/.gitkeep
+
+# Personal notes
+07_notes/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local project instructions
+CLAUDE.md

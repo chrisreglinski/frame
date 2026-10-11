@@ -1,0 +1,1263 @@
+schema_version: 1
+float_precision: 3
+
+ids:
+
+  match_id:
+    description: "match identifier"
+    built_from: [league, season, hmt_name, awt_name]
+    rule: "md5(league|season|hmt_name|awt_name)"
+    dtype: string
+
+tables:
+
+  match_info:
+    id: match_id
+    source: [raw/matches, raw/attributes]
+
+  match_target:
+    id: match_id
+    source: raw/matches
+
+  team_stats:
+    id: match_id
+    source: [raw/matches, raw/xg]
+    note: "one row per match; team statistics as home_/away_ dimensioned
+           features. all stats computed from matches strictly BEFORE the
+           match date (current match excluded). first matches carry NaN stats.
+           xg metrics are sourced from Understat and exist only where Understat
+           covers the league (major group); NaN elsewhere."
+
+  match_matchup_stats:
+    id: match_id
+    source: features/team_stats
+    note: "one row per match; comparative features derived from team_stats
+           home_/away_ columns. windowing follows team_stats."
+
+  match_team_fatigue:
+    id: match_id
+    source: [raw/matches, raw/domestic, raw/europe, raw/intl]
+    note: "one row per match; schedule-density features for both teams, computed on each
+           team's full fixture calendar: domestic league, domestic cups, european cups and
+           super / intercontinental cups. non-league fixtures enter the calendar as history
+           only and are never rows of this table. every backward window excludes the current
+           match and is truncated at the season start."
+
+columns:
+
+  league:
+    table: match_info
+    description: "league (england, spain, italy, germany, france)"
+    dtype: string
+
+  season:
+    table: match_info
+    description: "season, e.g. '2223'"
+    dtype: string
+
+  hmt_name:
+    table: match_info
+    description: "home team"
+    inputs: [HomeTeam]
+    dtype: string
+
+  awt_name:
+    table: match_info
+    description: "away team"
+    inputs: [AwayTeam]
+    dtype: string
+
+  date:
+    table: match_info
+    description: "match date"
+    inputs: [Date]
+    dtype: date
+
+  time:
+    table: match_info
+    description: "kick-off time"
+    inputs: [Time]
+    dtype: string
+
+  time_uk_num:
+    table: match_info
+    description: "kick-off time (UK) as a number: hour + minute/60 (e.g. 19:45 -> 19.75)"
+    inputs: [Time]
+    dtype: float
+    range: [11, 23]
+
+  time_uk_cat:
+    table: match_info
+    description: "kick-off time (UK) bucketed by floor(hour): early (11-13), early_afternoon (14-15), late_afternoon (16-17), evening (18+)"
+    inputs: [Time]
+    dtype: string
+    categories: [early, early_afternoon, late_afternoon, evening]
+
+  day_of_week:
+    table: match_info
+    description: "day of week of the match"
+    inputs: [Date]
+    dtype: string
+
+  day_of_week_cat:
+    table: match_info
+    description: "day_of_week grouped: weekend (sat/sun), shoulder (fri/mon), midweek (tue/wed/thu)"
+    dtype: string
+    categories: [weekend, shoulder, midweek]
+
+  season_game_number:
+    table: match_info
+    description: "sequential match number in the league-season (1 = first match of the season)"
+    dtype: int
+    range: [1, 552]
+
+  season_game_number_before_end:
+    table: match_info
+    description: "season_game_number counted backwards to the end of the season, the same way season_game_number_before_break counts back to the next break: -1 = last match of the season, down to -N for the first (N = full-season match count = n_teams*(n_teams-1)); a skipped match leaves the last match at -2 (e.g. france 2526, 305/306)"
+    dtype: int
+    range: [-552, -1]
+
+  gameweek:
+    table: match_info
+    description: "gameweek number; derived as ceil(season_game_number / (n_teams/2)) where n_teams is counted per league-season"
+    dtype: int
+    range: [1, 46]
+
+  gameweek_before_end:
+    table: match_info
+    description: "gameweek counted backwards to the end of the season: -1 = last gameweek, down to -G for the first (G = full-season gameweek count = 2*(n_teams-1))"
+    dtype: int
+    range: [-46, -1]
+
+  season_4phase:
+    table: match_info
+    description: "season phase (4 levels) based on international breaks; boundaries from 01_data/01_raw/03_dates/season_limit_dates.csv"
+    dtype: string
+    categories: [summer, fall, winter, spring]
+
+  season_3phase:
+    table: match_info
+    description: "season phase (3 levels): start=summer, mid=fall+winter, end=spring"
+    dtype: string
+    categories: [start, mid, end]
+
+  season_game_number_after_break:
+    table: match_info
+    description: "the league-season's matches counted from the last break in which every league of the group stopped: 1 = the first match the league played after it. The league-season counterpart of {side}_game_number_after_break, in the same relation as season_game_number to {side}_game_number. Unlike gameweek it does not give a whole round one value, so the friday match of a restart round is 1 and the monday one is 10. Empty before the season's first break"
+    dtype: int
+
+  season_game_number_before_break:
+    table: match_info
+    description: "the same league-season count taken backwards to the next break: -1 = the last match the league played before it. Empty after the season's last break"
+    dtype: int
+
+  gameweek_after_break:
+    table: match_info
+    description: "season_game_number_after_break bucketed into rounds the same way gameweek buckets season_game_number: ceil over half the team count. 1 = the league's first round back after the break. As with gameweek a bucket is not guaranteed to be a real round, because rescheduling moves matches between them. Empty before the season's first break"
+    dtype: int
+
+  gameweek_before_break:
+    table: match_info
+    description: "the same bucketing taken backwards to the next break: -1 = the league's last round before it. Empty after the season's last break"
+    dtype: int
+
+  "{side}_game_number_after_break":
+    table: match_info
+    description: "the {side} team's league matches counted from the last break in which every league of the group stopped: 1 = the first match after it. Break windows are hand-recorded in 01_data/01_raw/03_dates/break_dates.csv. Counted per team, not per gameweek, because a rescheduled fixture can leave two teams in one gameweek with different counts. Empty before the season's first break. A league-specific pause (the winter break, which england plays through) is not a break here, and neither is the gap between seasons"
+    dims:
+      side: [hmt, awt]
+    dtype: int
+
+  "{side}_game_number_before_break":
+    table: match_info
+    description: "the same count taken backwards to the next break: -1 = the {side} team's last league match before it, -2 the one before that. Empty after the season's last break"
+    dims:
+      side: [hmt, awt]
+    dtype: int
+
+  hmt_is_promoted:
+    table: match_info
+    description: "home team promoted to the league this season"
+    inputs: [Promotee]
+    dtype: bool
+
+  awt_is_promoted:
+    table: match_info
+    description: "away team promoted to the league this season"
+    inputs: [Promotee]
+    dtype: bool
+
+  hmt_is_top3_last:
+    table: match_info
+    leagues: [england, spain, italy, france, germany, netherlands, portugal]
+    description: "home team finished top 3 in this league last season (reigning top-3, analogous to promoted for the previous season's best). Top-tier leagues only. Seeded from external final tables for the earliest season; agrees with team_season_final rankings for all later seasons"
+    inputs: [Top3Last]
+    dtype: bool
+
+  awt_is_top3_last:
+    table: match_info
+    leagues: [england, spain, italy, france, germany, netherlands, portugal]
+    description: "away team finished top 3 in this league last season (reigning top-3, analogous to promoted for the previous season's best). Top-tier leagues only. Seeded from external final tables for the earliest season; agrees with team_season_final rankings for all later seasons"
+    inputs: [Top3Last]
+    dtype: bool
+
+  hmt_is_relegated:
+    table: match_info
+    leagues: [england2, spain2, italy2, france2, germany2]
+    description: "home team was relegated from the tier above into this league this season (second-tier leagues only; the second-tier analogue of is_top3_last)"
+    inputs: [Relegated]
+    dtype: bool
+
+  awt_is_relegated:
+    table: match_info
+    leagues: [england2, spain2, italy2, france2, germany2]
+    description: "away team was relegated from the tier above into this league this season (second-tier leagues only; the second-tier analogue of is_top3_last)"
+    inputs: [Relegated]
+    dtype: bool
+
+  hmt_is_island:
+    table: match_info
+    description: "home team is on a geographically isolated island (Canaries/Balearics/Sardinia/Corsica): Las Palmas, Mallorca, Cagliari, Ajaccio"
+    inputs: [Island]
+    dtype: bool
+
+  awt_is_island:
+    table: match_info
+    description: "away team is on a geographically isolated island (Canaries/Balearics/Sardinia/Corsica): Las Palmas, Mallorca, Cagliari, Ajaccio"
+    inputs: [Island]
+    dtype: bool
+
+  travel_distance_km:
+    table: match_info
+    leagues: [england, spain, italy, france, germany]
+    description: "haversine distance between home and away team stadiums. Stadium coordinates are only filled in for the top five leagues, so the column exists for those leagues alone"
+    inputs: [Latitude, Longitude]
+    dtype: float
+    range: [0, 4000]
+
+  travel_distance_cat:
+    table: match_info
+    leagues: [england, spain, italy, france, germany]
+    description: "travel_distance_km bucketed: derby (<30, city rivalries), regional (30-100, neighbouring cities same region), domestic (100-500, coach / high-speed rail incl. Barcelona-Real 499km AVE), long_haul (500+, flight territory)"
+    inputs: [Latitude, Longitude]
+    dtype: string
+    categories: [derby, regional, domestic, long_haul]
+
+  "{side}_elo":
+    table: match_info
+    leagues: [england, spain, italy, france, germany]
+    description: "Club Elo rating of the {side} team as of the match date (pre-match: the last published point strictly before the match, since clubelo dates a rating to the day of the match it follows; from clubelo.com via 04_elo/{league}/team_map.csv and the per-club series; NaN if the team has no clubelo page or no earlier point)"
+    dims:
+      side: [hmt, awt]
+    dtype: float
+    range: [1000, 2200]
+
+  "{side}_elo_cat2m":
+    table: match_info
+    leagues: [england, spain, italy, france, germany]
+    description: "high if {side}_elo > global elo mean (thresholds.json elo_mean), else low; None if elo is NaN"
+    dims:
+      side: [hmt, awt]
+    dtype: string
+    categories: [high, low]
+
+  "{side}_elo_cat3q":
+    table: match_info
+    leagues: [england, spain, italy, france, germany]
+    description: "tertile of {side}_elo from the pooled per-match elo distribution (thresholds.json elo_p33/p67); None if elo is NaN"
+    dims:
+      side: [hmt, awt]
+    dtype: string
+    categories: [low, medium, high]
+
+  "{side}_golo":
+    table: match_info
+    leagues: [england, spain, italy, france, germany]
+    description: "Club Elo's second rating for the {side} team, published alongside the elo on the same per-club series and joined the same point-in-time way (last point strictly before the match). clubelo.com gives no definition; measured across 95 clubs it correlates +0.75 with goals scored per match and +0.03 with goals conceded, so it reads as a purely attacking rate, opponent-adjusted (Bayern 2.45 against 3.59 goals per match actually scored, Getafe 0.78 against 0.84) - roughly the goals a team would be expected to score against an average opponent. NaN wherever {side}_elo is NaN"
+    dims:
+      side: [hmt, awt]
+    dtype: float
+    range: [0, 5]
+
+  "{bookmaker}_{outcome}_odds":
+    table: match_info
+    description: "odds from {bookmaker} for outcome {outcome}. b365/mrkt are the pre-closing line (football-data non-C columns); b365c/mrktc are the closing (kickoff) line (football-data C columns) — same bookmaker/market with a trailing c. Empty where football-data has no closing price"
+    dims:
+      bookmaker: [b365, mrkt, b365c, mrktc]
+      outcome: [home, draw, away]
+    dtype: float
+    range: [1.01, 100]
+
+  "{bookmaker}_{outcome}_impl":
+    table: match_info
+    description: "implied probability of {outcome} from {bookmaker} odds (1/odds)"
+    dims:
+      bookmaker: [b365, mrkt, b365c, mrktc]
+      outcome: [home, draw, away]
+    dtype: float
+    range: [0, 1]
+
+  "{bookmaker}_margin":
+    table: match_info
+    description: "{bookmaker} overround on HDA market (sum of implied - 1)"
+    dims:
+      bookmaker: [b365, mrkt, b365c, mrktc]
+    dtype: float
+    range: [0, 0.2]
+
+  "{bookmaker}_entropy":
+    table: match_info
+    description: "shannon entropy of normalized {bookmaker} implied probabilities (H/D/A); max = log2(3) ~ 1.585"
+    dims:
+      bookmaker: [b365, mrkt, b365c, mrktc]
+    dtype: float
+    range: [0, 1.585]
+
+  mrkt_favourite:
+    table: match_info
+    description: "team with mrkt normalized implied probability > 50% (home/away/balanced)"
+    dtype: string
+    categories: [home, away, balanced]
+
+  mrkt_impl_order:
+    table: match_info
+    description: "ordering of H/D/A outcomes by mrkt implied probability descending (e.g. hda = home > draw > away)"
+    dtype: string
+    categories: [hda, had, dha, dah, ahd, adh]
+
+  mrkt_favrt_impl:
+    table: match_info
+    description: "mrkt implied probability of the stronger side: max(home_impl, away_impl)"
+    dtype: float
+    range: [0, 1]
+
+  mrkt_undrd_impl:
+    table: match_info
+    description: "mrkt implied probability of the weaker side: min(home_impl, away_impl)"
+    dtype: float
+    range: [0, 1]
+
+  "{bookmaker}_home_away_impl_diff":
+    table: match_info
+    description: "{bookmaker} home implied probability minus away implied probability; positive = home favoured. b365/mrkt pre-closing, b365c/mrktc closing"
+    dims:
+      bookmaker: [b365, mrkt, b365c, mrktc]
+    dtype: float
+    range: [-1, 1]
+
+  "{side}_game_number":
+    table: team_stats
+    description: "sequential match number for the {side} team in the season (1 = first match)"
+    dims:
+      side: [hmt, awt]
+    dtype: int
+    range: [1, 46]
+
+  "{side}_{window}_{metric}_{kind}_avg":
+    table: team_stats
+    description: "arithmetic mean of {metric} {kind} per match over {window}, {side} team"
+    dims:
+      side: [hmt, awt]
+      window: [season, rolling6, rolling8]
+      metric: [goals, shots, shots_on_target, corners, yellow]
+      kind: [for, agst]
+    dtype: float
+
+  "{side}_{window}_xg_{kind}_avg":
+    table: team_stats
+    leagues: [england, spain, italy, france, germany]
+    description: "arithmetic mean of xg {kind} per match over {window}, {side} team. Understat only covers the top five leagues, so the column exists for those leagues alone"
+    dims:
+      side: [hmt, awt]
+      window: [season, rolling6, rolling8]
+      kind: [for, agst]
+    dtype: float
+
+  "hmt_home_{window}_{metric}_{kind}_avg":
+    table: team_stats
+    description: "arithmetic mean of {metric} {kind} per home match over {window}, home team only"
+    dims:
+      window: [season]
+      metric: [goals, shots, shots_on_target]
+      kind: [for, agst]
+    dtype: float
+
+  "awt_away_{window}_{metric}_{kind}_avg":
+    table: team_stats
+    description: "arithmetic mean of {metric} {kind} per away match over {window}, away team only"
+    dims:
+      window: [season]
+      metric: [goals, shots, shots_on_target]
+      kind: [for, agst]
+    dtype: float
+
+  "hmt_home_{window}_{metric}_avg":
+    table: team_stats
+    description: "arithmetic mean of {metric} per home match over {window}, home team only"
+    dims:
+      window: [season]
+      metric: [points, flg_diff, goals_diff, goals_total]
+    dtype: float
+
+  "awt_away_{window}_{metric}_avg":
+    table: team_stats
+    description: "arithmetic mean of {metric} per away match over {window}, away team only"
+    dims:
+      window: [season]
+      metric: [points, flg_diff, goals_diff, goals_total]
+    dtype: float
+
+  "hmt_home_{window}_{result}_ratio":
+    table: team_stats
+    description: "share of home matches with {result} over {window}, home team only"
+    dims:
+      window: [season]
+      result: [wins, draws, losses]
+    dtype: float
+    range: [0, 1]
+
+  "awt_away_{window}_{result}_ratio":
+    table: team_stats
+    description: "share of away matches with {result} over {window}, away team only"
+    dims:
+      window: [season]
+      result: [wins, draws, losses]
+    dtype: float
+    range: [0, 1]
+
+  "hmt_home_{window}_{line}_impl_points_avg":
+    table: team_stats
+    description: "market-expected points per home match over {window}, home team only, on the {line} line (mp pre-closing / mc closing): {line}_impl_win_avg * 3 + {line}_impl_draw_avg"
+    dims:
+      window: [season]
+      line: [mp, mc]
+    dtype: float
+    range: [0, 3]
+
+  "awt_away_{window}_{line}_impl_points_avg":
+    table: team_stats
+    description: "market-expected points per away match over {window}, away team only, on the {line} line (mp pre-closing / mc closing): {line}_impl_win_avg * 3 + {line}_impl_draw_avg"
+    dims:
+      window: [season]
+      line: [mp, mc]
+    dtype: float
+    range: [0, 3]
+
+  "hmt_home_{window}_{line}_impl_diff_avg":
+    table: team_stats
+    description: "market-implied margin per home match over {window}, home team only, on the {line} line (mp pre-closing / mc closing): mean of mrkt_home_away_impl_diff (= impl_win - impl_loss) over home matches; positive = market favours this team at home"
+    dims:
+      window: [season]
+      line: [mp, mc]
+    dtype: float
+    range: [-1, 1]
+
+  "awt_away_{window}_{line}_impl_diff_avg":
+    table: team_stats
+    description: "market-implied margin per away match over {window}, away team only, on the {line} line (mp pre-closing / mc closing): mean of the team-oriented margin (impl_win - impl_loss, = -mrkt_home_away_impl_diff) over away matches; positive = market favours this team away"
+    dims:
+      window: [season]
+      line: [mp, mc]
+    dtype: float
+    range: [-1, 1]
+
+  "hmt_home_{window}_{metric}_avg_adv":
+    table: team_stats
+    description: "home-venue advantage of home team: home {metric} avg minus away {metric} avg over {window} (positive = better at home)"
+    dims:
+      window: [season]
+      metric: [points, mp_impl_points, mc_impl_points, flg_diff, mp_impl_diff, mc_impl_diff]
+    dtype: float
+    range: [-3, 3]
+
+  "awt_away_{window}_{metric}_avg_adv":
+    table: team_stats
+    description: "away-venue advantage of away team: away {metric} avg minus home {metric} avg over {window} (usually negative = disadvantage)"
+    dims:
+      window: [season]
+      metric: [points, mp_impl_points, mc_impl_points, flg_diff, mp_impl_diff, mc_impl_diff]
+    dtype: float
+    range: [-3, 3]
+
+  "{side}_{window}_{metric}_avg":
+    table: team_stats
+    description: "arithmetic mean of {metric} per match over {window}, {side} team. flg_diff is the per-match signed result win_flg - loss_flg (+1/0/-1, same axis as t_flg_diff); its mean equals wins_ratio - losses_ratio and is the realized counterpart of {line}_impl_diff_avg"
+    dims:
+      side: [hmt, awt]
+      window: [season, rolling6, rolling8]
+      metric: [points, flg_diff, goals_diff, goals_total, shots_on_target_diff, shots_on_target_total]
+    dtype: float
+
+  "{side}_{window}_{xg_metric}_avg":
+    table: team_stats
+    leagues: [england, spain, italy, france, germany]
+    description: "arithmetic mean of {xg_metric} per match over {window}, {side} team. Understat only covers the top five leagues, so the column exists for those leagues alone"
+    dims:
+      side: [hmt, awt]
+      window: [season, rolling6, rolling8]
+      xg_metric: [xg_diff, xg_total]
+    dtype: float
+
+  "{side}_{window}_{metric}_std":
+    table: team_stats
+    description: "standard deviation of {metric} per match over {window}, {side} team"
+    dims:
+      side: [hmt, awt]
+      window: [season, rolling6, rolling8]
+      metric: [goals_diff, goals_total, shots_on_target_diff, shots_on_target_total]
+    dtype: float
+
+  "{side}_{window}_{xg_metric}_std":
+    table: team_stats
+    leagues: [england, spain, italy, france, germany]
+    description: "standard deviation of {xg_metric} per match over {window}, {side} team. Understat only covers the top five leagues, so the column exists for those leagues alone"
+    dims:
+      side: [hmt, awt]
+      window: [season, rolling6, rolling8]
+      xg_metric: [xg_diff, xg_total]
+    dtype: float
+
+  "{side}_{window}_{result}_ratio":
+    table: team_stats
+    description: "share of matches with {result} over {window}, {side} team"
+    dims:
+      side: [hmt, awt]
+      window: [season, rolling6, rolling8]
+      result: [wins, draws, losses]
+    dtype: float
+    range: [0, 1]
+
+  "{side}_{window}_goals_total_le{x}_ratio":
+    table: team_stats
+    description: "share of matches with total goals <= {x} over {window}, {side} team"
+    dims:
+      side: [hmt, awt]
+      window: [season, rolling6, rolling8]
+      x: [0, 1, 2, 3, 4]
+    dtype: float
+    range: [0, 1]
+
+  "{side}_{window}_goals_{kind}_le{x}_ratio":
+    table: team_stats
+    description: "share of matches with goals {kind} <= {x} over {window}, {side} team"
+    dims:
+      side: [hmt, awt]
+      window: [season, rolling6, rolling8]
+      kind: [for, agst]
+      x: [0, 1, 2]
+    dtype: float
+    range: [0, 1]
+
+  "{side}_{window}_shots_on_target_{kind}_ratio":
+    table: team_stats
+    description: "cumulative shots on target / cumulative shots ({kind}) over {window}, {side} team"
+    dims:
+      side: [hmt, awt]
+      window: [season, rolling6, rolling8]
+      kind: [for, agst]
+    dtype: float
+    range: [0, 1]
+
+  "{side}_{window}_red_for_avg":
+    table: team_stats
+    description: "average red cards received per match over {window}, {side} team"
+    dims:
+      side: [hmt, awt]
+      window: [season, rolling6, rolling8]
+    dtype: float
+
+  "{side}_red_last_match":
+    table: team_stats
+    description: "{side} team received a red card in its previous match (NaN if no previous match)"
+    dims:
+      side: [hmt, awt]
+    dtype: bool
+
+  "{side}_{window}_{line}_impl_{outcome}_avg":
+    table: team_stats
+    description: "market implied probability of {outcome} for {side} team over {window}, on the {line} line (mp = market pre-closing, mc = market closing; mc empty where no closing price)"
+    dims:
+      side: [hmt, awt]
+      window: [season, rolling6, rolling8]
+      line: [mp, mc]
+      outcome: [win, draw, loss]
+    dtype: float
+    range: [0, 1]
+
+  "{side}_{window}_{line}_impl_points_avg":
+    table: team_stats
+    description: "market-expected points per match over {window} on the {line} line (mp pre-closing / mc closing): {line}_impl_win_avg * 3 + {line}_impl_draw_avg"
+    dims:
+      side: [hmt, awt]
+      window: [season, rolling6, rolling8]
+      line: [mp, mc]
+    dtype: float
+    range: [0, 3]
+
+  "{side}_{window}_{line}_impl_diff_avg":
+    table: team_stats
+    description: "market-implied margin per match over {window} on the {line} line (mp pre-closing / mc closing): {line}_impl_win_avg - {line}_impl_loss_avg. Team-oriented mrkt_home_away_impl_diff (home +, away -; draw cancels, no devig); positive = market favours this team"
+    dims:
+      side: [hmt, awt]
+      window: [season, rolling6, rolling8]
+      line: [mp, mc]
+    dtype: float
+    range: [-1, 1]
+
+  "{side}_season_goals_total_cat2m":
+    table: team_stats
+    description: "high if season_goals_total_avg > global mean (thresholds.json goals_total_mean), else low"
+    dims:
+      side: [hmt, awt]
+    dtype: string
+    categories: [high, low]
+
+  "{side}_season_goals_diff_cat2m":
+    table: team_stats
+    description: "positive if season_goals_diff_avg > 0, else negative"
+    dims:
+      side: [hmt, awt]
+    dtype: string
+    categories: [positive, negative]
+
+  "{side}_season_goals_for_cat2m":
+    table: team_stats
+    description: "high if season_goals_for_avg > global mean (thresholds.json goals_for_mean), else low"
+    dims:
+      side: [hmt, awt]
+    dtype: string
+    categories: [high, low]
+
+  "{side}_season_goals_agst_cat2m":
+    table: team_stats
+    description: "high if season_goals_agst_avg > global mean (thresholds.json goals_agst_mean), else low"
+    dims:
+      side: [hmt, awt]
+    dtype: string
+    categories: [high, low]
+
+  "{side}_season_goals_total_cat3q":
+    table: team_stats
+    description: "tertile of season_goals_total_avg from team_season_final (thresholds.json goals_total_p33/p67)"
+    dims:
+      side: [hmt, awt]
+    dtype: string
+    categories: [low, medium, high]
+
+  "{side}_season_goals_diff_cat3q":
+    table: team_stats
+    description: "tertile of season_goals_diff_avg from team_season_final (thresholds.json goals_diff_p33/p67)"
+    dims:
+      side: [hmt, awt]
+    dtype: string
+    categories: [low, medium, high]
+
+  "{side}_season_goals_for_cat3q":
+    table: team_stats
+    description: "tertile of season_goals_for_avg from team_season_final (thresholds.json goals_for_p33/p67)"
+    dims:
+      side: [hmt, awt]
+    dtype: string
+    categories: [low, medium, high]
+
+  "{side}_season_goals_agst_cat3q":
+    table: team_stats
+    description: "tertile of season_goals_agst_avg from team_season_final (thresholds.json goals_agst_p33/p67)"
+    dims:
+      side: [hmt, awt]
+    dtype: string
+    categories: [low, medium, high]
+
+  "{side}_season_shots_on_target_for_cat2m":
+    table: team_stats
+    description: "high if season_shots_on_target_for_avg > global mean (thresholds.json shots_on_target_foragst_mean), else low"
+    dims:
+      side: [hmt, awt]
+    dtype: string
+    categories: [high, low]
+
+  "{side}_season_shots_on_target_agst_cat2m":
+    table: team_stats
+    description: "high if season_shots_on_target_agst_avg > global mean (thresholds.json shots_on_target_foragst_mean), else low"
+    dims:
+      side: [hmt, awt]
+    dtype: string
+    categories: [high, low]
+
+  "{side}_season_shots_on_target_for_cat3q":
+    table: team_stats
+    description: "tertile of season_shots_on_target_for_avg from team_season_final (thresholds.json shots_on_target_foragst_p33/p67)"
+    dims:
+      side: [hmt, awt]
+    dtype: string
+    categories: [low, medium, high]
+
+  "{side}_season_shots_on_target_agst_cat3q":
+    table: team_stats
+    description: "tertile of season_shots_on_target_agst_avg from team_season_final (thresholds.json shots_on_target_foragst_p33/p67)"
+    dims:
+      side: [hmt, awt]
+    dtype: string
+    categories: [low, medium, high]
+
+  "{side}_season_shots_on_target_total_cat2m":
+    table: team_stats
+    description: "high if season_shots_on_target_total_avg > global mean (thresholds.json shots_on_target_total_mean), else low"
+    dims:
+      side: [hmt, awt]
+    dtype: string
+    categories: [high, low]
+
+  "{side}_season_shots_on_target_diff_cat2m":
+    table: team_stats
+    description: "positive if season_shots_on_target_diff_avg > 0, else negative"
+    dims:
+      side: [hmt, awt]
+    dtype: string
+    categories: [positive, negative]
+
+  "{side}_season_shots_on_target_total_cat3q":
+    table: team_stats
+    description: "tertile of season_shots_on_target_total_avg from team_season_final (thresholds.json shots_on_target_total_p33/p67)"
+    dims:
+      side: [hmt, awt]
+    dtype: string
+    categories: [low, medium, high]
+
+  "{side}_season_shots_on_target_diff_cat3q":
+    table: team_stats
+    description: "tertile of season_shots_on_target_diff_avg from team_season_final (thresholds.json shots_on_target_diff_p33/p67)"
+    dims:
+      side: [hmt, awt]
+    dtype: string
+    categories: [low, medium, high]
+
+
+  "teams_{window}_{metric}_avg_diff":
+    table: match_matchup_stats
+    description: "home {window} {metric} avg minus away {window} {metric} avg; positive = the home team is the stronger / higher-volume side on that metric. metrics that already carry an inner for-agst difference (goals_diff, shots_on_target_diff, flg_diff) give a difference of differences; the per-side scalars (points, impl_points) give a plain one."
+    dims:
+      window: [season, rolling6, rolling8]
+      metric: [points, flg_diff, goals_diff, goals_total, shots_on_target_diff, shots_on_target_total, mp_impl_points, mc_impl_points]
+    dtype: float
+
+  "teams_{window}_{xg_metric}_avg_diff":
+    table: match_matchup_stats
+    leagues: [england, spain, italy, france, germany]
+    description: "home {window} {xg_metric} avg minus away {window} {xg_metric} avg; a difference of differences on xg_diff, a volume tilt on xg_total. Understat only covers the top five leagues, so the column exists for those leagues alone"
+    dims:
+      window: [season, rolling6, rolling8]
+      xg_metric: [xg_diff, xg_total]
+    dtype: float
+
+  "teams_{window}_{metric}_avg_total":
+    table: match_matchup_stats
+    description: "home {window} {metric} avg plus away {window} {metric} avg; the combined level of the matchup on that metric. on the *_total metrics it reads as combined intensity, on the *_diff and scalar ones as combined quality."
+    dims:
+      window: [season, rolling6, rolling8]
+      metric: [points, flg_diff, goals_diff, goals_total, shots_on_target_diff, shots_on_target_total, mp_impl_points, mc_impl_points]
+    dtype: float
+
+  "teams_{window}_{xg_metric}_avg_total":
+    table: match_matchup_stats
+    leagues: [england, spain, italy, france, germany]
+    description: "home {window} {xg_metric} avg plus away {window} {xg_metric} avg; the combined xg level of the matchup. Understat only covers the top five leagues, so the column exists for those leagues alone"
+    dims:
+      window: [season, rolling6, rolling8]
+      xg_metric: [xg_diff, xg_total]
+    dtype: float
+
+  "teams_{window}_goals_foragst_avg_max":
+    table: match_matchup_stats
+    description: "max over the four values: home/away {window} goals for/agst avg; low value = both teams score little and concede little"
+    dims:
+      window: [season, rolling6, rolling8]
+    dtype: float
+
+  "{side}_{window}_goals_foragst_avg_max":
+    table: match_matchup_stats
+    description: "max(goals_for_avg, goals_agst_avg) for {side} team over {window}; measures intensity of play regardless of direction"
+    dims:
+      side: [hmt, awt]
+      window: [season, rolling6, rolling8]
+    dtype: float
+
+  teams_elo_diff:
+    table: match_matchup_stats
+    leagues: [england, spain, italy, france, germany]
+    description: "hmt_elo minus awt_elo; positive = home team higher-rated (matchup strength tilt). NaN if either elo is NaN"
+    dtype: float
+
+  teams_elo_total:
+    table: match_matchup_stats
+    leagues: [england, spain, italy, france, germany]
+    description: "hmt_elo plus awt_elo; overall rating level of the matchup. NaN if either elo is NaN"
+    dtype: float
+
+  teams_golo_diff:
+    table: match_matchup_stats
+    leagues: [england, spain, italy, france, germany]
+    description: "hmt_golo minus awt_golo; positive = the home team is the stronger attacking side. NaN if either golo is NaN"
+    dtype: float
+
+  teams_golo_total:
+    table: match_matchup_stats
+    leagues: [england, spain, italy, france, germany]
+    description: "hmt_golo plus awt_golo; the combined scoring potential of the matchup, the natural over/under axis. NaN if either golo is NaN"
+    dtype: float
+
+  # elo -> home-minus-away margin, 2x2 grid: FORM (c=cubic / l=logistic) x FIT (rr=results / mr=market).
+  # Tag {c,l}{r,m}r: crr/cmr = cubic, lrr/lmr = logistic; *rr fit to outcomes, *mr fit to market price.
+  # Each splits additively into _stgh (strength, odd in d) + _lhfa (league home-field advantage) = _diff.
+  # Coefficients: fixed offline population fit per group in thresholds.json (elo_crr/elo_cmr/elo_lrr/elo_lmr),
+  # not refit per build. All in the same units as mrkt_home_away_impl_diff; all NaN if teams_elo_diff is NaN.
+
+  teams_elo_diff_crr_impl_diff:
+    table: match_matchup_stats
+    leagues: [england, spain, italy, france, germany]
+    description: "elo-implied home-minus-away win-probability margin, CUBIC form fit to RESULTS (crr): expected p_home - p_away from teams_elo_diff and league via g(d) = a0[league] + a1*d + a2*d^2 + a3*d^3 fit to realized outcomes (t_home_flg - t_away_flg); coefficients in thresholds.json as elo_crr. d is clamped to the cubic's monotone range so extreme mismatches plateau instead of hitting the polynomial turnover. Equals teams_elo_diff_crr_impl_stgh + teams_elo_diff_crr_impl_lhfa. NaN if teams_elo_diff is NaN"
+    dtype: float
+
+  teams_elo_diff_crr_impl_stgh:
+    table: match_matchup_stats
+    leagues: [england, spain, italy, france, germany]
+    description: "strength component of teams_elo_diff_crr_impl_diff: the antisymmetric (venue-free) part a1*d + a3*d^3, odd in teams_elo_diff so it flips sign when the teams swap. NaN if teams_elo_diff is NaN"
+    dtype: float
+
+  teams_elo_diff_crr_impl_lhfa:
+    table: match_matchup_stats
+    leagues: [england, spain, italy, france, germany]
+    description: "league home-field-advantage component of teams_elo_diff_crr_impl_diff: per-league intercept a0[league] plus the symmetric a2*d^2 term. NaN if teams_elo_diff is NaN"
+    dtype: float
+
+  teams_elo_diff_cmr_impl_diff:
+    table: match_matchup_stats
+    leagues: [england, spain, italy, france, germany]
+    description: "elo-implied home-minus-away margin, CUBIC form fit to MARKET (cmr): the same cubic g(d) = a0[league] + a1*d + a2*d^2 + a3*d^3 but fit to the market price mrkt_home_away_impl_diff instead of outcomes (coefficients in thresholds.json as elo_cmr). d clamped to the monotone range as for crr. Reconstructs the elo+league component of the market price. Equals teams_elo_diff_cmr_impl_stgh + teams_elo_diff_cmr_impl_lhfa. NaN if teams_elo_diff is NaN"
+    dtype: float
+
+  teams_elo_diff_cmr_impl_stgh:
+    table: match_matchup_stats
+    leagues: [england, spain, italy, france, germany]
+    description: "strength component of teams_elo_diff_cmr_impl_diff: the antisymmetric part a1*d + a3*d^3 of the market-price fit. NaN if teams_elo_diff is NaN"
+    dtype: float
+
+  teams_elo_diff_cmr_impl_lhfa:
+    table: match_matchup_stats
+    leagues: [england, spain, italy, france, germany]
+    description: "league home-field-advantage component of teams_elo_diff_cmr_impl_diff: per-league intercept a0[league] plus a2*d^2, from the market-price fit. NaN if teams_elo_diff is NaN"
+    dtype: float
+
+  teams_elo_diff_lrr_impl_diff:
+    table: match_matchup_stats
+    leagues: [england, spain, italy, france, germany]
+    description: "elo-implied home-minus-away margin, LOGISTIC form fit to RESULTS (lrr): margin = 2/(1 + 10^(-(d + hfa[league])/scale)) - 1 (the ClubElo Elo equation, d = teams_elo_diff), with a global scale and a per-league home-field shift hfa[league] in elo points, fit to realized outcomes (t_flg_diff); parameters in thresholds.json as elo_lrr. Fixed logistic shape (only scale + hfa fitted), saturates smoothly toward +-1 so no clamping is needed. Equals teams_elo_diff_lrr_impl_stgh + teams_elo_diff_lrr_impl_lhfa. NaN if teams_elo_diff is NaN"
+    dtype: float
+
+  teams_elo_diff_lrr_impl_stgh:
+    table: match_matchup_stats
+    leagues: [england, spain, italy, france, germany]
+    description: "strength component of teams_elo_diff_lrr_impl_diff: the venue-free margin 2/(1 + 10^(-d/scale)) - 1 (hfa=0), odd in teams_elo_diff. Fitted scale only; no home-field. NaN if teams_elo_diff is NaN"
+    dtype: float
+
+  teams_elo_diff_lrr_impl_lhfa:
+    table: match_matchup_stats
+    leagues: [england, spain, italy, france, germany]
+    description: "league home-field-advantage component of teams_elo_diff_lrr_impl_diff: the boost the hfa[league] elo-point shift adds to the margin, = diff - stgh. Unlike the cubic's, it saturates toward 0 as |d| grows (home advantage matters less in lopsided matches). NaN if teams_elo_diff is NaN"
+    dtype: float
+
+  teams_elo_diff_lmr_impl_diff:
+    table: match_matchup_stats
+    leagues: [england, spain, italy, france, germany]
+    description: "elo-implied home-minus-away margin, LOGISTIC form fit to MARKET (lmr): the same logistic margin = 2/(1 + 10^(-(d + hfa[league])/scale)) - 1 but with scale + hfa[league] fit to the market price mrkt_home_away_impl_diff instead of outcomes (parameters in thresholds.json as elo_lmr). Reconstructs the elo+league component of the market price. Equals teams_elo_diff_lmr_impl_stgh + teams_elo_diff_lmr_impl_lhfa. NaN if teams_elo_diff is NaN"
+    dtype: float
+
+  teams_elo_diff_lmr_impl_stgh:
+    table: match_matchup_stats
+    leagues: [england, spain, italy, france, germany]
+    description: "strength component of teams_elo_diff_lmr_impl_diff: the venue-free margin 2/(1 + 10^(-d/scale)) - 1 (hfa=0) at the market-fit scale. NaN if teams_elo_diff is NaN"
+    dtype: float
+
+  teams_elo_diff_lmr_impl_lhfa:
+    table: match_matchup_stats
+    leagues: [england, spain, italy, france, germany]
+    description: "league home-field-advantage component of teams_elo_diff_lmr_impl_diff: the market-priced home boost from hfa[league], = diff - stgh, saturating toward 0 as |d| grows. NaN if teams_elo_diff is NaN"
+    dtype: float
+
+  # Match-level combinations of the two sides of match_team_fatigue, on the same teams_
+  # convention as the block above: _total is home plus away, _diff is home minus away.
+  # _total reads as "how congested is this fixture's slot in the calendar", a property the
+  # two teams share; _diff reads as "which side comes in fresher", the fatigue asymmetry.
+  # Neither is derivable from the other, and they answer different questions.
+
+  "teams_hours_since_{n}_match_total":
+    table: match_matchup_stats
+    description: "hmt_hours_since_{n}_match plus awt_hours_since_{n}_match, the per-side column being the hours since the fixture {n} in the team's calendar; combined schedule load carried into the fixture by the two teams. NaN if either side's gap is NaN"
+    dims:
+      n: [last, 2nd_last, 3rd_last]
+    dtype: float
+
+  "teams_hours_since_{n}_match_diff":
+    table: match_matchup_stats
+    description: "hmt_hours_since_{n}_match minus awt_hours_since_{n}_match, the per-side column being the hours since the fixture {n} in the team's calendar; positive = the home team carried more of it. NaN if either side's gap is NaN"
+    dims:
+      n: [last, 2nd_last, 3rd_last]
+    dtype: float
+
+  "teams_games_in_{x}d_total":
+    table: match_matchup_stats
+    description: "hmt_games_in_{x}d plus awt_games_in_{x}d, the per-side column being the fixtures in any competition in the {x} days before kick-off; combined schedule load carried into the fixture by the two teams. never NaN — a team with no earlier fixture counts zero"
+    dims:
+      x: [8, 15, 45]
+    dtype: int
+
+  "teams_games_in_{x}d_diff":
+    table: match_matchup_stats
+    description: "hmt_games_in_{x}d minus awt_games_in_{x}d, the per-side column being the fixtures in any competition in the {x} days before kick-off; positive = the home team carried more of it. never NaN — a team with no earlier fixture counts zero"
+    dims:
+      x: [8, 15, 45]
+    dtype: int
+
+  "teams_{venue}_games_in_{x}d_total":
+    table: match_matchup_stats
+    description: "hmt_{venue}_games_in_{x}d plus awt_{venue}_games_in_{x}d, the per-side column being the fixtures played {venue} in the {x} days before kick-off; combined schedule load carried into the fixture by the two teams. never NaN — a team with no earlier fixture counts zero"
+    dims:
+      venue: [home, domestic, abroad]
+      x: [8, 15, 45]
+    dtype: int
+
+  "teams_{venue}_games_in_{x}d_diff":
+    table: match_matchup_stats
+    description: "hmt_{venue}_games_in_{x}d minus awt_{venue}_games_in_{x}d, the per-side column being the fixtures played {venue} in the {x} days before kick-off; positive = the home team carried more of it. never NaN — a team with no earlier fixture counts zero"
+    dims:
+      venue: [home, domestic, abroad]
+      x: [8, 15, 45]
+    dtype: int
+
+  "teams_{stream}_games_in_{x}d_total":
+    table: match_matchup_stats
+    description: "hmt_{stream}_games_in_{x}d plus awt_{stream}_games_in_{x}d, the per-side column being the {stream} fixtures in the {x} days before kick-off; combined schedule load carried into the fixture by the two teams. never NaN — a team with no earlier fixture counts zero"
+    dims:
+      stream: [league, europe, other]
+      x: [8, 15, 45]
+    dtype: int
+
+  "teams_{stream}_games_in_{x}d_diff":
+    table: match_matchup_stats
+    description: "hmt_{stream}_games_in_{x}d minus awt_{stream}_games_in_{x}d, the per-side column being the {stream} fixtures in the {x} days before kick-off; positive = the home team carried more of it. never NaN — a team with no earlier fixture counts zero"
+    dims:
+      stream: [league, europe, other]
+      x: [8, 15, 45]
+    dtype: int
+
+  "teams_games_load_{tau}d_total":
+    table: match_matchup_stats
+    description: "hmt_games_load_{tau}d plus awt_games_load_{tau}d, the per-side column being the exponentially decayed fixture load at tau = {tau} days; combined schedule load carried into the fixture by the two teams. never NaN — a team with no earlier fixture counts zero"
+    dims:
+      tau: [7, 14]
+    dtype: float
+
+  "teams_games_load_{tau}d_diff":
+    table: match_matchup_stats
+    description: "hmt_games_load_{tau}d minus awt_games_load_{tau}d, the per-side column being the exponentially decayed fixture load at tau = {tau} days; positive = the home team carried more of it. never NaN — a team with no earlier fixture counts zero"
+    dims:
+      tau: [7, 14]
+    dtype: float
+
+  "teams_{venue}_games_load_{tau}d_total":
+    table: match_matchup_stats
+    description: "hmt_{venue}_games_load_{tau}d plus awt_{venue}_games_load_{tau}d, the per-side column being the exponentially decayed load over fixtures played {venue}, tau = {tau} days; combined schedule load carried into the fixture by the two teams. never NaN — a team with no earlier fixture counts zero"
+    dims:
+      venue: [home, domestic, abroad]
+      tau: [7, 14]
+    dtype: float
+
+  "teams_{venue}_games_load_{tau}d_diff":
+    table: match_matchup_stats
+    description: "hmt_{venue}_games_load_{tau}d minus awt_{venue}_games_load_{tau}d, the per-side column being the exponentially decayed load over fixtures played {venue}, tau = {tau} days; positive = the home team carried more of it. never NaN — a team with no earlier fixture counts zero"
+    dims:
+      venue: [home, domestic, abroad]
+      tau: [7, 14]
+    dtype: float
+
+  "teams_{stream}_games_load_{tau}d_total":
+    table: match_matchup_stats
+    description: "hmt_{stream}_games_load_{tau}d plus awt_{stream}_games_load_{tau}d, the per-side column being the exponentially decayed load over {stream} fixtures, tau = {tau} days; combined schedule load carried into the fixture by the two teams. never NaN — a team with no earlier fixture counts zero"
+    dims:
+      stream: [league, europe, other]
+      tau: [7, 14]
+    dtype: float
+
+  "teams_{stream}_games_load_{tau}d_diff":
+    table: match_matchup_stats
+    description: "hmt_{stream}_games_load_{tau}d minus awt_{stream}_games_load_{tau}d, the per-side column being the exponentially decayed load over {stream} fixtures, tau = {tau} days; positive = the home team carried more of it. never NaN — a team with no earlier fixture counts zero"
+    dims:
+      stream: [league, europe, other]
+      tau: [7, 14]
+    dtype: float
+
+  "teams_games_load_gauss_{tau}d_total":
+    table: match_matchup_stats
+    description: "hmt_games_load_gauss_{tau}d plus awt_games_load_gauss_{tau}d, the per-side column being the gaussian-kernel fixture load at tau = {tau} days; combined schedule load carried into the fixture by the two teams. never NaN — a team with no earlier fixture counts zero"
+    dims:
+      tau: [4, 7]
+    dtype: float
+
+  "teams_games_load_gauss_{tau}d_diff":
+    table: match_matchup_stats
+    description: "hmt_games_load_gauss_{tau}d minus awt_games_load_gauss_{tau}d, the per-side column being the gaussian-kernel fixture load at tau = {tau} days; positive = the home team carried more of it. never NaN — a team with no earlier fixture counts zero"
+    dims:
+      tau: [4, 7]
+    dtype: float
+
+  "teams_{venue}_games_load_gauss_{tau}d_total":
+    table: match_matchup_stats
+    description: "hmt_{venue}_games_load_gauss_{tau}d plus awt_{venue}_games_load_gauss_{tau}d, the per-side column being the gaussian-kernel load over fixtures played {venue}, tau = {tau} days; combined schedule load carried into the fixture by the two teams. never NaN — a team with no earlier fixture counts zero"
+    dims:
+      venue: [home, domestic, abroad]
+      tau: [4, 7]
+    dtype: float
+
+  "teams_{venue}_games_load_gauss_{tau}d_diff":
+    table: match_matchup_stats
+    description: "hmt_{venue}_games_load_gauss_{tau}d minus awt_{venue}_games_load_gauss_{tau}d, the per-side column being the gaussian-kernel load over fixtures played {venue}, tau = {tau} days; positive = the home team carried more of it. never NaN — a team with no earlier fixture counts zero"
+    dims:
+      venue: [home, domestic, abroad]
+      tau: [4, 7]
+    dtype: float
+
+  "teams_{stream}_games_load_gauss_{tau}d_total":
+    table: match_matchup_stats
+    description: "hmt_{stream}_games_load_gauss_{tau}d plus awt_{stream}_games_load_gauss_{tau}d, the per-side column being the gaussian-kernel load over {stream} fixtures, tau = {tau} days; combined schedule load carried into the fixture by the two teams. never NaN — a team with no earlier fixture counts zero"
+    dims:
+      stream: [league, europe, other]
+      tau: [4, 7]
+    dtype: float
+
+  "teams_{stream}_games_load_gauss_{tau}d_diff":
+    table: match_matchup_stats
+    description: "hmt_{stream}_games_load_gauss_{tau}d minus awt_{stream}_games_load_gauss_{tau}d, the per-side column being the gaussian-kernel load over {stream} fixtures, tau = {tau} days; positive = the home team carried more of it. never NaN — a team with no earlier fixture counts zero"
+    dims:
+      stream: [league, europe, other]
+      tau: [4, 7]
+    dtype: float
+
+
+  # match_team_fatigue — schedule density on the team's full fixture calendar.
+  # Fixtures are described on two orthogonal axes, each of which partitions the calendar,
+  # so either family sums to the {side}_games_* total.
+  #   venue  — where the fixture was played: home / domestic (away in the team's own
+  #            country, or a neutral venue inside it) / abroad (a trip out of the country).
+  #   stream — which competition: league / europe (champions, europa and conference league
+  #            including qualifying) / other (domestic cups, domestic and uefa super cups,
+  #            fifa club competitions).
+  # Roughly nine in ten `abroad` fixtures are european away legs; the rest are super cups
+  # and fifa competitions, so the column reads as "played a serious match out of the country".
+  # The full venue x stream grid is not carried here — several of its cells hold a few dozen
+  # rows — but the calendar written alongside the table keeps it in a `cell` column.
+
+  "{side}_hours_since_{n}_match":
+    table: match_team_fatigue
+    description: "hours between the kick-off of this match and the kick-off of the fixture {n} in the {side} team's calendar, counting fixtures in any competition. kick-offs are normalised to central european time before subtracting (football-data league times are uk, fbref times are venue-local with cet in brackets). capped at the 95th percentile of its own distribution over the group (thresholds.json hours_since_{n}_match_cap): past that the gap is a winter/international break or a postponement and the number stops describing recovery. each depth is capped separately, so this is not the sum of the shorter gaps. NaN if the team has fewer earlier fixtures in the season than {n} requires"
+    dims:
+      side: [hmt, awt]
+      n: [last, 2nd_last, 3rd_last]
+    dtype: float
+
+  # cat2q splits at the median, cat3q at the tertiles. The suffix follows the elo and
+  # season-stat categories, with q rather than m because the two-way split here is a
+  # quantile, not the mean. Thresholds come from the pooled hmt + awt values over all
+  # seasons — boundaries only, the same global convention as {side}_elo_cat3q — and the
+  # p95 cap sits above the p67 boundary, so the capped tail lands wholly in `high`.
+  "{side}_hours_since_{n}_match_cat2q":
+    table: match_team_fatigue
+    description: "half of the pooled {side}_hours_since_{n}_match distribution the value falls in (thresholds.json hours_since_{n}_match_p50); low is the shorter gap. None where the gap is NaN"
+    dims:
+      side: [hmt, awt]
+      n: [last, 2nd_last, 3rd_last]
+    dtype: string
+    categories: [low, high]
+
+  "{side}_hours_since_{n}_match_cat3q":
+    table: match_team_fatigue
+    description: "tertile of the pooled {side}_hours_since_{n}_match distribution (thresholds.json hours_since_{n}_match_p33/p67); low is the shortest gap. None where the gap is NaN"
+    dims:
+      side: [hmt, awt]
+      n: [last, 2nd_last, 3rd_last]
+    dtype: string
+    categories: [low, medium, high]
+
+
+  "{side}_games_in_{x}d":
+    table: match_team_fatigue
+    description: "number of fixtures in any competition played by the {side} team in the {x} days before this match's kick-off"
+    dims:
+      side: [hmt, awt]
+      x: [8, 15, 45]
+    dtype: int
+
+  "{side}_{venue}_games_in_{x}d":
+    table: match_team_fatigue
+    description: "number of fixtures played {venue} by the {side} team in the {x} days before this match's kick-off. the three venues sum to {side}_games_in_{x}d"
+    dims:
+      side: [hmt, awt]
+      venue: [home, domestic, abroad]
+      x: [8, 15, 45]
+    dtype: int
+
+  "{side}_{stream}_games_in_{x}d":
+    table: match_team_fatigue
+    description: "number of {stream} fixtures played by the {side} team in the {x} days before this match's kick-off. the three streams sum to {side}_games_in_{x}d"
+    dims:
+      side: [hmt, awt]
+      stream: [league, europe, other]
+      x: [8, 15, 45]
+    dtype: int
+
+  "{side}_games_load_{tau}d":
+    table: match_team_fatigue
+    description: "decayed fixture load for the {side} team: sum over all earlier fixtures of the season of exp(-age_in_days / {tau}), age measured from this match's kick-off. a fixture played {tau} days ago contributes 1/e, one played 2*{tau} days ago 1/e^2. unlike the {x}d windows it has no cut-off, so no fixture is dropped and none counts in full"
+    dims:
+      side: [hmt, awt]
+      tau: [7, 14]
+    dtype: float
+
+  "{side}_{venue}_games_load_{tau}d":
+    table: match_team_fatigue
+    description: "decayed load over fixtures played {venue} only, same kernel as {side}_games_load_{tau}d. the three venues sum to it"
+    dims:
+      side: [hmt, awt]
+      venue: [home, domestic, abroad]
+      tau: [7, 14]
+    dtype: float
+
+  "{side}_{stream}_games_load_{tau}d":
+    table: match_team_fatigue
+    description: "decayed load over {stream} fixtures only, same kernel as {side}_games_load_{tau}d. the three streams sum to it"
+    dims:
+      side: [hmt, awt]
+      stream: [league, europe, other]
+      tau: [7, 14]
+    dtype: float
+
+  "{side}_games_load_gauss_{tau}d":
+    table: match_team_fatigue
+    description: "decayed fixture load for the {side} team under a gaussian kernel: sum over all earlier fixtures of the season of exp(-(age_in_days / {tau})^2). compared with {side}_games_load_{tau}d the weight is flat for the first days and the tail dies far faster — a fixture {tau} days old still contributes 1/e, one 2*{tau} days old only 1/e^4"
+    dims:
+      side: [hmt, awt]
+      tau: [4, 7]
+    dtype: float
+
+  "{side}_{venue}_games_load_gauss_{tau}d":
+    table: match_team_fatigue
+    description: "gaussian-kernel load over fixtures played {venue} only, same kernel as {side}_games_load_gauss_{tau}d. the three venues sum to it"
+    dims:
+      side: [hmt, awt]
+      venue: [home, domestic, abroad]
+      tau: [4, 7]
+    dtype: float
+
+  "{side}_{stream}_games_load_gauss_{tau}d":
+    table: match_team_fatigue
+    description: "gaussian-kernel load over {stream} fixtures only, same kernel as {side}_games_load_gauss_{tau}d. the three streams sum to it"
+    dims:
+      side: [hmt, awt]
+      stream: [league, europe, other]
+      tau: [4, 7]
+    dtype: float
+
+  "{side}_last_match_is_away":
+    table: match_team_fatigue
+    description: "the {side} team's previous fixture in any competition was played away; false at a neutral venue. NaN if the team has no earlier fixture in the season"
+    dims:
+      side: [hmt, awt]
+    dtype: bool
+
+  "{side}_last_match_is_abroad":
+    table: match_team_fatigue
+    description: "the {side} team's previous fixture in any competition was played out of the country — a european away leg, or a super cup or fifa competition staged abroad. NaN if the team has no earlier fixture in the season"
+    dims:
+      side: [hmt, awt]
+    dtype: bool
+
+  "{side}_last_match_is_europe":
+    table: match_team_fatigue
+    description: "the {side} team's previous fixture in any competition was a champions / europa / conference league match, including qualifying. NaN if the team has no earlier fixture in the season"
+    dims:
+      side: [hmt, awt]
+    dtype: bool
+
+
+target_columns:
+
+  t_home_goals:
+    table: match_target
+    description: "goals scored by home team"
+    inputs: [FTHG]
+    dtype: int
+
+  t_away_goals:
+    table: match_target
+    description: "goals scored by away team"
+    inputs: [FTAG]
+    dtype: int
+
+  t_result:
+    table: match_target
+    description: "full-time result H/D/A"
+    inputs: [FTR]
+    dtype: string
+
+  t_home_flg:
+    table: match_target
+    description: "home win flag"
+    inputs: [FTR]
+    dtype: bool
+
+  t_draw_flg:
+    table: match_target
+    description: "draw flag"
+    inputs: [FTR]
+    dtype: bool
+
+  t_away_flg:
+    table: match_target
+    description: "away win flag"
+    inputs: [FTR]
+    dtype: bool
+
+  t_flg_diff:
+    table: match_target
+    description: "signed match result: 1 home win, 0 draw, -1 away win (= t_home_flg - t_away_flg). Same scale as teams_elo_diff_crr_impl_diff / teams_elo_diff_lrr_impl_diff, whose fits target it"
+    inputs: [FTR]
+    dtype: int
+
+  t_goals_diff:
+    table: match_target
+    description: "home_goals - away_goals"
+    inputs: [FTHG, FTAG]
+    dtype: int
+
+  t_goals_total:
+    table: match_target
+    description: "home_goals + away_goals"
+    inputs: [FTHG, FTAG]
+    dtype: int
+
+  t_home_profit:
+    table: match_target
+    description: "profit from betting on home win: 1 - mrkt_home_impl if home wins, else -mrkt_home_impl"
+    inputs: [FTR, AvgH]
+    dtype: float
+
+  t_draw_profit:
+    table: match_target
+    description: "profit from betting on draw: 1 - mrkt_draw_impl if draw, else -mrkt_draw_impl"
+    inputs: [FTR, AvgD]
+    dtype: float
+
+  t_away_profit:
+    table: match_target
+    description: "profit from betting on away win: 1 - mrkt_away_impl if away wins, else -mrkt_away_impl"
+    inputs: [FTR, AvgA]
+    dtype: float

@@ -1,0 +1,505 @@
+import hashlib
+import itertools
+import json
+import math
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import yaml
+
+from features.utils import league_set, match_files, round_floats
+
+
+_ROOT = Path(__file__).parents[2]
+_DATA = _ROOT / "01_data"
+_ATTR_DIR = _DATA / "01_raw" / "02_attributes"
+_YAML_PATH = _ROOT / "06_docs" / "data.yaml"
+_DATES_PATH = _DATA / "01_raw" / "03_dates" / "season_limit_dates.csv"
+_BREAKS_PATH = _DATA / "01_raw" / "03_dates" / "break_dates.csv"
+_ELO_DIR = _DATA / "01_raw" / "04_elo"
+
+
+def _features_dir(group: str) -> Path:
+    return _DATA / "02_features" / group
+
+def _load_phase_limits() -> dict[str, dict[str, pd.Timestamp]]:
+    if not _DATES_PATH.exists():
+        return {}
+    df = pd.read_csv(_DATES_PATH, dtype={"season": str}, parse_dates=["summer_fall", "fall_winter", "winter_spring"])
+    return {
+        row["season"]: {
+            "summer_fall":  row["summer_fall"],
+            "fall_winter":  row["fall_winter"],
+            "winter_spring": row["winter_spring"],
+        }
+        for _, row in df.iterrows()
+    }
+
+
+def _season_4phase(date: pd.Series, season: str, limits: dict) -> pd.Series:
+    if season not in limits:
+        return pd.Series(np.nan, index=date.index)
+    lim = limits[season]
+    return pd.cut(
+        date,
+        bins=[pd.Timestamp.min, lim["summer_fall"], lim["fall_winter"], lim["winter_spring"], pd.Timestamp.max],
+        labels=["summer", "fall", "winter", "spring"],
+        right=False,
+    ).astype(str)
+
+
+_3PHASE_MAP = {"summer": "start", "fall": "mid", "winter": "mid", "spring": "end"}
+
+_DOW_CAT = {
+    "Saturday": "weekend", "Sunday": "weekend",
+    "Friday": "shoulder", "Monday": "shoulder",
+    "Tuesday": "midweek", "Wednesday": "midweek", "Thursday": "midweek",
+}
+
+
+def _season_3phase(phase4: pd.Series) -> pd.Series:
+    return phase4.map(_3PHASE_MAP)
+
+
+_RAW_ODDS = {
+    "b365":  {"home": "B365H",  "draw": "B365D",  "away": "B365A"},
+    "mrkt":  {"home": "AvgH",   "draw": "AvgD",   "away": "AvgA"},
+    "b365c": {"home": "B365CH", "draw": "B365CD", "away": "B365CA"},   # closing (kickoff) line
+    "mrktc": {"home": "AvgCH",  "draw": "AvgCD",  "away": "AvgCA"},
+}
+
+
+# Per-league "reigning strength" flag carried in the team-attribute files: the raw column name
+# and the output column suffix. It follows the tier, not the league set — a top flight uses last
+# season's top 3 (Top3Last -> {side}_is_top3_last), a second tier uses relegated from above
+# (Relegated -> {side}_is_relegated). The matching contract columns carry the same league lists
+# under `leagues:` in data.yaml, so a set only gets the flags its leagues actually have.
+_TOP3 = {"raw": "Top3Last", "out": "is_top3_last"}
+_RELEGATED = {"raw": "Relegated", "out": "is_relegated"}
+_LAST_FLAG = {
+    "england": _TOP3, "spain": _TOP3, "italy": _TOP3, "france": _TOP3, "germany": _TOP3,
+    "netherlands": _TOP3, "portugal": _TOP3,
+    "england2": _RELEGATED, "spain2": _RELEGATED, "italy2": _RELEGATED,
+    "france2": _RELEGATED, "germany2": _RELEGATED,
+}
+
+
+def _columns(group: str) -> list[str]:
+    with open(_YAML_PATH) as f:
+        schema = yaml.safe_load(f)
+    result = []
+    for name, meta in schema["columns"].items():
+        if not meta:
+            continue
+        table = meta.get("table")
+        if "match_info" not in (table if isinstance(table, list) else [table]):
+            continue
+        leagues = meta.get("leagues")
+        if leagues is not None and not set(leagues) & set(league_set(group)):
+            continue
+        if "dims" in meta:
+            keys = list(meta["dims"].keys())
+            values = [meta["dims"][k] for k in keys]
+            for combo in itertools.product(*values):
+                result.append(name.format(**dict(zip(keys, combo))))
+        else:
+            result.append(name)
+    return result
+
+
+def _match_id(league: str, season: str, home: str, away: str) -> str:
+    return hashlib.md5(f"{league}|{season}|{home}|{away}".encode()).hexdigest()
+
+
+def _parse_dates(series: pd.Series) -> pd.Series:
+    for fmt in ("%d/%m/%y", "%d/%m/%Y"):
+        try:
+            return pd.to_datetime(series, format=fmt)
+        except ValueError:
+            continue
+    return pd.to_datetime(series, dayfirst=True)
+
+
+def _haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    R = 6371.0
+    phi1, phi2 = math.radians(lat1), math.radians(lat2)
+    dphi = math.radians(lat2 - lat1)
+    dlambda = math.radians(lon2 - lon1)
+    a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
+    return 2 * R * math.asin(math.sqrt(a))
+
+
+def _load_attributes(league: str, season: str) -> dict[str, dict] | None:
+    path = _ATTR_DIR / league / f"{league}_{season}_attributes.csv"
+    if not path.exists():
+        return None
+    df = pd.read_csv(path)
+    flag = _LAST_FLAG.get(league)
+    # source files may not carry the flag column yet -> default to False until they are filled
+    has_flag = flag is not None and flag["raw"] in df.columns
+    return {
+        row["TeamName"]: {
+            "lat": row["Latitude"],
+            "lon": row["Longitude"],
+            "promoted": bool(row["Promotee"]),
+            "island": bool(row["Island"]),
+            "last_flag": bool(row[flag["raw"]]) if has_flag else False,
+        }
+        for _, row in df.iterrows()
+    }
+
+
+def _check_missing(teams: set[str], attrs: dict, league: str, season: str) -> None:
+    missing = sorted(teams - attrs.keys())
+    if missing:
+        lines = [f"  {league} {season}: {t}" for t in missing]
+        raise ValueError("missing team-attribute entries:\n" + "\n".join(lines))
+
+
+def _break_segments(date: pd.Series, edges: pd.Series) -> tuple[np.ndarray, np.ndarray]:
+    """Number a chronological run of matches from the last break and back to the next one.
+
+    The breaks cut the run into segments; inside a segment the matches are 1, 2, 3 ... from
+    the restart and -1, -2, -3 ... back from the last one before the next break. Matches
+    before the season's first break have nothing to count from, and matches after its last
+    one nothing to count to, so those stay NaN.
+    """
+    after = np.full(len(date), np.nan)
+    before = np.full(len(date), np.nan)
+    seg = np.searchsorted(edges.to_numpy(), date.to_numpy(), side="right")
+    for s_id in np.unique(seg):
+        idx = np.flatnonzero(seg == s_id)
+        if s_id > 0:
+            after[idx] = np.arange(1, len(idx) + 1)
+        if s_id < len(edges):
+            before[idx] = np.arange(-len(idx), 0)
+    return after, before
+
+
+def _load_file(path: Path, attrs: dict[str, dict], limits: dict,
+               breaks: pd.DataFrame) -> pd.DataFrame:
+    league, season = path.stem.removesuffix("_matches").rsplit("_", 1)
+    raw = pd.read_csv(path)
+
+    all_teams = set(raw["HomeTeam"]) | set(raw["AwayTeam"])
+    n_teams = len(all_teams)
+    matches_per_gw = n_teams // 2
+    season_game_number = pd.Series(range(1, len(raw) + 1))
+    gameweek = ((season_game_number - 1) // matches_per_gw + 1).rename("gameweek")
+
+    # counted from the end, anchored to the FULL-season counts (from team count), not the rows
+    # present — so a skipped/abandoned match leaves the last match at -2 rather than -1.
+    n_expected = n_teams * (n_teams - 1)                      # full-season match count
+    season_game_number_before_end = (season_game_number - n_expected - 1).rename("season_game_number_before_end")
+    gameweek_before_end = (gameweek - 2 * (n_teams - 1) - 1).rename("gameweek_before_end")
+
+    date = _parse_dates(raw["Date"])
+
+    # the same pair of counters anchored on the breaks instead of the season's ends. Bucketed
+    # into rounds the same way gameweek buckets season_game_number; a bucket is not guaranteed
+    # to be a real round there either, because rescheduling moves matches between them.
+    edges = breaks.loc[breaks["season"] == season, "first_match_after"].sort_values()
+    sgn_after, sgn_before = _break_segments(date, edges)
+    _int = lambda v, name: pd.Series(v, name=name).astype("Int64")
+    season_game_number_after_break = _int(sgn_after, "season_game_number_after_break")
+    season_game_number_before_break = _int(sgn_before, "season_game_number_before_break")
+    gameweek_after_break = _int(np.ceil(sgn_after / matches_per_gw), "gameweek_after_break")
+    gameweek_before_break = _int(-np.ceil(-sgn_before / matches_per_gw), "gameweek_before_break")
+    odds, impl, margins, hadiffs = {}, {}, {}, {}
+
+    for bk, mapping in _RAW_ODDS.items():
+        for outcome, raw_col in mapping.items():
+            odds[f"{bk}_{outcome}_odds"] = raw[raw_col]
+            impl[f"{bk}_{outcome}_impl"] = 1.0 / raw[raw_col]
+        margins[f"{bk}_margin"] = sum(1.0 / raw[c] for c in mapping.values()) - 1
+        hadiffs[f"{bk}_home_away_impl_diff"] = impl[f"{bk}_home_impl"] - impl[f"{bk}_away_impl"]
+
+    entropies = {}
+    for bk, mapping in _RAW_ODDS.items():
+        p = pd.DataFrame({o: impl[f"{bk}_{o}_impl"] for o in mapping})
+        p_norm = p.div(p.sum(axis=1), axis=0)
+        entropies[f"{bk}_entropy"] = -(p_norm * np.log2(p_norm)).sum(axis=1)
+
+    mrkt_p = pd.DataFrame({o: impl[f"mrkt_{o}_impl"] for o in ["home", "draw", "away"]})
+    mrkt_p_norm = mrkt_p.div(mrkt_p.sum(axis=1), axis=0)
+    mrkt_favourite = pd.Series(np.where(
+        mrkt_p_norm["home"] > 0.5, "home",
+        np.where(mrkt_p_norm["away"] > 0.5, "away", "balanced")
+    ), name="mrkt_favourite")
+    mrkt_impl_order = pd.Series([
+        "".join(k[0] for k in sorted(
+            [("h", h), ("d", d), ("a", a)], key=lambda x: -x[1]
+        ))
+        for h, d, a in zip(
+            impl["mrkt_home_impl"], impl["mrkt_draw_impl"], impl["mrkt_away_impl"]
+        )
+    ], name="mrkt_impl_order")
+    mrkt_favrt_impl = pd.Series(
+        np.maximum(impl["mrkt_home_impl"], impl["mrkt_away_impl"]),
+        name="mrkt_favrt_impl",
+    )
+    mrkt_undrd_impl = pd.Series(
+        np.minimum(impl["mrkt_home_impl"], impl["mrkt_away_impl"]),
+        name="mrkt_undrd_impl",
+    )
+
+    time_parts = raw["Time"].astype("string").str.split(":")
+    _hh = pd.to_numeric(time_parts.str[0], errors="coerce")
+    _mm = pd.to_numeric(time_parts.str[1], errors="coerce")
+    time_uk_num = _hh + _mm / 60.0
+    time_uk_cat = pd.cut(_hh, bins=[0, 13, 15, 17, 24],
+                         labels=["early", "early_afternoon", "late_afternoon", "evening"]).astype(object)
+    time_uk_cat = time_uk_cat.where(time_uk_cat.notna(), None)
+
+    phase4 = _season_4phase(date, season, limits)
+    phase3 = _season_3phase(phase4)
+
+    if attrs is None:
+        blank = pd.Series(np.nan, index=raw.index)
+        hmt_is_promoted = awt_is_promoted = blank
+        hmt_is_island = awt_is_island = blank
+        hmt_last = awt_last = blank
+        travel = blank.rename("travel_distance_km")
+    else:
+        _check_missing(all_teams, attrs, league, season)
+        hmt_is_promoted = raw["HomeTeam"].map(lambda t: attrs[t]["promoted"])
+        awt_is_promoted = raw["AwayTeam"].map(lambda t: attrs[t]["promoted"])
+        hmt_is_island = raw["HomeTeam"].map(lambda t: attrs[t]["island"])
+        awt_is_island = raw["AwayTeam"].map(lambda t: attrs[t]["island"])
+        hmt_last = raw["HomeTeam"].map(lambda t: attrs[t]["last_flag"])
+        awt_last = raw["AwayTeam"].map(lambda t: attrs[t]["last_flag"])
+        travel = pd.Series([
+            _haversine(
+                attrs[h]["lat"], attrs[h]["lon"],
+                attrs[a]["lat"], attrs[a]["lon"],
+            )
+            for h, a in zip(raw["HomeTeam"], raw["AwayTeam"])
+        ], name="travel_distance_km")
+
+    # bucket the distance: derby (<30, city rivalries) / regional (30-100, neighbouring cities in the
+    # same region) / domestic (100-500, coach or high-speed rail) / long_haul (500+, flight territory).
+    # Thresholds anchored on transport reality: 30 km separates true city derbies from regional trips;
+    # 500 km sits just above the Barcelona-Real AVE (499 km), so high-speed-rail trips stay domestic and
+    # only flight-range trips become long_haul.
+    travel_cat = pd.cut(
+        travel, bins=[0, 30, 100, 500, np.inf], right=False,
+        labels=["derby", "regional", "domestic", "long_haul"],
+    ).astype(object)
+    travel_cat = travel_cat.where(travel_cat.notna(), None)
+
+    out = pd.concat([
+        pd.Series(
+            [_match_id(league, season, h, a) for h, a in zip(raw["HomeTeam"], raw["AwayTeam"])],
+            name="match_id",
+        ),
+        pd.Series([league] * len(raw), name="league"),
+        pd.Series([season] * len(raw), name="season"),
+        date.rename("date"),
+        raw["Time"].rename("time"),
+        time_uk_num.rename("time_uk_num"),
+        time_uk_cat.rename("time_uk_cat"),
+        date.dt.day_name().rename("day_of_week"),
+        date.dt.day_name().map(_DOW_CAT).rename("day_of_week_cat"),
+        season_game_number.rename("season_game_number"),
+        season_game_number_before_end,
+        season_game_number_after_break,
+        season_game_number_before_break,
+        gameweek_after_break,
+        gameweek_before_break,
+        gameweek,
+        gameweek_before_end,
+        phase4.rename("season_4phase"),
+        phase3.rename("season_3phase"),
+        raw["HomeTeam"].rename("hmt_name"),
+        raw["AwayTeam"].rename("awt_name"),
+        hmt_is_promoted.rename("hmt_is_promoted"),
+        awt_is_promoted.rename("awt_is_promoted"),
+        hmt_is_island.rename("hmt_is_island"),
+        awt_is_island.rename("awt_is_island"),
+        travel,
+        travel_cat.rename("travel_distance_cat"),
+        pd.DataFrame(odds),
+        pd.DataFrame(impl),
+        pd.DataFrame(margins),
+        pd.DataFrame(entropies),
+        mrkt_favourite,
+        mrkt_impl_order,
+        mrkt_favrt_impl,
+        mrkt_undrd_impl,
+        pd.DataFrame(hadiffs),
+    ], axis=1)
+
+    # the reigning-strength flag follows the league's tier (top flight: is_top3_last;
+    # second tier: is_relegated); attach it under its own name so base[cols] can select it.
+    flag = _LAST_FLAG.get(league)
+    if flag:
+        out[f"hmt_{flag['out']}"] = hmt_last.values
+        out[f"awt_{flag['out']}"] = awt_last.values
+
+    return out
+
+
+def _load_break_dates() -> pd.DataFrame:
+    """Breaks in which every league of the group stopped: the FIFA windows and the 2022
+    world cup. Hand-recorded, like the season phase boundaries next to them."""
+    if not _BREAKS_PATH.exists():
+        return pd.DataFrame(columns=["season", "last_match_before", "first_match_after", "type"])
+    return pd.read_csv(_BREAKS_PATH, dtype={"season": str}, parse_dates=["last_match_before", "first_match_after"])
+
+
+def _attach_team_break_counters(df: pd.DataFrame, breaks: pd.DataFrame) -> pd.DataFrame:
+    """Count each team's league matches from the last break and to the next one.
+
+    A team's season is cut into segments by the breaks; within a segment the matches are
+    numbered 1, 2, 3 ... from the restart and -1, -2, -3 ... back from the last one before
+    the next break. Matches before the season's first break have no count from a break, and
+    matches after its last one have none to a break.
+
+    Counted per team rather than per gameweek: `gameweek` is only the sequential match
+    number bucketed by half the team count, so a rescheduled fixture can leave two teams in
+    one bucket with different numbers of matches played since the break. The restart date is
+    league-specific for the world cup — england came back on boxing day, germany three weeks
+    later — which the per-team rule handles by itself.
+    """
+    df = df.copy()
+    date = pd.to_datetime(df["date"])
+    long = pd.concat([
+        pd.DataFrame({"row": df.index, "side": side, "league": df["league"],
+                      "season": df["season"], "team": df[f"{side}_name"], "date": date})
+        for side in ("hmt", "awt")
+    ], ignore_index=True).sort_values("date")
+
+    after = pd.Series(np.nan, index=long.index)
+    before = pd.Series(np.nan, index=long.index)
+    for (season, _league, _team), grp in long.groupby(["season", "league", "team"], sort=False):
+        edges = breaks.loc[breaks["season"] == season, "first_match_after"].sort_values()
+        a, b = _break_segments(grp["date"], edges)
+        after.loc[grp.index] = a
+        before.loc[grp.index] = b
+
+    for side in ("hmt", "awt"):
+        m = long["side"] == side
+        for name, values in (("game_number_after_break", after), ("game_number_before_break", before)):
+            col = pd.Series(np.nan, index=df.index)
+            col.loc[long.loc[m, "row"].to_numpy()] = values[m].to_numpy()
+            df[f"{side}_{name}"] = col.astype("Int64")
+
+    return df
+
+
+def _attach_clubelo(df: pd.DataFrame, group: str) -> pd.DataFrame:
+    """Add the two Club Elo ratings of each team as of the match date: {side}_elo and
+    {side}_golo, the latter clubelo's attacking rate published on the same series.
+
+    Ratings come from 04_elo/<league>/<slug>.json, one point per match played, where the
+    value on date D is the rating AFTER that day's match. The pre-match rating for a match
+    on D is therefore the last point strictly before D, which is what the point-in-time
+    merge_asof resolves (backward, exact matches excluded), so no future information leaks
+    in. NaN where the team has no slug (clubelo publishes no page for it) or has no earlier
+    point (the site serves roughly four years back, so the first weeks of 22/23 fall off)."""
+    df = df.copy()
+
+    name_to_slug, frames = {}, []
+    for league in league_set(group):
+        league_dir = _ELO_DIR / league
+        tmap_path = league_dir / "team_map.csv"
+        if not tmap_path.exists():
+            continue
+        tmap = pd.read_csv(tmap_path).fillna({"slug": ""})
+        name_to_slug.update({team: slug
+                             for team, slug in zip(tmap["team"], tmap["slug"]) if slug})
+        for slug in sorted(set(tmap["slug"]) - {""}):
+            path = league_dir / f"{slug}.json"
+            if not path.exists():
+                continue
+            series = json.loads(path.read_text(encoding="utf-8"))
+            frames.append(pd.DataFrame({
+                "slug": slug,
+                "date": [point["Date"][:10] for point in series],
+                "elo": [point["Elo"] for point in series],
+                "golo": [point["Golo"] for point in series],
+            }))
+
+    if not frames:
+        for prefix in ("hmt", "awt"):
+            df[f"{prefix}_elo"] = np.nan
+            df[f"{prefix}_golo"] = np.nan
+        return df
+
+    hist = pd.concat(frames, ignore_index=True).drop_duplicates(subset=["slug", "date"])
+    hist["date"] = pd.to_datetime(hist["date"])
+    hist = hist.sort_values("date").reset_index(drop=True)
+
+    match_date = pd.to_datetime(df["date"])
+    for prefix in ("hmt", "awt"):
+        left = pd.DataFrame({
+            "_row": range(len(df)),
+            "date": match_date.values,
+            "slug": df[f"{prefix}_name"].map(name_to_slug).fillna("").values,
+        }).sort_values("date")
+        merged = pd.merge_asof(left, hist, on="date", by="slug",
+                               direction="backward", allow_exact_matches=False
+                               ).sort_values("_row")
+        df[f"{prefix}_elo"] = merged["elo"].values
+        df[f"{prefix}_golo"] = merged["golo"].values
+    return df
+
+
+def _attach_elo_cats(df: pd.DataFrame, group: str) -> pd.DataFrame:
+    """Categorize hmt_elo / awt_elo against the pooled per-match elo distribution.
+
+    cat2m: high/low vs the global elo mean. cat3q: low/medium/high tertiles (p33/p67).
+    Thresholds come from all hmt_elo + awt_elo values in the group (global, all seasons —
+    same boundary-only convention as the other cat columns) and are recorded in
+    thresholds.json. None where elo is NaN."""
+    df = df.copy()
+    thresholds_path = _features_dir(group) / "thresholds.json"
+    pooled = pd.concat([df["hmt_elo"], df["awt_elo"]]).dropna()
+
+    if pooled.empty:
+        for side in ("hmt", "awt"):
+            df[f"{side}_elo_cat2m"] = None
+            df[f"{side}_elo_cat3q"] = None
+        return df
+
+    elo_mean = round(float(pooled.mean()), 3)
+    elo_p33 = round(float(pooled.quantile(1 / 3)), 3)
+    elo_p67 = round(float(pooled.quantile(2 / 3)), 3)
+
+    thresholds = json.loads(thresholds_path.read_text()) if thresholds_path.exists() else {}
+    thresholds.update({"elo_mean": elo_mean, "elo_p33": elo_p33, "elo_p67": elo_p67})
+    thresholds_path.parent.mkdir(parents=True, exist_ok=True)
+    thresholds_path.write_text(json.dumps(thresholds, indent=2))
+
+    for side in ("hmt", "awt"):
+        e = df[f"{side}_elo"]
+        df[f"{side}_elo_cat2m"] = np.where(e.isna(), None, np.where(e > elo_mean, "high", "low"))
+        df[f"{side}_elo_cat3q"] = np.where(
+            e.isna(), None,
+            np.where(e <= elo_p33, "low", np.where(e <= elo_p67, "medium", "high")),
+        )
+    return df
+
+
+def build_match_info(group: str = "major") -> pd.DataFrame:
+    cols = ["match_id"] + _columns(group)
+    limits = _load_phase_limits()
+    breaks = _load_break_dates()
+    features_dir = _features_dir(group)
+    frames = []
+    for path in match_files(group):
+        league, season = path.stem.removesuffix("_matches").rsplit("_", 1)
+        attrs = _load_attributes(league, season)
+        frames.append(_load_file(path, attrs, limits, breaks))
+
+    base = _attach_clubelo(pd.concat(frames, ignore_index=True), group)
+    base = _attach_elo_cats(base, group)
+    base = _attach_team_break_counters(base, breaks)
+    df = round_floats(base[cols])
+
+    features_dir.mkdir(parents=True, exist_ok=True)
+    df.to_csv(features_dir / "match_info.csv", index=False)
+    df.to_parquet(features_dir / "match_info.parquet", index=False)
+
+    return df
